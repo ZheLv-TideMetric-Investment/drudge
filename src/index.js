@@ -8,7 +8,18 @@ const moment = require('moment');
 // newsService.fetchNews();
 
 (async () => {
-  const lastHourNews = await newsService.getLastHourNews();
+  // 获取上一个小时的新闻（精确到整点）
+  const currentHour = moment().hour();
+  const startTime = moment()
+    .hour(currentHour - 1)
+    .minute(0)
+    .second(0);
+  const endTime = moment().hour(currentHour).minute(0).second(0);
+
+  logger.info(
+    `开始总结 ${startTime.format('YYYY-MM-DD HH:mm:ss')} 到 ${endTime.format('YYYY-MM-DD HH:mm:ss')} 的新闻`
+  );
+  const lastHourNews = await newsService.getNewsByTimeRange(startTime, endTime);
   if (lastHourNews.length > 0) {
     const summary = await aiService.summarizeNews(lastHourNews);
     await webhookService.sendMessage(summary);
@@ -35,10 +46,22 @@ cron.schedule('* * * * *', async () => {
   }
 });
 
-// 每小时执行新闻总结（10:00-22:00）
-cron.schedule('0 11-22 * * *', async () => {
+// 每小时执行新闻总结（11:01-22:01）
+cron.schedule('1 11-22 * * *', async () => {
   try {
-    const lastHourNews = await newsService.getLastHourNews();
+    // 获取上一个小时的新闻（精确到整点）
+    const currentHour = moment().hour();
+    const startTime = moment()
+      .hour(currentHour - 1)
+      .minute(0)
+      .second(0);
+    const endTime = moment().hour(currentHour).minute(0).second(0);
+
+    logger.info(
+      `开始总结 ${startTime.format('YYYY-MM-DD HH:mm:ss')} 到 ${endTime.format('YYYY-MM-DD HH:mm:ss')} 的新闻`
+    );
+    const lastHourNews = await newsService.getNewsByTimeRange(startTime, endTime);
+
     if (lastHourNews.length > 0) {
       const summary = await aiService.summarizeNews(lastHourNews);
       await webhookService.sendMessage(summary);
@@ -49,8 +72,8 @@ cron.schedule('0 11-22 * * *', async () => {
   }
 });
 
-// 每天早上10点总结前一天22点后的新闻
-cron.schedule('0 10 * * *', async () => {
+// 每天早上10:01总结前一天22点后的新闻
+cron.schedule('1 10 * * *', async () => {
   try {
     const yesterday = moment().subtract(1, 'day');
     const startTime = yesterday.hour(22).minute(0).second(0);

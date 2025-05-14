@@ -68,7 +68,7 @@ class StorageService {
         // 从文件名中提取时间戳
         const timestamp = file.replace('news_', '').replace('.json', '');
         const fileTime = moment(timestamp, 'YYYY-MM-DD_HH-mm-ss');
-        return fileTime.isAfter(startTime) && fileTime.isBefore(endTime);
+        return fileTime.isSameOrAfter(startTime) && fileTime.isBefore(endTime);
       });
 
       if (relevantFiles.length === 0) {
