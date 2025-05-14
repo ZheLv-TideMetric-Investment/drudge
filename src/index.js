@@ -5,6 +5,16 @@ const newsService = require('./services/newsService');
 const aiService = require('./services/aiService');
 const webhookService = require('./services/webhookService');
 
+// newsService.fetchNews();
+
+(async () => {
+  const lastHourNews = await newsService.getLastHourNews();
+  if (lastHourNews.length > 0) {
+    const summary = await aiService.summarizeNews(lastHourNews);
+    await webhookService.sendMessage(summary);
+  }
+})();
+
 // 每分钟执行新闻获取
 cron.schedule('* * * * *', async () => {
   try {

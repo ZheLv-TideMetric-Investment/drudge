@@ -1,32 +1,52 @@
 const axios = require('axios');
-const fs = require('fs').promises;
-const path = require('path');
 const config = require('../config/config');
 const logger = require('../utils/logger');
+const storageService = require('./storageService');
+const moment = require('moment');
 
 class NewsService {
   constructor() {
-    this.newsData = [];
-    this.lastNewsIds = new Set();
-    this.ensureStorageDirectory();
+    this.isFirstRun = true;
   }
 
-  async ensureStorageDirectory() {
-    try {
-      await fs.mkdir(config.storage.path, { recursive: true });
-    } catch (error) {
-      logger.error('创建存储目录失败:', error);
-    }
+  async getLastNewsId() {
+    const latestNews = await storageService.getLatest();
+    return latestNews ? latestNews.id : null;
   }
 
   async fetchNews() {
     try {
+      // 首次运行，获取一页新数据
+      if (this.isFirstRun) {
+        logger.info('首次运行，获取最新一页新闻');
+        const response = await this.makeRequest();
+
+        if (!response || !response.data || !response.data.data || !response.data.data.data) {
+          logger.error('获取新闻失败: 响应格式错误');
+          return [];
+        }
+
+        const { news } = response.data.data.data;
+        if (news && news.length > 0) {
+          // 首次运行也需要过滤新闻
+          const newNews = await this.filterNewNews(news);
+          if (newNews.length > 0) {
+            await storageService.save(newNews);
+            logger.info(`首次运行获取新闻成功，新数据数量: ${newNews.length}`);
+          } else {
+            logger.info('首次运行没有获取到新新闻');
+          }
+        }
+        this.isFirstRun = false;
+        return news;
+      }
+
+      // 非首次运行，执行完整的瀑布流获取
       let allNews = [];
       let seqMark = null;
-      let hasMore = true;
-      let isFirstRequest = true;
+      let hasNewData = true;
 
-      while (hasMore) {
+      while (hasNewData) {
         const response = await this.makeRequest(seqMark);
 
         if (!response || !response.data || !response.data.data || !response.data.data.data) {
@@ -34,28 +54,28 @@ class NewsService {
           break;
         }
 
-        const { news, seqMark: nextSeqMark, hasMore: nextHasMore } = response.data.data.data;
+        const { news, seqMark: nextSeqMark } = response.data.data.data;
 
         // 检查是否有新数据
-        const newNews = this.filterNewNews(news);
-        if (newNews.length === 0 && !isFirstRequest) {
-          logger.info('没有新的新闻数据');
+        const newNews = await this.filterNewNews(news);
+        if (newNews.length < config.newsApi.pageSize) {
+          logger.info(`最新的新闻只有${newNews.length}条，停止获取`);
+          hasNewData = false;
           break;
         }
 
         allNews = [...allNews, ...newNews];
         seqMark = nextSeqMark;
-        hasMore = nextHasMore;
-        isFirstRequest = false;
 
         // 控制请求间隔
-        if (hasMore) {
-          await new Promise(resolve => setTimeout(resolve, config.newsApi.requestInterval));
-        }
+        await new Promise(resolve => setTimeout(resolve, config.newsApi.requestInterval));
       }
 
       if (allNews.length > 0) {
-        await this.saveNews(allNews);
+        await storageService.save(allNews);
+        logger.info(`本次获取到 ${allNews.length} 条新新闻`);
+      } else {
+        logger.info('本次没有获取到新新闻');
       }
 
       return allNews;
@@ -70,6 +90,7 @@ class NewsService {
       const params = {
         pageSize: config.newsApi.pageSize,
         _t: Date.now(),
+        lang: 'zh-cn',
       };
 
       if (seqMark) {
@@ -84,37 +105,29 @@ class NewsService {
     }
   }
 
-  filterNewNews(news) {
-    const newNews = news.filter(item => !this.lastNewsIds.has(item.id));
-    news.forEach(item => this.lastNewsIds.add(item.id));
-    return newNews;
-  }
+  async filterNewNews(news) {
+    const lastNewsId = await this.getLastNewsId();
 
-  async saveNews(news) {
-    try {
-      const timestamp = new Date().toISOString();
-      const fileName = `news_${timestamp.replace(/[:.]/g, '-')}.json`;
-      const filePath = path.join(config.storage.path, fileName);
-
-      await fs.writeFile(filePath, JSON.stringify(news, null, 2));
-      this.newsData.push(...news);
-      logger.info(`保存新闻成功: ${fileName}, 数量: ${news.length}`);
-    } catch (error) {
-      logger.error('保存新闻失败:', error);
+    if (!lastNewsId) {
+      // 如果没有最后一条新闻的ID，说明是首次运行，返回所有新闻
+      return news;
     }
+
+    // 找到最后一条新闻的位置
+    const lastNewsIndex = news.findIndex(item => item.id === lastNewsId);
+    if (lastNewsIndex === -1) {
+      // 如果找不到最后一条新闻，说明都是新数据
+      return news;
+    }
+
+    // 返回最后一条新闻之前的所有新闻
+    return news.slice(0, lastNewsIndex);
   }
 
   async getLastHourNews() {
-    const oneHourAgo = new Date(Date.now() - config.summary.interval);
-    return this.newsData.filter(news => new Date(news.time * 1000) > oneHourAgo);
-  }
-
-  clearOldNews() {
-    const oneHourAgo = new Date(Date.now() - config.summary.interval);
-    this.newsData = this.newsData.filter(news => new Date(news.time * 1000) > oneHourAgo);
-    // 清理过期的新闻ID
-    const oldIds = new Set(this.newsData.map(news => news.id));
-    this.lastNewsIds = new Set(Array.from(this.lastNewsIds).filter(id => oldIds.has(id)));
+    const oneHourAgo = moment().subtract(1, 'hour');
+    const now = moment();
+    return await storageService.getByTimeRange(oneHourAgo, now);
   }
 }
 
