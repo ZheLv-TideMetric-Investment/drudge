@@ -2,7 +2,10 @@ const axios = require('axios');
 const config = require('../config/config');
 const logger = require('../utils/logger');
 const storageService = require('./storageService');
-const moment = require('moment');
+const moment = require('moment-timezone');
+
+// 设置默认时区为北京时间
+moment.tz.setDefault('Asia/Shanghai');
 
 // 随机生成 User-Agent
 function getRandomUserAgent() {
@@ -84,13 +87,14 @@ class NewsService {
 
         // 检查是否有新数据
         const newNews = await this.filterNewNews(news);
+        allNews = [...allNews, ...newNews];
+
         if (newNews.length < config.newsApi.pageSize) {
           logger.info(`最新的新闻只有${newNews.length}条，停止获取`);
           hasNewData = false;
           break;
         }
 
-        allNews = [...allNews, ...newNews];
         seqMark = nextSeqMark;
 
         // 控制请求间隔
@@ -191,6 +195,12 @@ class NewsService {
 
     // 返回最后一条新闻之前的所有新闻
     return news.slice(0, lastNewsIndex);
+  }
+
+  async getLastHourNews() {
+    const oneHourAgo = moment().subtract(1, 'hour');
+    const now = moment();
+    return await this.getNewsByTimeRange(oneHourAgo, now);
   }
 
   async getNewsByTimeRange(startTime, endTime) {
