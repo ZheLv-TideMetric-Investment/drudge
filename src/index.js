@@ -5,26 +5,7 @@ const aiService = require('./services/aiService');
 const webhookService = require('./services/webhookService');
 const moment = require('moment');
 
-// newsService.fetchNews();
-
-(async () => {
-  // 获取上一个小时的新闻（精确到整点）
-  const currentHour = moment().hour();
-  const startTime = moment()
-    .hour(currentHour - 1)
-    .minute(0)
-    .second(0);
-  const endTime = moment().hour(currentHour).minute(0).second(0);
-
-  logger.info(
-    `开始总结 ${startTime.format('YYYY-MM-DD HH:mm:ss')} 到 ${endTime.format('YYYY-MM-DD HH:mm:ss')} 的新闻`
-  );
-  const lastHourNews = await newsService.getNewsByTimeRange(startTime, endTime);
-  if (lastHourNews.length > 0) {
-    const summary = await aiService.summarizeNews(lastHourNews);
-    await webhookService.sendMessage(summary);
-  }
-})();
+newsService.fetchNews();
 
 // 错误通知函数
 async function sendErrorNotification(error, context) {
