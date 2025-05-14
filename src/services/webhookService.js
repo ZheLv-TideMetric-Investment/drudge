@@ -23,7 +23,7 @@ class WebhookService {
         msgtype: 'markdown',
         markdown: {
           title: `[Tide]${moment().subtract(1, 'hour').format('YYYY-MM-DD HH:mm')} - ${moment().format('HH:mm')}新闻摘要`,
-          text: `${content}`,
+          text: `${moment().subtract(1, 'hour').format('YYYY-MM-DD HH:mm')} - ${moment().format('HH:mm')}摘要：\n${content}`,
         },
       };
 
