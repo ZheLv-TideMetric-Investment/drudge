@@ -18,7 +18,7 @@ class WebhookService {
       const message = {
         msgtype: 'text',
         text: {
-          content: `[Tide]${moment().subtract(1, 'hour').format('YYYY-MM-DD HH:mm')} - ${moment().format('YYYY-MM-DD HH:mm')}新闻摘要: \n${content}`,
+          content: `[Tide]${moment().subtract(1, 'hour').format('YYYY-MM-DD HH:mm')} - ${moment().format('HH:mm')}新闻摘要: \n${content}`,
         },
       };
 

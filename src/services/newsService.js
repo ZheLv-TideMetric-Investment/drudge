@@ -127,7 +127,11 @@ class NewsService {
   async getLastHourNews() {
     const oneHourAgo = moment().subtract(1, 'hour');
     const now = moment();
-    return await storageService.getByTimeRange(oneHourAgo, now);
+    return await this.getNewsByTimeRange(oneHourAgo, now);
+  }
+
+  async getNewsByTimeRange(startTime, endTime) {
+    return await storageService.getByTimeRange(startTime, endTime);
   }
 }
 
