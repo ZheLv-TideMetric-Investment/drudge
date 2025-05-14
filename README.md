@@ -26,7 +26,10 @@ npm install
 3. 配置环境变量
 ```bash
 cp .env.example .env
-# 编辑.env文件，填入必要的配置信息
+# 编辑.env文件，填入必要的配置信息：
+# - WEBHOOK_URL: 消息推送的webhook地址
+# - AI_API_KEY: DeepSeek API密钥
+# - 其他配置项可以根据需要调整
 ```
 
 ## 开发
@@ -90,10 +93,24 @@ src/
   └── index.js      # 入口文件
 ```
 
+## 环境变量说明
+
+- `WEBHOOK_URL`: 消息推送的webhook地址
+- `STORAGE_PATH`: 数据存储路径
+- `LOG_LEVEL`: 日志级别
+- `LOG_FILE`: 日志文件路径
+- `AI_BASE_URL`: AI服务的基础URL
+- `AI_API_KEY`: DeepSeek API密钥
+- `AI_MODEL`: 使用的AI模型
+- `NEWS_API_PAGE_SIZE`: 新闻API每页数量
+- `NEWS_API_INTERVAL`: 新闻获取间隔（毫秒）
+- `NEWS_API_REQUEST_INTERVAL`: 新闻API请求间隔（毫秒）
+
 ## 注意事项
 
 1. 确保服务器已安装Node.js环境
-2. 配置正确的webhook URL
+2. 配置正确的webhook URL和AI API密钥
 3. 确保存储目录有写入权限
 4. 建议使用PM2进行进程管理
 5. 提交代码前请运行 `npm run format` 和 `npm run lint` 确保代码格式正确
+6. 不要提交 `.env` 文件到版本控制系统
