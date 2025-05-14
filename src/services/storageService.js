@@ -1,7 +1,10 @@
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
-const moment = require('moment');
+const moment = require('moment-timezone');
+
+// 设置默认时区为北京时间
+moment.tz.setDefault('Asia/Shanghai');
 
 class StorageService {
   constructor() {
@@ -40,7 +43,7 @@ class StorageService {
       const now = moment();
       const fileName = `news_${now.format('YYYY-MM-DD_HH-mm-ss')}.json`;
       const dirPath = this.getNewsPath(now);
-
+      
       await this.ensureDirectoryExists(dirPath);
       const filePath = path.join(dirPath, fileName);
 
@@ -78,9 +81,7 @@ class StorageService {
           for (const day of days) {
             const dayPath = path.join(monthPath, day);
             const files = await fs.readdir(dayPath);
-            const newsFiles = files.filter(
-              file => file.startsWith('news_') && file.endsWith('.json')
-            );
+            const newsFiles = files.filter(file => file.startsWith('news_') && file.endsWith('.json'));
 
             if (newsFiles.length > 0) {
               // 找到最新的文件
@@ -111,7 +112,7 @@ class StorageService {
     try {
       const start = moment(startTime);
       const end = moment(endTime);
-
+      
       // 获取时间范围内的所有日期
       const dates = [];
       let current = start.clone();
@@ -126,9 +127,7 @@ class StorageService {
         const dirPath = this.getNewsPath(date);
         try {
           const files = await fs.readdir(dirPath);
-          const newsFiles = files.filter(
-            file => file.startsWith('news_') && file.endsWith('.json')
-          );
+          const newsFiles = files.filter(file => file.startsWith('news_') && file.endsWith('.json'));
 
           // 只处理时间范围内的文件
           const relevantFiles = newsFiles.filter(file => {

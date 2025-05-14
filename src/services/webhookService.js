@@ -1,7 +1,11 @@
 const axios = require('axios');
-const moment = require('moment');
+const moment = require('moment-timezone');
 
 const logger = require('../utils/logger');
+
+// 设置默认时区为北京时间
+moment.tz.setDefault('Asia/Shanghai');
+
 class WebhookService {
   /**
    * 发送消息到钉钉群
