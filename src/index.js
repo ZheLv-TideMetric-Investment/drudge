@@ -56,7 +56,7 @@ cron.schedule(
 
       if (lastHourNews.length > 0) {
         const summary = await aiService.summarizeNews(lastHourNews);
-        await webhookService.sendMessage(summary);
+        await webhookService.sendMessage(startTime, endTime, summary);
       }
     } catch (error) {
       logger.error('新闻总结任务失败:', error);
