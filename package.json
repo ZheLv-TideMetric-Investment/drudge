@@ -15,7 +15,10 @@
     "pm2:stop": "pm2 stop ecosystem.config.js",
     "pm2:restart": "pm2 restart ecosystem.config.js",
     "pm2:logs": "pm2 logs drudge",
-    "pm2:status": "pm2 status"
+    "pm2:status": "pm2 status",
+    "trigger:fetch": "node src/scripts/manualTrigger.js fetch",
+    "trigger:last-hour": "node src/scripts/manualTrigger.js last-hour",
+    "trigger:custom": "node src/scripts/manualTrigger.js custom"
   },
   "author": "",
   "license": "ISC",
