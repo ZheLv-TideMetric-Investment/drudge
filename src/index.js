@@ -14,7 +14,11 @@ newsService.fetchNews();
 async function sendErrorNotification(error, context) {
   const errorMessage = `[系统异常] ${context}\n时间：${moment().format('YYYY-MM-DD HH:mm:ss')}\n错误信息：${error.message || error}\n${error.stack || ''}`;
   try {
-    await webhookService.sendMessage(errorMessage);
+    await webhookService.sendMessage(
+      moment().format('YYYY-MM-DD HH:mm:ss'),
+      moment().format('YYYY-MM-DD HH:mm:ss'),
+      errorMessage
+    );
   } catch (sendError) {
     logger.error('发送错误通知失败:', sendError);
   }
@@ -79,7 +83,7 @@ cron.schedule(
       const overnightNews = await newsService.getNewsByTimeRange(startTime, endTime);
       if (overnightNews.length > 0) {
         const summary = await aiService.summarizeNews(overnightNews);
-        await webhookService.sendMessage(summary);
+        await webhookService.sendMessage(startTime, endTime, summary);
       }
     } catch (error) {
       logger.error('夜间新闻总结任务失败:', error);
