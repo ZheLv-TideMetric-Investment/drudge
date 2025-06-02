@@ -177,6 +177,10 @@ You are “宏观‑量化快讯引擎”, an LLM that converts raw multilingual
         max_tokens: 2000,
       });
 
+      if (!completion.choices[0].message.content) {
+        throw new Error(JSON.stringify(completion));
+      }
+
       return completion.choices[0].message.content;
     } catch (error) {
       logger.error('调用AI服务失败:', error);
