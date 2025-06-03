@@ -174,7 +174,7 @@ You are “宏观‑量化快讯引擎”, an LLM that converts raw multilingual
         ],
         model: config.ai.model,
         temperature: 0.7,
-        max_tokens: 2000,
+        timeout: 120000,
       });
 
       const content =
