@@ -10,12 +10,33 @@ export async function callGemi(messages) {
   return text;
 }
 
+export async function callGemiV2(messages) {
+  const { text } = await generateText({
+    model: google('gemini-2.0-flash-exp'),
+    messages: messages,
+  });
+  return text;
+}
+
 export async function callDeepSeek(messages) {
   const { text } = await generateText({
     model: deepseek('deepseek-reasoner'),
     messages: messages,
   });
   return text;
+}
+
+export async function callDeepSeekV3(messages) {
+  const { text } = await generateText({
+    model: deepseek('deepseek-chat'),
+    messages: messages,
+  });
+  return text;
+}
+
+export async function callSimpleLLM(messages) {
+  return callDeepSeekV3(messages);
+  // return callGemi(messages);
 }
 
 export async function callLLM(messages) {

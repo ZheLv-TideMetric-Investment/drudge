@@ -29,7 +29,11 @@
     "snake:status": "node src/scripts/snakeTrackingTrigger.js status",
     "snake:report": "node src/scripts/snakeTrackingTrigger.js report",
     "snake:health": "node src/scripts/snakeTrackingTrigger.js health",
-    "snake:init": "node src/scripts/snakeTrackingTrigger.js init"
+    "snake:init": "node src/scripts/snakeTrackingTrigger.js init",
+    "graph:init": "node src/scripts/graphTrigger.js init",
+    "graph:process": "node src/scripts/graphTrigger.js process",
+    "graph:query": "node src/scripts/graphTrigger.js query",
+    "graph:health": "node src/scripts/graphTrigger.js health"
   },
   "author": "",
   "license": "ISC",
@@ -42,6 +46,7 @@
     "js-yaml": "^4.1.0",
     "moment": "^2.30.1",
     "moment-timezone": "^0.5.48",
+    "neo4j-driver": "^5.28.1",
     "node-cron": "^3.0.3",
     "pm2": "^5.3.1",
     "winston": "^3.11.0"

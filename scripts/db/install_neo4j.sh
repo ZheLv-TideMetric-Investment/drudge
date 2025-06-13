@@ -28,6 +28,124 @@ check_command() {
     return 0
 }
 
+# 安装 APOC 插件
+install_apoc() {
+    print_info "安装 APOC 插件..."
+    
+    if [ "$OS" = "macos" ]; then
+        NEO4J_PLUGINS_DIR="/opt/homebrew/var/lib/neo4j/plugins"
+        NEO4J_CONF_DIR="/opt/homebrew/etc/neo4j"
+    else
+        NEO4J_PLUGINS_DIR="/var/lib/neo4j/plugins"
+        NEO4J_CONF_DIR="/etc/neo4j"
+    fi
+    
+    # 创建插件目录
+    sudo mkdir -p "$NEO4J_PLUGINS_DIR"
+    
+    # 下载 APOC 插件
+    print_info "下载 APOC 插件..."
+    APOC_VERSION="5.9.0"
+    APOC_URL="https://github.com/neo4j/apoc/releases/download/${APOC_VERSION}/apoc-${APOC_VERSION}-core.jar"
+    
+    sudo curl -L "$APOC_URL" -o "$NEO4J_PLUGINS_DIR/apoc-${APOC_VERSION}-core.jar"
+    
+    if [ $? -eq 0 ]; then
+        print_info "APOC 插件下载成功"
+    else
+        print_error "APOC 插件下载失败"
+        return 1
+    fi
+    
+    # 修改 Neo4j 配置以启用 APOC
+    NEO4J_CONF="$NEO4J_CONF_DIR/neo4j.conf"
+    if [ -f "$NEO4J_CONF" ]; then
+        # 添加 APOC 配置
+        sudo grep -q "dbms.security.procedures.unrestricted=apoc.*" "$NEO4J_CONF" || \
+        echo "dbms.security.procedures.unrestricted=apoc.*" | sudo tee -a "$NEO4J_CONF"
+        
+        sudo grep -q "dbms.security.procedures.allowlist=apoc.*" "$NEO4J_CONF" || \
+        echo "dbms.security.procedures.allowlist=apoc.*" | sudo tee -a "$NEO4J_CONF"
+        
+        print_info "APOC 配置已添加到 neo4j.conf"
+    fi
+    
+    return 0
+}
+
+# 查找 cypher-shell 的位置
+find_cypher_shell() {
+    local possible_paths=(
+        "/usr/local/bin/cypher-shell"
+        "/usr/bin/cypher-shell"
+        "/opt/neo4j/bin/cypher-shell"
+        "/usr/local/Cellar/neo4j/*/libexec/bin/cypher-shell"
+        "/opt/homebrew/bin/cypher-shell"
+    )
+    
+    for path in "${possible_paths[@]}"; do
+        if [ -f "$path" ]; then
+            echo "$path"
+            return 0
+        fi
+    done
+    
+    # 如果上述路径都没找到，尝试使用 which 命令
+    local which_path=$(which cypher-shell 2>/dev/null)
+    if [ ! -z "$which_path" ]; then
+        echo "$which_path"
+        return 0
+    fi
+    
+    return 1
+}
+
+# 重置 Neo4j 密码
+reset_neo4j_password() {
+    print_info "尝试重置 Neo4j 密码..."
+    
+    # 停止 Neo4j 服务
+    if [ "$OS" = "macos" ]; then
+        brew services stop neo4j
+        # 删除 Neo4j 数据目录
+        if [ -d "/opt/homebrew/var/lib/neo4j" ]; then
+            sudo rm -rf /opt/homebrew/var/lib/neo4j/data/databases
+            sudo rm -rf /opt/homebrew/var/lib/neo4j/data/dbms
+        fi
+        # 重新启动服务
+        brew services start neo4j
+    else
+        sudo systemctl stop neo4j
+        # 删除 Neo4j 数据目录
+        if [ -d "/var/lib/neo4j" ]; then
+            sudo rm -rf /var/lib/neo4j/data/databases
+            sudo rm -rf /var/lib/neo4j/data/dbms
+        fi
+        sudo systemctl start neo4j
+    fi
+    
+    # 等待服务重新启动
+    print_info "等待 Neo4j 服务重新启动..."
+    sleep 20
+}
+
+# 从 .env 文件读取配置
+load_env() {
+    if [ -f .env ]; then
+        print_info "正在从 .env 文件加载配置..."
+        export $(cat .env | grep -v '^#' | xargs)
+    else
+        print_warning ".env 文件不存在，将使用默认配置"
+        NEO4J_USER="neo4j"
+        NEO4J_PASSWORD="neo4j"
+    fi
+    
+    # 设置默认的 neo4j 用户密码（如果没有指定）
+    if [ -z "$NEO4J_DEFAULT_PASSWORD" ]; then
+        NEO4J_DEFAULT_PASSWORD="$NEO4J_PASSWORD"
+    fi
+}
+
 # 检测操作系统
 if [[ "$OSTYPE" == "darwin"* ]]; then
     OS="macos"
@@ -39,6 +157,9 @@ else
 fi
 
 print_info "检测到操作系统: $OS"
+
+# 加载环境变量
+load_env
 
 # 安装 Neo4j
 if [ "$OS" = "macos" ]; then
@@ -92,12 +213,17 @@ fi
 print_info "等待 Neo4j 服务启动..."
 sleep 10
 
+# 安装 APOC 插件
+install_apoc
+
 # 设置默认密码
 print_info "设置默认密码..."
 if [ "$OS" = "macos" ]; then
-    NEO4J_CONF="/usr/local/etc/neo4j/neo4j.conf"
+    NEO4J_CONF="/opt/homebrew/etc/neo4j/neo4j.conf"
+    NEO4J_BIN="/opt/homebrew/bin/neo4j"
 else
     NEO4J_CONF="/etc/neo4j/neo4j.conf"
+    NEO4J_BIN="/usr/bin/neo4j"
 fi
 
 # 修改配置文件
@@ -117,7 +243,77 @@ if [ -f "$NEO4J_CONF" ]; then
     fi
 fi
 
+# 等待 Neo4j 完全启动
+print_info "等待 Neo4j 服务完全启动..."
+sleep 15
+
+# 查找 cypher-shell
+print_info "查找 cypher-shell..."
+CYPHER_SHELL=$(find_cypher_shell)
+
+if [ -z "$CYPHER_SHELL" ]; then
+    print_error "找不到 cypher-shell，请确保 Neo4j 安装正确"
+    exit 1
+fi
+
+print_info "找到 cypher-shell: $CYPHER_SHELL"
+
+# 修改默认密码和创建新用户
+print_info "正在配置 Neo4j 用户..."
+
+# 尝试使用默认密码登录
+print_info "尝试使用默认密码登录..."
+echo "RETURN 1;" | "$CYPHER_SHELL" -u neo4j -p neo4j -d system > /dev/null 2>&1
+
+if [ $? -ne 0 ]; then
+    print_warning "默认密码登录失败，可能密码已被修改"
+    print_info "是否要重置 Neo4j 数据库？这将删除所有现有数据！"
+    read -p "输入 'yes' 确认重置: " confirm
+    
+    if [ "$confirm" = "yes" ]; then
+        reset_neo4j_password
+    else
+        print_error "无法继续配置，请手动重置密码或提供正确的当前密码"
+        exit 1
+    fi
+fi
+
+# 修改默认 neo4j 用户密码
+print_info "修改默认 neo4j 用户密码..."
+echo "ALTER CURRENT USER SET PASSWORD FROM 'neo4j' TO '$NEO4J_DEFAULT_PASSWORD';" | "$CYPHER_SHELL" -u neo4j -p neo4j -d system
+
+if [ $? -eq 0 ]; then
+    print_info "默认 neo4j 用户密码修改成功！"
+    
+    # 创建新用户（如果用户名不是 neo4j）
+    if [ "$NEO4J_USER" != "neo4j" ]; then
+        print_info "创建新用户: $NEO4J_USER"
+        echo "CREATE USER $NEO4J_USER SET PASSWORD '$NEO4J_PASSWORD' CHANGE NOT REQUIRED;" | "$CYPHER_SHELL" -u neo4j -p "$NEO4J_DEFAULT_PASSWORD" -d system
+        
+        if [ $? -eq 0 ]; then
+            print_info "新用户创建成功！"
+        else
+            print_error "新用户创建失败，请手动创建"
+        fi
+    fi
+else
+    print_error "默认用户密码修改失败，请手动修改密码"
+fi
+
+# 验证 APOC 安装
+print_info "验证 APOC 插件安装..."
+echo "CALL apoc.help('meta');" | "$CYPHER_SHELL" -u neo4j -p "$NEO4J_DEFAULT_PASSWORD" -d neo4j > /dev/null 2>&1
+
+if [ $? -eq 0 ]; then
+    print_info "APOC 插件安装成功！"
+else
+    print_warning "APOC 插件可能未正确安装，请检查插件目录和配置"
+fi
+
 print_info "Neo4j 安装完成！"
 print_info "你可以通过以下地址访问 Neo4j 浏览器：http://localhost:7474"
-print_info "默认用户名：neo4j"
-print_info "默认密码：neo4j" 
+print_info "默认用户 neo4j 密码：$NEO4J_DEFAULT_PASSWORD"
+if [ "$NEO4J_USER" != "neo4j" ]; then
+    print_info "新用户名：$NEO4J_USER"
+    print_info "新用户密码：$NEO4J_PASSWORD"
+fi 

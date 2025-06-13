@@ -37,14 +37,14 @@ describe('AI OHN Processing', () => {
           time: 1640995200,
           level: 1,
           source: '官方',
-          detailUrl: 'http://example.com/1'
-        }
+          detailUrl: 'http://example.com/1',
+        },
       ];
 
       // 由于这个测试需要真实的AI调用，我们只测试数据结构
       try {
         const result = await aiService.processOHNData(mockNews);
-        
+
         expect(result).toHaveProperty('categorizedNews');
         expect(result).toHaveProperty('totalProcessed');
         expect(typeof result.totalProcessed).toBe('number');
@@ -55,4 +55,4 @@ describe('AI OHN Processing', () => {
       }
     });
   });
-}); 
+});
