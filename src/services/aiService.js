@@ -1,20 +1,11 @@
-const OpenAI = require('openai');
-const moment = require('moment-timezone');
-
-const config = require('../config/config');
-const logger = require('../utils/logger');
+import moment from 'moment-timezone';
+import { callLLM } from '../utils/llm.js';
+import logger from '../utils/logger.js';
 
 // 设置默认时区为北京时间
 moment.tz.setDefault('Asia/Shanghai');
 
 class AIService {
-  constructor() {
-    this.openai = new OpenAI({
-      baseURL: config.ai.baseURL,
-      apiKey: config.ai.apiKey,
-    });
-  }
-
   async summarizeNews(news) {
     try {
       if (!news || news.length === 0) {
@@ -49,39 +40,38 @@ class AIService {
         .map(([level, news]) => {
           const levelContent = news
             .map(item => {
-              return `标题：${item.title}\n内容：${item.content}\n时间：${moment(item.time * 1000).format('YYYY-MM-DD HH:mm:ss')}\n`;
+              return `标题：${item.title}\n内容：${item.content}\n时间：${item.time}\n`;
             })
             .join('\n');
           return `【${level}级新闻】\n${levelContent}`;
         })
         .join('\n\n');
 
-      const completion = await this.openai.chat.completions.create({
-        messages: [
-          {
-            role: 'system',
-            content: `
-You are “宏观‑量化快讯引擎”, an LLM that converts raw multilingual financial headlines into an actionable Markdown briefing for global portfolio managers and economists.
+      const messages = [
+        {
+          role: 'system',
+          content: `
+You are "宏观‑量化快讯引擎", an LLM that converts raw multilingual financial headlines into an actionable Markdown briefing for global portfolio managers and economists.
 
 ############################################################
 ◆ 一、重要级映射与无地域偏好  
-1. 输入若含“【N级新闻】”，**N越大越重要**，全部保留；在输出中以 “### N级新闻” 单独分段呈现，按 N 递减排序。  
+1. 输入若含"【N级新闻】"，**N越大越重要**，全部保留；在输出中以 "### N级新闻" 单独分段呈现，按 N 递减排序。  
 2. 无级别新闻由模型自动归档，不因国家/市场来源加权或降权。  
-3. 每个段内再依下表 **Scope Tier** 排序（同级只按时间倒序）。  
+3. 每个段内再依下表 **Scope Tier** 排序（同级只按时间倒序）。  
 
-| Scope Tier | 定义 | 典型示例 |
+| Scope Tier | 定义 | 典型示例 |
 |------------|------|----------|
-| **宏观政策/系统风险** | 任一央行/财政部决议、主权违约、G‑20 / IMF / 世行决策，或关键宏观指标（GDP、CPI、PMI、失业率等） | 欧央行加息；土耳其通胀爆表 |
-| **跨市场价格冲击** | 股、债、汇、期货、商品等当日波动 ≥ ±1 σ 或异常成交/资金流 | 原油⏫5%、比特币⏬8% |
+| **宏观政策/系统风险** | 任一央行/财政部决议、主权违约、G‑20 / IMF / 世行决策，或关键宏观指标（GDP、CPI、PMI、失业率等） | 欧央行加息；土耳其通胀爆表 |
+| **跨市场价格冲击** | 股、债、汇、期货、商品等当日波动 ≥ ±1 σ 或异常成交/资金流 | 原油⏫5%、比特币⏬8% |
 | **行业／主题驱动** | 行业政策、供需冲击、跨国监管文件、重大并购、集体涨跌 | 全球半导体补贴法案 |
-| **大型主体事件** | 全球前 100 市值公司、G‑SIB、AAA/AA 主权或机构债信变动、IPO > 10 亿美元 | 台积电财报；沙特阿美配股 |
+| **大型主体事件** | 全球前 100 市值公司、G‑SIB、AAA/AA 主权或机构债信变动、IPO > 10 亿美元 | 台积电财报；沙特阿美配股 |
 | **一般公司／区域新闻** | 中小市值公司、地方经济、社会/科技/民生资讯 | 手机品牌新品发布 |
 
 > **同级别不同国家事件一律平等排序**。
 
 ############################################################
 ◆ 二、聚合与去重  
-- 30 分钟内同主题多条 → 合并，保留最大冲击数字 & 最新时间，用 \`*(截至 HH:MM)*\`。  
+- 30 分钟内同主题多条 → 合并，保留最大冲击数字 & 最新时间，用 \`*(截至 HH:MM)*\`。  
 - 删除无新增数据的纯重复。  
 
 ############################################################
@@ -96,7 +86,7 @@ You are “宏观‑量化快讯引擎”, an LLM that converts raw multilingual
 ############################################################
 ◆ 四、Markdown 输出模板  
 ### 概览  
-一句 ≤ 25 字，高亮 **方向 + 关键数字/事件**。  
+一句 ≤ 25 字，高亮 **方向 + 关键数字/事件**。  
 
 ### N级新闻(N数值大的排最前；若存在)  
 - **…** *(HH:MM)*  
@@ -125,8 +115,8 @@ You are “宏观‑量化快讯引擎”, an LLM that converts raw multilingual
 ############################################################
 ◆ 五、硬性排版规范
 
-* 列表符统一 \`- \`；每条 ≤ 40 字，仅陈述事实。
-* 时间统一用 *斜体(HH\:MM)*；跨日则 *YYYY‑MM‑DD HH\:MM*。
+* 列表符统一 \`- \`；每条 ≤ 40 字，仅陈述事实。
+* 时间统一用 *斜体(HH:MM)*；跨日则 *YYYY‑MM‑DD HH:MM*。
 * **数字原样输出**（不转中文大写、不加千位分隔符）。
 * 若某分段无内容，则整段省略。
 * 全文中文；除模板 Emoji 与标、颜色签外不加其他装饰；禁止评论、预测或情绪化字眼。
@@ -144,46 +134,36 @@ You are “宏观‑量化快讯引擎”, an LLM that converts raw multilingual
 
 ### 宏观政策 / 系统风险
 
-* **北约**拟至 **2032** 年防务支出占 **GDP 5 %** *(13:34)*
+* **北约**拟至 **2032** 年防务支出占 **GDP 5 %** *(13:34)*
 
 ### 跨市场价格冲击
 
-* <span style="color:#16a34a">**恒指▲2 %**</span>；<span style="color:#16a34a">**恒生科技▲2.3 %**</span> *(13:42)*
-* <span style="color:#16a34a">**富时中国 A50 期指▲2 %**</span> *(13:39)*
+* <span style="color:#16a34a">**恒指▲2 %**</span>；<span style="color:#16a34a">**恒生科技▲2.3 %**</span> *(13:42)*
+* <span style="color:#16a34a">**富时中国 A50 期指▲2 %**</span> *(13:39)*
 
-### L2 行业 / 主题
+### 行业 / 主题
 
-* **港股中资券商股▲6–22 %**，**弘业期货**领涨 *(13:46)*
-* **国际能源署**：2025 年电动车销量或破 **2000万辆** *(13:45)*
+* **港股中资券商股▲6–22 %**，**弘业期货**领涨 *(13:46)*
+* **国际能源署**：2025 年电动车销量或破 **2000万辆** *(13:45)*
 
-### L3 大型主体事件
+### 大型主体事件
 
-* **中国平安市值重返 1 万亿元** *(13:41)*
-* **东方财富成交额达 100 亿元**，股价▲5.8 % *(13:42)*
+* **中国平安市值重返 1 万亿元** *(13:41)*
+* **东方财富成交额达 100 亿元**，股价▲5.8 % *(13:42)*
 
-### L4 其他
+### 其他
 
 * **京东外卖**午间部分地区出现无人接单 *(13:08)*
 
 `.trim(),
-          },
-          {
-            role: 'user',
-            content: `新闻内容：\n\n${newsContent}`,
-          },
-        ],
-        model: config.ai.model,
-        temperature: 0.7,
-        timeout: 120000,
-      });
+        },
+        {
+          role: 'user',
+          content: `新闻内容：\n\n${newsContent}`,
+        },
+      ];
 
-      const content =
-        completion.choices[0].message.content || completion.choices[0].message.reasoning_content;
-
-      if (!content) {
-        throw new Error(JSON.stringify(completion));
-      }
-
+      const content = await callLLM(messages);
       return content;
     } catch (error) {
       logger.error('调用AI服务失败:', error);
@@ -192,4 +172,4 @@ You are “宏观‑量化快讯引擎”, an LLM that converts raw multilingual
   }
 }
 
-module.exports = new AIService();
+export default new AIService();

@@ -1,7 +1,6 @@
-const axios = require('axios');
-const moment = require('moment-timezone');
-
-const logger = require('../utils/logger');
+import axios from 'axios';
+import moment from 'moment-timezone';
+import logger from '../utils/logger.js';
 
 // 设置默认时区为北京时间
 moment.tz.setDefault('Asia/Shanghai');
@@ -77,4 +76,4 @@ class WebhookService {
   }
 }
 
-module.exports = new WebhookService();
+export default new WebhookService();

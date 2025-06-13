@@ -1,10 +1,15 @@
-const fs = require('fs').promises;
-const path = require('path');
-const logger = require('../utils/logger');
-const moment = require('moment-timezone');
+import { promises as fs } from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import logger from '../utils/logger.js';
+import moment from 'moment-timezone';
 
 // 设置默认时区为北京时间
 moment.tz.setDefault('Asia/Shanghai');
+
+// 获取当前文件的目录路径
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class StorageService {
   constructor() {
@@ -169,4 +174,4 @@ class StorageService {
   }
 }
 
-module.exports = new StorageService();
+export default new StorageService();

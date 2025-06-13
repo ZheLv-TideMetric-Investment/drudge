@@ -1,6 +1,6 @@
-require('dotenv').config();
+import 'dotenv/config';
 
-module.exports = {
+export default {
   newsApi: {
     url: 'https://news.futunn.com/news-site-api/main/get-flash-list',
     pageSize: parseInt(process.env.NEWS_API_PAGE_SIZE || '50', 10),

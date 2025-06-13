@@ -1,8 +1,8 @@
-const axios = require('axios');
-const config = require('../config/config');
-const logger = require('../utils/logger');
-const storageService = require('./storageService');
-const moment = require('moment-timezone');
+import axios from 'axios';
+import config from '../config/config.js';
+import logger from '../utils/logger.js';
+import storageService from './storageService.js';
+import moment from 'moment-timezone';
 
 // 设置默认时区为北京时间
 moment.tz.setDefault('Asia/Shanghai');
@@ -208,4 +208,4 @@ class NewsService {
   }
 }
 
-module.exports = new NewsService();
+export default new NewsService();
