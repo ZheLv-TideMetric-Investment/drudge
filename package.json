@@ -33,7 +33,12 @@
     "graph:init": "node src/scripts/graphTrigger.js init",
     "graph:process": "node src/scripts/graphTrigger.js process",
     "graph:query": "node src/scripts/graphTrigger.js query",
-    "graph:health": "node src/scripts/graphTrigger.js health"
+    "graph:health": "node src/scripts/graphTrigger.js health",
+    "realtime:start": "node scripts/runAll.js",
+    "realtime:dev": "NODE_ENV=development node scripts/runAll.js",
+    "realtime:schema": "cypher-shell -f neo4j/schema.cypher",
+    "alias:seed": "node scripts/fetch_alias_seed.js",
+    "alias:refresh": "NODE_ENV=production node scripts/fetch_alias_seed.js"
   },
   "author": "",
   "license": "ISC",

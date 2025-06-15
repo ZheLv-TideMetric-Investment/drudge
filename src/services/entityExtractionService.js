@@ -1,4 +1,4 @@
-import { callSimpleLLM } from '../utils/llm.js';
+import { callLLM } from '../utils/llm.js';
 import logger from '../utils/logger.js';
 import {
   EntityNode,
@@ -178,7 +178,7 @@ class EntityExtractionService {
     let lastError;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        const response = await callSimpleLLM(messages);
+        const response = await callLLM(messages);
         return this.parseAIResponse(response);
       } catch (error) {
         lastError = error;
@@ -360,4 +360,4 @@ class EntityExtractionService {
   }
 }
 
-export default new EntityExtractionService();
+export default new EntityExtractionService(); 

@@ -44,16 +44,22 @@ class Neo4jService {
     const session = this.getSession();
     try {
       // 为实体名称创建索引
-      await session.run('CREATE INDEX entity_name_index IF NOT EXISTS FOR (e:Entity) ON (e.name)');
+      await session.run(
+        'CREATE INDEX entity_name_index IF NOT EXISTS FOR (e:Entity) ON (e.name)'
+      );
 
       // 为事件类型创建索引
-      await session.run('CREATE INDEX event_type_index IF NOT EXISTS FOR (e:Event) ON (e.type)');
+      await session.run(
+        'CREATE INDEX event_type_index IF NOT EXISTS FOR (e:Event) ON (e.type)'
+      );
 
       // 为新闻ID创建索引
       await session.run('CREATE INDEX news_id_index IF NOT EXISTS FOR (n:News) ON (n.id)');
 
       // 为实体类型创建索引
-      await session.run('CREATE INDEX entity_type_index IF NOT EXISTS FOR (e:Entity) ON (e.type)');
+      await session.run(
+        'CREATE INDEX entity_type_index IF NOT EXISTS FOR (e:Entity) ON (e.type)'
+      );
 
       // 为时间戳创建索引
       await session.run(
@@ -152,52 +158,35 @@ class Neo4jService {
   // 获取数据库统计信息
   async getStats() {
     try {
-      // 首先尝试使用 APOC
-      try {
-        const result = await this.executeQuery(`
-          CALL apoc.meta.stats() YIELD labelCount, relTypeCount, propertyKeyCount, nodeCount, relCount
-          RETURN labelCount, relTypeCount, propertyKeyCount, nodeCount, relCount
-        `);
+      const result = await this.executeQuery(`
+        CALL apoc.meta.stats() YIELD labelCount, relTypeCount, propertyKeyCount, nodeCount, relCount
+        RETURN labelCount, relTypeCount, propertyKeyCount, nodeCount, relCount
+      `);
 
-        if (result.records.length > 0) {
-          const record = result.records[0];
-          return {
-            nodeCount: record.get('nodeCount').toNumber(),
-            relationshipCount: record.get('relCount').toNumber(),
-            labelCount: record.get('labelCount').toNumber(),
-            relationshipTypeCount: record.get('relTypeCount').toNumber(),
-            propertyKeyCount: record.get('propertyKeyCount').toNumber(),
-            timestamp: new Date().toISOString(),
-          };
-        }
-      } catch (apocError) {
-        // APOC 不可用，使用基础查询
-        logger.warn('APOC 插件不可用，使用基础查询获取统计信息');
+      if (result.records.length > 0) {
+        const record = result.records[0];
+        return {
+          nodeCount: record.get('nodeCount').toNumber(),
+          relationshipCount: record.get('relCount').toNumber(),
+          labelCount: record.get('labelCount').toNumber(),
+          relationshipTypeCount: record.get('relTypeCount').toNumber(),
+          propertyKeyCount: record.get('propertyKeyCount').toNumber(),
+          timestamp: new Date().toISOString(),
+        };
       }
 
-      // 使用基础 Cypher 查询获取统计信息
-      const [nodeResult, relResult, labelResult, relTypeResult] = await Promise.all([
-        this.executeQuery('MATCH (n) RETURN count(n) as nodeCount'),
-        this.executeQuery('MATCH ()-[r]->() RETURN count(r) as relCount'),
-        this.executeQuery('MATCH (n) RETURN count(DISTINCT labels(n)) as labelCount'),
-        this.executeQuery('MATCH ()-[r]->() RETURN count(DISTINCT type(r)) as relTypeCount'),
-      ]);
+      // 如果没有 APOC，使用基础查询
+      const nodeResult = await this.executeQuery('MATCH (n) RETURN count(n) as nodeCount');
+      const relResult = await this.executeQuery('MATCH ()-[r]->() RETURN count(r) as relCount');
 
       return {
         nodeCount: nodeResult.records[0].get('nodeCount').toNumber(),
         relationshipCount: relResult.records[0].get('relCount').toNumber(),
-        labelCount: labelResult.records[0].get('labelCount').toNumber(),
-        relationshipTypeCount: relTypeResult.records[0].get('relTypeCount').toNumber(),
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
       logger.error('获取数据库统计信息失败:', error);
-      // 返回默认的统计信息
       return {
-        nodeCount: 0,
-        relationshipCount: 0,
-        labelCount: 0,
-        relationshipTypeCount: 0,
         error: error.message,
         timestamp: new Date().toISOString(),
       };
@@ -235,4 +224,4 @@ class Neo4jService {
   }
 }
 
-export default new Neo4jService(); 
+export default new Neo4jService();
