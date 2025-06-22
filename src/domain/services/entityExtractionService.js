@@ -1,4 +1,4 @@
-import { callLLM } from '../../shared/utils/llm.js';
+import { callLLMWithJsonResponse } from '../../shared/utils/llm.js';
 import logger from '../../shared/utils/logger.js';
 import config from '../../shared/config/config.js';
 import {
@@ -13,7 +13,7 @@ import {
 import { 
   NewsLevel, 
   NewsLevelDescription, 
-  SignificanceLevel, 
+  SignificanceLevel,
   RelationshipTypes,
   EventTypes
 } from '../../shared/types/enums.js';
@@ -239,8 +239,8 @@ class EntityExtractionService {
     let lastError;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        const response = await callLLM(messages);
-        return this.parseAIResponse(response);
+        const extractionData = await callLLMWithJsonResponse(messages);
+        return extractionData;
       } catch (error) {
         lastError = error;
         logger.warn(`AI六要素提取尝试 ${attempt} 失败:`, error.message);
@@ -254,38 +254,7 @@ class EntityExtractionService {
     throw lastError;
   }
 
-  /**
-   * 解析AI响应
-   * @param {string} response - AI响应文本
-   * @returns {Object} - 解析后的数据
-   */
-  parseAIResponse(response) {
-    try {
-      // 尝试直接解析JSON
-      const cleaned = response.trim();
-      if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
-        return JSON.parse(cleaned);
-      }
 
-      // 尝试提取JSON代码块
-      const jsonMatch = cleaned.match(/```json\s*([\s\S]*?)\s*```/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[1]);
-      }
-
-      // 尝试提取{}包围的内容
-      const objectMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (objectMatch) {
-        return JSON.parse(objectMatch[0]);
-      }
-
-      throw new Error('无法解析AI响应为JSON格式');
-    } catch (error) {
-      logger.error('解析AI响应失败:', error);
-      logger.error('原始响应:', response);
-      throw new Error(`AI响应解析失败: ${error.message}`);
-    }
-  }
 
   /**
    * 解析提取结果
@@ -539,59 +508,51 @@ class EntityExtractionService {
   }
 
   /**
-   * 批量提取多个新闻的六要素（真正的批量AI调用）
-   * @param {Array} newsItems - 新闻对象数组
-   * @param {number} batchSize - 批量大小，默认5
+   * 批量提取新闻六要素（简化版，用于NewsProcessingService）
+   * @param {Array} newsItems - 新闻数组（一批，比如5条）
    * @returns {Array} - 提取结果数组
    */
-  async batchExtract(newsItems, batchSize = 5) {
+  async batchExtractEntities(newsItems) {
+    if (!newsItems || newsItems.length === 0) {
+      return [];
+    }
+
     const startTime = Date.now();
-    const results = [];
-    
-    // 按批次处理
-    for (let i = 0; i < newsItems.length; i += batchSize) {
-      const batch = newsItems.slice(i, i + batchSize);
-      try {
-        logger.info(`开始批量提取第${Math.floor(i/batchSize) + 1}批，共${batch.length}条新闻`);
-        
-        // 真正的批量AI调用
-        const batchResults = await this.callBatchAIExtraction(batch);
-        results.push(...batchResults);
-        
-        logger.info(`第${Math.floor(i/batchSize) + 1}批提取完成，成功处理${batchResults.length}条新闻`);
-        
-        // 批次间短暂延迟
-        if (i + batchSize < newsItems.length) {
-          await this.delay(config.batch?.delayBetweenBatches || 500);
-        }
-      } catch (error) {
-        logger.error(`批量提取第${Math.floor(i/batchSize) + 1}批失败:`, error);
-        
-        // 失败时回退到单条处理
-        for (const newsItem of batch) {
-          try {
-            const result = await this.extractFromNews(newsItem);
-            results.push(result);
-          } catch (singleError) {
-            logger.error(`单条提取失败: ${newsItem.id}`, singleError);
-            results.push(new NewsExtractionResult({
-              news_id: newsItem.id,
-              confidence: 0,
-              processing_time: 0,
-            }));
-          }
+    logger.info(`开始批量AI提取${newsItems.length}条新闻的六要素`);
+
+    try {
+      // 调用批量AI提取
+      const batchResults = await this.callBatchAIExtraction(newsItems);
+      
+      const processingTime = Date.now() - startTime;
+      logger.info(`批量AI提取完成，${newsItems.length}条新闻，耗时${processingTime}ms，平均${Math.round(processingTime/newsItems.length)}ms/条`);
+      
+      return batchResults;
+    } catch (error) {
+      logger.error(`批量AI提取失败，回退到单条处理:`, error);
+      
+      // 回退到单条处理
+      const results = [];
+      for (const newsItem of newsItems) {
+        try {
+          const result = await this.extractFromNews(newsItem);
+          results.push(result);
+        } catch (singleError) {
+          logger.error(`单条提取失败: ${newsItem.id}`, singleError);
+          results.push(new NewsExtractionResult({
+            news_id: newsItem.id,
+            confidence: 0,
+            processing_time: 0,
+          }));
         }
       }
+      
+      return results;
     }
-    
-    const totalTime = Date.now() - startTime;
-    logger.info(`批量提取完成，共处理${newsItems.length}条新闻，耗时${totalTime}ms，平均${Math.round(totalTime/newsItems.length)}ms/条`);
-    
-    return results;
   }
 
   /**
-   * 真正的批量AI调用 - 一次性处理多条新闻
+   * 批量AI调用 - 一次性处理多条新闻（简化版）
    * @param {Array} newsItems - 新闻对象数组
    * @returns {Array} - 提取结果数组
    */
@@ -698,14 +659,14 @@ class EntityExtractionService {
       "locations": [...],
       "times": [...],
       "relationships": [...]
-    },
-    ... // 其他新闻的结果
+    }
   ]
 }
 \`\`\`
 
 ## 重要提醒：
 - 为每条新闻提供完整的独立提取结果
+- 确保results数组的顺序与输入新闻的顺序一致
 - 只提取新闻中明确提到的信息，不要推测
 - 公司名称要标准化
 - **必须为每个事件都提供event_level字段**，根据上述判断标准准确分级
@@ -731,13 +692,13 @@ ${newsItems.map((item, index) => `
     let lastError;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        const response = await callLLM(messages);
-        const batchData = this.parseBatchAIResponse(response);
+        const batchData = await callLLMWithJsonResponse(messages);
         
         // 解析每条新闻的结果，确保按顺序对应
         const results = [];
         for (let i = 0; i < newsItems.length; i++) {
           const newsItem = newsItems[i];
+          
           // 先尝试按ID匹配，再按索引匹配
           let extractionData = batchData.results?.find(r => r.news_id === newsItem.id);
           if (!extractionData && batchData.results && batchData.results[i]) {
@@ -764,38 +725,9 @@ ${newsItems.map((item, index) => `
     throw lastError;
   }
 
-  /**
-   * 解析批量AI响应
-   * @param {string} response - AI响应文本
-   * @returns {Object} - 解析后的批量数据
-   */
-  parseBatchAIResponse(response) {
-    try {
-      // 尝试直接解析JSON
-      const cleaned = response.trim();
-      if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
-        return JSON.parse(cleaned);
-      }
 
-      // 尝试提取JSON代码块
-      const jsonMatch = cleaned.match(/```json\s*([\s\S]*?)\s*```/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[1]);
-      }
 
-      // 尝试提取{}包围的内容
-      const objectMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (objectMatch) {
-        return JSON.parse(objectMatch[0]);
-      }
 
-      throw new Error('无法解析批量AI响应为JSON格式');
-    } catch (error) {
-      logger.error('解析批量AI响应失败:', error);
-      logger.error('原始响应:', response);
-      throw new Error(`批量AI响应解析失败: ${error.message}`);
-    }
-  }
 }
 
 export default new EntityExtractionService(); 

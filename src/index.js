@@ -38,7 +38,7 @@ class NewsProcessingSystem {
         logger.info('新闻处理工作线程已启用');
       } else {
         logger.info('新闻处理工作线程已禁用');
-      }
+  }
 
       this.initialized = true;
       logger.info('新闻处理系统主控制器初始化完成');
@@ -73,7 +73,7 @@ class NewsProcessingSystem {
       try {
         logger.info(`收到新闻处理触发请求: ${data.reason}，通知新闻处理工作线程`);
         await workerManager.triggerProcessing();
-      } catch (error) {
+    } catch (error) {
         logger.error('触发新闻处理失败:', error);
       }
     } else {
@@ -176,11 +176,11 @@ async function startSystem() {
     logger.info('🚀 新闻处理系统完全启动完成');
     logger.info('📊 所有定时任务已在调度器工作线程中自动启动');
     
-  } catch (error) {
+    } catch (error) {
     logger.error('系统启动失败:', error);
     await system.sendErrorNotification(error, '系统启动失败');
     process.exit(1);
-  }
+    }
 }
 
 // 启动系统

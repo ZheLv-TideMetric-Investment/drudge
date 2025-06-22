@@ -4,7 +4,7 @@ import path from 'path';
 import logger from '../shared/utils/logger.js';
 import storageService from '../infrastructure/storage/FileStorage.js';
 import newsLevelService from '../application/services/newsLevelService.js';
-import knowledgeGraphService from '../application/services/knowledgeGraphService.js';
+import newsProcessingService from '../application/services/NewsProcessingService.js';
 import config from '../shared/config/config.js';
 
 /**
@@ -30,7 +30,7 @@ class NewsProcessorWorker {
     try {
       logger.info('新闻处理工作线程开始初始化...');
       
-      await knowledgeGraphService.initialize();
+      await newsProcessingService.knowledgeGraph.initialize();
       await newsLevelService.initialize();
       
       this.initialized = true;
@@ -136,7 +136,7 @@ class NewsProcessorWorker {
 
       // 2. 过滤出未处理的新闻
       const newsIds = allNews.map(item => item.id);
-      const unprocessedIds = await knowledgeGraphService.getUnprocessedNewsIds(newsIds);
+      const unprocessedIds = await newsProcessingService.getUnprocessedNewsIds(newsIds);
       const unprocessedNews = allNews.filter(item => unprocessedIds.includes(item.id));
 
       if (unprocessedNews.length === 0) {
@@ -191,69 +191,117 @@ class NewsProcessorWorker {
   }
 
   /**
-   * 批量处理新闻
+   * 批量处理新闻（增强版：支持流式处理）
    */
   async batchProcessNews(newsItems) {
-    const results = [];
+    const allResults = [];
     
-    if (newsItems.length >= 3) {
-      // 使用批量处理
-      logger.info(`开始批量处理${newsItems.length}条新闻`);
-      const batchResults = await knowledgeGraphService.batchProcessNews(newsItems);
+    if (newsItems.length >= config.batch?.minBatchSize || 3) {
+      // 使用批量流式处理
+      logger.info(`🚀 开始批量流式处理${newsItems.length}条新闻`);
       
-      for (let i = 0; i < batchResults.length; i++) {
-        const newsItem = newsItems[i];
-        const graphResult = batchResults[i];
+      // 定义批次完成回调函数
+      const onBatchComplete = async (batchInfo) => {
+        logger.info(`📦 批次${batchInfo.batchNumber}/${batchInfo.totalBatches}处理完成 (${batchInfo.overallProgress.percentage}%)`);
         
-        if (graphResult.success && !graphResult.skipped) {
-          // 处理新闻级别
-          let levelResult = null;
-          if (graphResult.extractionResult) {
-            try {
-              levelResult = await newsLevelService.checkAndHandleNewsLevel(
-                newsItem, 
-                graphResult.extractionResult
-              );
-            } catch (error) {
-              logger.warn(`新闻级别处理失败: ${newsItem.id}`, error);
+        // 处理每个批次的结果
+        for (const graphResult of batchInfo.batchResults) {
+          const newsItem = newsItems.find(n => n.id === graphResult.newsId);
+          
+          if (graphResult.success && !graphResult.skipped && newsItem) {
+            // 立即处理新闻级别
+            let levelResult = null;
+            if (graphResult.extractionResult) {
+              try {
+                levelResult = await newsLevelService.checkAndHandleNewsLevel(
+                  newsItem, 
+                  graphResult.extractionResult
+                );
+                
+                // 如果是高级别新闻，立即通知主线程
+                if (levelResult?.shouldPush) {
+                  this.notifyMainThread('HIGH_LEVEL_NEWS_DETECTED', {
+                    newsId: newsItem.id,
+                    newsLevel: graphResult.extractionResult.news_level,
+                    title: newsItem.title,
+                    timestamp: Date.now()
+                  });
+                }
+              } catch (error) {
+                logger.warn(`新闻级别处理失败: ${newsItem.id}`, error);
+              }
             }
-          }
 
-          results.push({
-            success: true,
-            newsId: newsItem.id,
-            stats: graphResult.stats,
-            newsLevel: graphResult.extractionResult?.news_level,
-            shouldPush: levelResult?.shouldPush || false
-          });
-        } else {
-          results.push({
-            success: graphResult.success,
-            newsId: newsItem.id,
-            skipped: graphResult.skipped || false,
-            error: graphResult.error
-          });
+            allResults.push({
+              success: true,
+              newsId: newsItem.id,
+              stats: graphResult.stats,
+              newsLevel: graphResult.extractionResult?.news_level,
+              shouldPush: levelResult?.shouldPush || false,
+              processed_at: graphResult.processed_at
+            });
+          } else {
+            allResults.push({
+              success: graphResult.success,
+              newsId: graphResult.newsId,
+              skipped: graphResult.skipped || false,
+              error: graphResult.error,
+              processed_at: graphResult.processed_at
+            });
+          }
         }
-      }
+        
+        // 通知主线程批次进度
+        this.notifyMainThread('BATCH_PROGRESS', {
+          batchNumber: batchInfo.batchNumber,
+          totalBatches: batchInfo.totalBatches,
+          progress: batchInfo.overallProgress,
+          batchSummary: batchInfo.batchSummary,
+          performance: batchInfo.performance
+        });
+      };
+
+      // 使用流式处理
+      const batchSize = config.batch?.maxBatchSize || 5;
+      const result = await newsProcessingService.batchProcessNews(newsItems, batchSize, onBatchComplete);
+      
+      logger.info(`✅ 批量流式处理完成，汇总统计:`, result.summary);
+      
+      // 通知主线程总体完成
+      this.notifyMainThread('BATCH_PROCESSING_COMPLETE', {
+        summary: result.summary,
+        timestamp: Date.now()
+      });
+      
     } else {
       // 单条处理
-      logger.info(`开始单条处理${newsItems.length}条新闻`);
+      logger.info(`🔄 开始单条处理${newsItems.length}条新闻`);
       for (const newsItem of newsItems) {
         try {
           const result = await this.processSingleNews(newsItem);
-          results.push(result);
+          allResults.push(result);
+          
+          // 立即通知处理进度
+          this.notifyMainThread('SINGLE_NEWS_PROCESSED', {
+            newsId: newsItem.id,
+            success: result.success,
+            newsLevel: result.newsLevel,
+            shouldPush: result.shouldPush
+          });
+          
         } catch (error) {
           logger.error(`单条处理失败: ${newsItem.id}`, error);
-          results.push({
+          allResults.push({
             success: false,
             newsId: newsItem.id,
-            error: error.message
+            error: error.message,
+            processed_at: new Date().toISOString()
           });
         }
       }
     }
 
-    return results;
+    return allResults;
   }
 
   /**
@@ -262,7 +310,7 @@ class NewsProcessorWorker {
   async processSingleNews(newsItem) {
     try {
       // 1. 构建知识图谱
-      const graphResult = await knowledgeGraphService.processNews(newsItem);
+      const graphResult = await newsProcessingService.processNews(newsItem);
       
       if (!graphResult.success) {
         return {

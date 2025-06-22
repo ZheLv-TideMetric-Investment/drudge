@@ -27,7 +27,7 @@ class HealthChecker {
 
   async checkServices() {
     const services = [
-          { name: 'Snake Tracking Service', module: '../services/snakeTrackingService' },
+      { name: 'Snake Tracking Service', module: '../services/snakeTrackingService' },
     ];
 
     for (const service of services) {

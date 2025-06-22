@@ -787,111 +787,97 @@ class KnowledgeGraphService {
   }
 
   /**
-   * 批量处理新闻（真正的批量处理）
-   * @param {Array} newsItems - 新闻数组
-   * @param {number} batchSize - 批量大小，默认5
+   * 批量创建知识图谱（供NewsProcessingService调用）
+   * @param {Array} extractionResults - 实体提取结果数组
+   * @returns {Array} - 处理结果数组
    */
-  async batchProcessNews(newsItems, batchSize = 5) {
-    const startTime = Date.now();
+  async batchCreateGraphData(extractionResults) {
     const results = [];
     
     try {
-      logger.info(`开始批量处理${newsItems.length}条新闻，批量大小: ${batchSize}`);
+      // 1. 批量创建新闻节点（从extractionResults推断新闻信息）
+      await this.batchCreateNewsNodesFromExtractions(extractionResults);
       
-      // 1. 批量提取实体信息
-      const extractionResults = await entityExtractionService.batchExtract(newsItems, batchSize);
-      
-      // 2. 批量创建新闻节点
-      await this.batchCreateNewsNodes(newsItems, extractionResults);
-      
-      // 3. 批量创建实体节点和关系
+      // 2. 批量创建实体节点和关系
       await this.batchCreateEntitiesAndRelationships(extractionResults);
       
-      // 4. 准备返回结果
-      for (let i = 0; i < newsItems.length; i++) {
-        const newsItem = newsItems[i];
-        const extractionResult = extractionResults[i];
-        
-        const stats = {
-          events: extractionResult.events.length,
-          companies: extractionResult.companies.length,
-          persons: extractionResult.persons.length,
-          organizations: extractionResult.organizations.length,
-          locations: extractionResult.locations.length,
-          times: extractionResult.times.length,
-          news_level: extractionResult.news_level,
-          confidence: extractionResult.confidence
-        };
-        
-        results.push({
-          newsId: newsItem.id,
-          success: true,
-          stats,
-          extractionResult
-        });
-      }
-      
-      const totalTime = Date.now() - startTime;
-      logger.info(`批量处理完成，共处理${newsItems.length}条新闻，耗时${totalTime}ms，平均${Math.round(totalTime/newsItems.length)}ms/条`);
-      
-    } catch (error) {
-      logger.error('批量处理失败，回退到单条处理:', error);
-      
-      // 回退到单条处理
-      for (const newsItem of newsItems) {
-        try {
-          const result = await this.processNews(newsItem);
-          results.push({ newsId: newsItem.id, ...result });
-        } catch (singleError) {
-          logger.error(`单条处理失败: ${newsItem.id}`, singleError);
-          results.push({ 
-            newsId: newsItem.id, 
-            success: false, 
-            error: singleError.message 
+      // 3. 构建返回结果
+      for (const extractionResult of extractionResults) {
+        if (extractionResult && extractionResult.news_id) {
+          const stats = {
+            events: extractionResult.events?.length || 0,
+            companies: extractionResult.companies?.length || 0,
+            persons: extractionResult.persons?.length || 0,
+            organizations: extractionResult.organizations?.length || 0,
+            locations: extractionResult.locations?.length || 0,
+            times: extractionResult.times?.length || 0,
+            news_level: extractionResult.news_level,
+            confidence: extractionResult.confidence
+          };
+          
+          results.push({
+            newsId: extractionResult.news_id,
+            success: true,
+            stats,
+            extractionResult,
+            processed_at: new Date().toISOString()
+          });
+        } else {
+          results.push({
+            newsId: extractionResult?.news_id || 'unknown',
+            success: false,
+            error: '实体提取失败或缺少news_id',
+            processed_at: new Date().toISOString()
           });
         }
       }
+      
+      return results;
+    } catch (error) {
+      logger.error('批量创建图数据失败:', error);
+      // 返回错误结果
+      return extractionResults.map(extractionResult => ({
+        newsId: extractionResult?.news_id || 'unknown',
+        success: false,
+        error: error.message,
+        processed_at: new Date().toISOString()
+      }));
     }
-    
-    return results;
   }
 
   /**
-   * 批量创建新闻节点
-   * @param {Array} newsItems - 新闻数组
+   * 从提取结果批量创建新闻节点
    * @param {Array} extractionResults - 提取结果数组
    */
-  async batchCreateNewsNodes(newsItems, extractionResults) {
+  async batchCreateNewsNodesFromExtractions(extractionResults) {
     const queries = [];
     
-    for (let i = 0; i < newsItems.length; i++) {
-      const newsItem = newsItems[i];
-      const extractionResult = extractionResults[i];
+    for (const extractionResult of extractionResults) {
+      if (!extractionResult.news_id) continue;
       
       const query = {
         cypher: `
           MERGE (n:News {id: $id})
-          SET n.title = $title,
-              n.content = $content,
-              n.timestamp = $timestamp,
-              n.source = $source,
-              n.url = $url,
-              n.level = $level,
-              n.news_level = $newsLevel,
+          SET n.news_level = $newsLevel,
+              n.confidence = $confidence,
               n.processed = true,
+              n.processing_time = $processingTime,
+              n.entity_count = $entityCount,
               n.created_at = $createdAt,
               n.updated_at = $updatedAt
           RETURN n.id as newsId
         `,
         parameters: {
-          id: newsItem.id,
-          title: newsItem.title,
-          content: newsItem.content,
-          timestamp: new Date(newsItem.time * 1000).toISOString(),
-          source: newsItem.source || '',
-          url: newsItem.url || '',
-          level: newsItem.level || 0,
-          newsLevel: extractionResult.news_level,
+          id: extractionResult.news_id,
+          newsLevel: extractionResult.news_level || 'Level 5',
+          confidence: extractionResult.confidence || 0,
+          processingTime: extractionResult.processing_time || 0,
+          entityCount: (extractionResult.events?.length || 0) + 
+                      (extractionResult.companies?.length || 0) + 
+                      (extractionResult.persons?.length || 0) + 
+                      (extractionResult.organizations?.length || 0) + 
+                      (extractionResult.locations?.length || 0) + 
+                      (extractionResult.times?.length || 0),
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         }
@@ -901,7 +887,9 @@ class KnowledgeGraphService {
     }
     
     // 批量执行
-    await this.executeBatchQueries(queries, '新闻节点');
+    if (queries.length > 0) {
+      await this.executeBatchQueries(queries, '新闻节点');
+    }
   }
 
   /**
@@ -944,7 +932,7 @@ class KnowledgeGraphService {
     const queries = [];
     
     // 事件节点
-    for (const event of extractionResult.events) {
+    for (const event of extractionResult.events || []) {
       queries.push({
         cypher: `
           MERGE (e:Event {id: $id})
@@ -977,7 +965,7 @@ class KnowledgeGraphService {
     }
     
     // 公司节点
-    for (const company of extractionResult.companies) {
+    for (const company of extractionResult.companies || []) {
       queries.push({
         cypher: `
           MERGE (c:Company {company_name: $companyName})
@@ -998,7 +986,7 @@ class KnowledgeGraphService {
     }
     
     // 人物节点
-    for (const person of extractionResult.persons) {
+    for (const person of extractionResult.persons || []) {
       queries.push({
         cypher: `
           MERGE (p:Person {person_name: $personName})
@@ -1019,7 +1007,7 @@ class KnowledgeGraphService {
     }
     
     // 机构节点
-    for (const organization of extractionResult.organizations) {
+    for (const organization of extractionResult.organizations || []) {
       queries.push({
         cypher: `
           MERGE (o:Organization {organization_name: $organizationName})
@@ -1040,7 +1028,7 @@ class KnowledgeGraphService {
     }
     
     // 地点节点
-    for (const location of extractionResult.locations) {
+    for (const location of extractionResult.locations || []) {
       queries.push({
         cypher: `
           MERGE (l:Location {location_name: $locationName})
@@ -1061,7 +1049,7 @@ class KnowledgeGraphService {
     }
     
     // 时间节点
-    for (const time of extractionResult.times) {
+    for (const time of extractionResult.times || []) {
       queries.push({
         cypher: `
           MERGE (t:Time {timestamp: $timestamp})
@@ -1094,7 +1082,7 @@ class KnowledgeGraphService {
     const createdAt = new Date().toISOString();
     
     // 事件与新闻的关系
-    for (const event of extractionResult.events) {
+    for (const event of extractionResult.events || []) {
       queries.push({
         cypher: `
           MATCH (e:Event {id: $eventId})
@@ -1111,9 +1099,9 @@ class KnowledgeGraphService {
     }
     
     // 推断的关系
-    for (const event of extractionResult.events) {
+    for (const event of extractionResult.events || []) {
       // 事件与公司的关系
-      for (const company of extractionResult.companies) {
+      for (const company of extractionResult.companies || []) {
         queries.push({
           cypher: `
             MATCH (e:Event {id: $eventId})
@@ -1132,7 +1120,7 @@ class KnowledgeGraphService {
       }
       
       // 事件与人物的关系
-      for (const person of extractionResult.persons) {
+      for (const person of extractionResult.persons || []) {
         queries.push({
           cypher: `
             MATCH (e:Event {id: $eventId})
@@ -1151,7 +1139,7 @@ class KnowledgeGraphService {
       }
       
       // 事件与地点的关系
-      for (const location of extractionResult.locations) {
+      for (const location of extractionResult.locations || []) {
         queries.push({
           cypher: `
             MATCH (e:Event {id: $eventId})
@@ -1169,7 +1157,7 @@ class KnowledgeGraphService {
       }
       
       // 事件与时间的关系
-      for (const time of extractionResult.times) {
+      for (const time of extractionResult.times || []) {
         queries.push({
           cypher: `
             MATCH (e:Event {id: $eventId})
@@ -1187,7 +1175,7 @@ class KnowledgeGraphService {
     }
     
     // 自定义关系
-    for (const rel of extractionResult.relationships) {
+    for (const rel of extractionResult.relationships || []) {
       queries.push({
         cypher: `
           MATCH (from) WHERE from.event_name = $fromName OR from.company_name = $fromName OR from.person_name = $fromName
@@ -1222,19 +1210,11 @@ class KnowledgeGraphService {
     
     for (let i = 0; i < queries.length; i += batchSize) {
       const batch = queries.slice(i, i + batchSize);
+      let session = null;
       
       try {
-        // 使用事务批量执行
-        const session = neo4jService.getDriver().session();
-        
-        const txc = session.beginTransaction();
-        const promises = batch.map(query => 
-          txc.run(query.cypher, query.parameters)
-        );
-        
-        await Promise.all(promises);
-        await txc.commit();
-        
+        // 使用Neo4jRepository的executeBatch方法
+        await neo4jService.executeBatch(batch);
         logger.debug(`批量执行${queryType}查询成功: ${batch.length}条`);
         
       } catch (error) {
@@ -1247,8 +1227,6 @@ class KnowledgeGraphService {
             logger.warn(`单条${queryType}查询失败:`, singleError.message);
           }
         }
-      } finally {
-        await session.close();
       }
     }
   }

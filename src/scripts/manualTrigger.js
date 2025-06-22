@@ -3,9 +3,9 @@ import logger from '../../shared/utils/logger.js';
 import newsService from '../services/newsService.js';
 import aiService from '../services/aiService.js';
 import webhookService from '../services/webhookService.js';
-import knowledgeGraphService from '../services/knowledgeGraphService.js';
-import newsLevelService from '../services/newsLevelService.js';
-import storageService from '../services/storageService.js';
+import newsProcessingService from '../application/services/NewsProcessingService.js';
+import newsLevelService from '../application/services/newsLevelService.js';
+import storageService from '../infrastructure/storage/FileStorage.js';
 import workerManager from '../services/workerManager.js';
 import config from '../../shared/config/config.js';
 
@@ -138,7 +138,7 @@ class ManualTrigger {
       logger.info('开始手动处理所有本地存储的新闻...');
       
       // 初始化服务
-      await knowledgeGraphService.initialize();
+      await newsProcessingService.knowledgeGraph.initialize();
       await newsLevelService.initialize();
       
       // 获取所有本地存储的新闻
@@ -156,7 +156,7 @@ class ManualTrigger {
       
       // 过滤掉已处理的新闻
       const newsIds = allStoredNews.map(item => item.id);
-      const unprocessedIds = await knowledgeGraphService.getUnprocessedNewsIds(newsIds);
+      const unprocessedIds = await newsProcessingService.getUnprocessedNewsIds(newsIds);
       const unprocessedNews = allStoredNews.filter(item => unprocessedIds.includes(item.id));
       
       if (unprocessedNews.length === 0) {
@@ -182,7 +182,7 @@ class ManualTrigger {
         for (const newsItem of batch) {
           try {
             // 处理单条新闻
-            const result = await knowledgeGraphService.processNews(newsItem);
+            const result = await newsProcessingService.processNews(newsItem);
             
             if (result.success && !result.skipped) {
               processedCount++;
@@ -260,7 +260,7 @@ class ManualTrigger {
     try {
       logger.info(`开始处理最近${hours}小时的新闻...`);
       
-      await knowledgeGraphService.initialize();
+      await newsProcessingService.knowledgeGraph.initialize();
       await newsLevelService.initialize();
       
       const endTime = moment();
@@ -278,13 +278,13 @@ class ManualTrigger {
       
       // 过滤未处理的新闻
       const newsIds = recentNews.map(item => item.id);
-      const unprocessedIds = await knowledgeGraphService.getUnprocessedNewsIds(newsIds);
+      const unprocessedIds = await newsProcessingService.getUnprocessedNewsIds(newsIds);
       const unprocessedNews = recentNews.filter(item => unprocessedIds.includes(item.id));
       
       let processedCount = 0;
       for (const newsItem of unprocessedNews) {
         try {
-          const result = await knowledgeGraphService.processNews(newsItem);
+          const result = await newsProcessingService.processNews(newsItem);
           if (result.success && !result.skipped) {
             processedCount++;
             
@@ -325,8 +325,8 @@ class ManualTrigger {
     try {
       logger.info('开始执行健康检查...');
       
-      const healthResult = await knowledgeGraphService.healthCheck();
-      const graphStats = await knowledgeGraphService.getGraphStats();
+      const healthResult = await newsProcessingService.healthCheck();
+      const graphStats = await newsProcessingService.getStats();
       const latestNews = await storageService.getLatest();
       
       const result = {
@@ -404,7 +404,7 @@ class ManualTrigger {
   async getSystemStatus() {
     try {
       const allStoredNews = await storageService.getAll(1);
-      const graphStats = await knowledgeGraphService.getGraphStats();
+      const graphStats = await newsProcessingService.getStats();
       
       // 获取工作线程状态
       let workerStatus = null;

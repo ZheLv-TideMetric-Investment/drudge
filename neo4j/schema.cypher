@@ -125,7 +125,7 @@ CALL apoc.custom.asProcedure(
   'getCompanyEvents',
   'MATCH (c:Company {company_name: $companyName})<-[:OCCURRED_IN]-(e:Event)
    RETURN e ORDER BY e.event_date DESC LIMIT $limit',
-  'read',
+    'read',
   [['e', 'NODE']],
   [['companyName', 'STRING'], ['limit', 'INTEGER']]
 );
@@ -135,7 +135,7 @@ CALL apoc.custom.asProcedure(
   'getDayEvents',
   'MATCH (t:Time {date: $date})<-[:HAPPENED_AT]-(e:Event)
    RETURN e ORDER BY t.timestamp',
-  'read',
+    'read',
   [['e', 'NODE']],
   [['date', 'STRING']]
 );

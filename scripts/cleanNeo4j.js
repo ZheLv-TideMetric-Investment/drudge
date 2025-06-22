@@ -1,5 +1,5 @@
 import neo4j from 'neo4j-driver';
-import logger from '../src/utils/logger.js';
+import logger from '../src/shared/utils/logger.js';
 import moment from 'moment-timezone';
 
 // 设置默认时区为北京时间

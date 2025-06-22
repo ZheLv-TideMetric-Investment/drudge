@@ -40,8 +40,8 @@ export async function callSimpleLLM(messages) {
 }
 
 export async function callLLM(messages) {
-  return callDeepSeek(messages);
-  // return callGemi(messages);
+  // return callDeepSeek(messages);
+  return callGemi(messages);
 }
 
 export async function callLLMWithJsonResponse(messages) {
