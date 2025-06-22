@@ -25,20 +25,50 @@ class WebhookService {
 
   /**
    * 发送消息到钉钉群
-   * @param {string} content 消息内容
+   * @param {string|moment.Moment} startTime - 开始时间 
+   * @param {string|moment.Moment} endTime - 结束时间
+   * @param {string} content - 消息内容
+   * @param {string} title - 自定义标题（可选）
    * @returns {Promise<boolean>} 发送结果
    */
-  async sendMessage(startTime, endTime, content) {
+  async sendMessage(startTime, endTime, content, title = null) {
     const tokens = this.getAccessTokens();
     if (tokens.length === 0) {
       return false;
     }
 
+    // 处理时间参数，支持字符串和moment对象
+    const formatTime = (time) => {
+      if (typeof time === 'string') {
+        return time;
+      }
+      return moment(time).format('YYYY-MM-DD HH:mm');
+    };
+
+    const startTimeStr = formatTime(startTime);
+    const endTimeStr = formatTime(endTime);
+
+    // 确保标题始终包含Tide关键字
+    let finalTitle;
+    if (title) {
+      finalTitle = title.includes('Tide') ? title : `[Tide] ${title}`;
+    } else {
+      finalTitle = `[Tide]${startTimeStr} - ${endTimeStr.split(' ')[1]}新闻摘要`;
+    }
+
+    // 确保消息内容始终包含Tide关键字
+    let finalContent;
+    if (content.includes('Tide')) {
+      finalContent = content;
+    } else {
+      finalContent = `[Tide]\n\n${content}`;
+    }
+
     const message = {
       msgtype: 'markdown',
       markdown: {
-        title: `[Tide]${startTime.format('YYYY-MM-DD HH:mm')} - ${endTime.format('HH:mm')}新闻摘要`,
-        text: `${startTime.format('YYYY-MM-DD HH:mm')} - ${endTime.format('HH:mm')}摘要：\n${content}`,
+        title: finalTitle,
+        text: finalContent,
       },
     };
 

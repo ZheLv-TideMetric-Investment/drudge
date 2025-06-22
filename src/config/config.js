@@ -31,4 +31,21 @@ export default {
     password: process.env.NEO4J_PASSWORD || '',
     database: process.env.NEO4J_DATABASE || 'neo4j',
   },
+  // 批量处理配置
+  batch: {
+    enabled: process.env.BATCH_ENABLED !== 'false', // 默认启用批量处理
+    minBatchSize: parseInt(process.env.BATCH_MIN_SIZE || '3', 10), // 最小批量大小
+    maxBatchSize: parseInt(process.env.BATCH_MAX_SIZE || '5', 10), // 最大批量大小
+    aiRetryAttempts: parseInt(process.env.BATCH_AI_RETRY || '3', 10), // AI调用重试次数
+    dbBatchSize: parseInt(process.env.BATCH_DB_SIZE || '20', 10), // 数据库批量大小
+    delayBetweenBatches: parseInt(process.env.BATCH_DELAY || '500', 10), // 批次间延迟(ms)
+  },
+
+  // 工作线程配置
+  workers: {
+    enabled: process.env.WORKERS_ENABLED !== 'false', // 默认启用工作线程
+    maxWorkers: parseInt(process.env.MAX_WORKERS || '2', 10), // 最大工作线程数
+    timeout: parseInt(process.env.WORKER_TIMEOUT || '300000', 10), // 工作线程任务超时时间(ms)
+    healthCheckInterval: parseInt(process.env.WORKER_HEALTH_CHECK_INTERVAL || '60000', 10), // 健康检查间隔(ms)
+  },
 };

@@ -1,19 +1,27 @@
 import neo4jService from './neo4jService.js';
 import entityExtractionService from './entityExtractionService.js';
 import logger from '../utils/logger.js';
+import config from '../config/config.js';
 import {
-  EntityNode,
   EventNode,
+  CompanyNode,
+  PersonNode,
+  OrganizationNode,
+  LocationNode,
+  TimeNode,
   NewsNode,
   Relationship,
   GraphQueryResult,
   RelationshipTypes,
-  EntityTypes,
+  NodeTypes,
+  SignificanceLevel,
+  SnakeTrackingQuery,
+  HourlySummary,
 } from '../models/GraphModels.js';
 
 /**
- * 知识图谱服务
- * 负责构建、维护和查询新闻事件网络图
+ * 新闻处理与图数据库存储系统 - 知识图谱服务
+ * 基于新闻六要素（5W1H）构建和查询知识图谱
  */
 class KnowledgeGraphService {
   constructor() {
@@ -37,48 +45,90 @@ class KnowledgeGraphService {
   }
 
   /**
-   * 处理新闻并构建知识图谱
+   * 检查新闻是否已经处理过
+   * @param {string} newsId - 新闻ID
+   * @returns {boolean} - 是否已处理
+   */
+  async isNewsProcessed(newsId) {
+    const cypher = `
+      MATCH (n:News {id: $newsId, processed: true})
+      RETURN n
+      LIMIT 1
+    `;
+    
+    const result = await neo4jService.executeQuery(cypher, { newsId });
+    return result.records.length > 0;
+  }
+
+  /**
+   * 批量检查新闻是否已处理过
+   * @param {Array} newsIds - 新闻ID列表
+   * @returns {Array} - 未处理的新闻ID列表
+   */
+  async getUnprocessedNewsIds(newsIds) {
+    if (newsIds.length === 0) return [];
+    
+    const cypher = `
+      WITH $newsIds as ids
+      UNWIND ids as newsId
+      OPTIONAL MATCH (n:News {id: newsId, processed: true})
+      WITH newsId, n
+      WHERE n IS NULL
+      RETURN newsId
+    `;
+    
+    const result = await neo4jService.executeQuery(cypher, { newsIds });
+    return result.records.map(record => record.get('newsId'));
+  }
+
+  /**
+   * 处理新闻并构建知识图谱（幂等性保证）
    * @param {Object} newsItem - 新闻对象
    * @returns {Object} - 处理结果
    */
   async processNews(newsItem) {
     try {
-      logger.info(`开始处理新闻: ${newsItem.id}`);
+      // 幂等性检查：如果新闻已经处理过，直接返回
+      const alreadyProcessed = await this.isNewsProcessed(newsItem.id);
+      if (alreadyProcessed) {
+        logger.debug(`新闻 ${newsItem.id} 已经处理过，跳过`);
+        return { 
+          success: true, 
+          skipped: true, 
+          reason: 'already_processed',
+          stats: { events: 0, companies: 0, persons: 0 }
+        };
+      }
 
-      // 提取实体和事件
+      logger.info(`开始处理新闻构建图谱: ${newsItem.id}`);
+
+      // 提取新闻六要素
       const extractionResult = await entityExtractionService.extractFromNews(newsItem);
 
-      if (extractionResult.entities.length === 0 && extractionResult.events.length === 0) {
-        logger.info(`新闻 ${newsItem.id} 未提取到有效实体或事件`);
-        return { success: true, stats: extractionResult.getStats() };
+      if (extractionResult.events.length === 0) {
+        logger.info(`新闻 ${newsItem.id} 未提取到有效事件`);
+        // 即使没有事件也要标记为已处理
+        await this.createNewsNode(newsItem, extractionResult.news_level || 'Level 5');
+        return { success: true, stats: extractionResult.getStats(), extractionResult };
       }
 
       // 创建新闻节点
-      await this.createNewsNode(newsItem);
+      await this.createNewsNode(newsItem, extractionResult.news_level);
 
-      // 处理实体
-      const entityNodes = await this.processEntities(extractionResult.entities, newsItem.id);
+      // 处理各类节点
+      const createdNodes = await this.processAllNodes(extractionResult, newsItem.id);
 
-      // 处理事件
-      const eventNodes = await this.processEvents(extractionResult.events, newsItem.id);
-
-      // 处理关系
-      await this.processRelationships(extractionResult.relationships, newsItem.id);
-
-      // 建立实体与新闻的关系
-      await this.linkEntitiesToNews(entityNodes, newsItem.id);
-
-      // 建立事件与新闻的关系
-      await this.linkEventsToNews(eventNodes, newsItem.id);
+      // 建立关系
+      await this.createRelationships(extractionResult, newsItem.id);
 
       const stats = {
         ...extractionResult.getStats(),
-        createdEntityNodes: entityNodes.length,
-        createdEventNodes: eventNodes.length,
+        created_nodes: createdNodes,
+        news_level: extractionResult.news_level
       };
 
-      logger.info(`新闻 ${newsItem.id} 处理完成:`, stats);
-      return { success: true, stats };
+      logger.info(`新闻 ${newsItem.id} 图谱构建完成:`, stats);
+      return { success: true, stats, extractionResult };
     } catch (error) {
       logger.error(`处理新闻 ${newsItem.id} 失败:`, error);
       return { success: false, error: error.message };
@@ -86,22 +136,9 @@ class KnowledgeGraphService {
   }
 
   /**
-   * 批量处理新闻
-   * @param {Array} newsItems - 新闻数组
-   */
-  async batchProcessNews(newsItems) {
-    const results = [];
-    for (const newsItem of newsItems) {
-      const result = await this.processNews(newsItem);
-      results.push({ newsId: newsItem.id, ...result });
-    }
-    return results;
-  }
-
-  /**
    * 创建新闻节点
    */
-  async createNewsNode(newsItem) {
+  async createNewsNode(newsItem, newsLevel = 'Level 3') {
     const cypher = `
       MERGE (n:News {id: $id})
       SET n.title = $title,
@@ -110,9 +147,10 @@ class KnowledgeGraphService {
           n.source = $source,
           n.url = $url,
           n.level = $level,
+          n.news_level = $newsLevel,
           n.processed = true,
-          n.createdAt = $createdAt,
-          n.updatedAt = $updatedAt
+          n.created_at = $createdAt,
+          n.updated_at = $updatedAt
       RETURN n
     `;
 
@@ -124,6 +162,7 @@ class KnowledgeGraphService {
       source: newsItem.source || '',
       url: newsItem.url || '',
       level: newsItem.level || 0,
+      newsLevel,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -132,466 +171,594 @@ class KnowledgeGraphService {
   }
 
   /**
-   * 处理实体
+   * 处理所有节点创建
    */
-  async processEntities(entities, newsId) {
-    const createdEntities = [];
-
-    for (const entity of entities) {
-      try {
-        // 查找是否存在相同或相似的实体
-        const existingEntity = await this.findSimilarEntity(entity);
-
-        if (existingEntity) {
-          // 更新现有实体
-          await this.updateEntity(existingEntity.name, entity);
-          createdEntities.push(existingEntity);
-          logger.debug(`实体 "${entity.name}" 合并到现有实体 "${existingEntity.name}"`);
-        } else {
-          // 创建新实体
-          const newEntity = await this.createEntity(entity);
-          createdEntities.push(newEntity);
-          logger.debug(`创建新实体: "${entity.name}"`);
-        }
-      } catch (error) {
-        logger.error(`处理实体 "${entity.name}" 失败:`, error);
-      }
-    }
-
-    return createdEntities;
-  }
-
-  /**
-   * 查找相似实体
-   */
-  async findSimilarEntity(entity) {
-    // 首先精确匹配
-    let cypher = `
-      MATCH (e:Entity)
-      WHERE e.name = $name OR $name IN e.aliases
-      RETURN e LIMIT 1
-    `;
-
-    let result = await neo4jService.executeQuery(cypher, { name: entity.name });
-
-    if (result.records.length > 0) {
-      return result.records[0].get('e').properties;
-    }
-
-    // 模糊匹配（针对同类型实体）
-    cypher = `
-      MATCH (e:Entity {type: $type})
-      WHERE e.name CONTAINS $namePart OR ANY(alias IN e.aliases WHERE alias CONTAINS $namePart)
-      RETURN e, 
-             CASE 
-               WHEN e.name = $name THEN 1.0
-               WHEN $name IN e.aliases THEN 0.9
-               WHEN e.name CONTAINS $name OR $name CONTAINS e.name THEN 0.8
-               ELSE 0.7
-             END as similarity
-      ORDER BY similarity DESC
-      LIMIT 1
-    `;
-
-    const namePart = entity.name.length > 2 ? entity.name.substring(0, Math.min(entity.name.length, 3)) : entity.name;
-
-    result = await neo4jService.executeQuery(cypher, {
-      type: entity.type,
-      name: entity.name,
-      namePart,
-    });
-
-    if (result.records.length > 0 && result.records[0].get('similarity') > 0.7) {
-      return result.records[0].get('e').properties;
-    }
-
-    return null;
-  }
-
-  /**
-   * 创建实体
-   */
-  async createEntity(entity) {
-    const cypher = `
-      CREATE (e:Entity {
-        name: $name,
-        type: $type,
-        aliases: $aliases,
-        description: $description,
-        confidence: $confidence,
-        createdAt: $createdAt,
-        updatedAt: $updatedAt
-      })
-      RETURN e
-    `;
-
-    const parameters = {
-      name: entity.name,
-      type: entity.type,
-      aliases: entity.aliases,
-      description: entity.description,
-      confidence: entity.confidence,
-      createdAt: entity.createdAt,
-      updatedAt: entity.updatedAt,
+  async processAllNodes(extractionResult, newsId) {
+    const createdNodes = {
+      events: 0,
+      companies: 0,
+      persons: 0,
+      organizations: 0,
+      locations: 0,
+      times: 0,
     };
 
-    const result = await neo4jService.executeQuery(cypher, parameters);
-    return result.records[0].get('e').properties;
+    // 处理事件节点
+    for (const event of extractionResult.events) {
+      await this.createEventNode(event);
+      createdNodes.events++;
+    }
+
+    // 处理公司节点
+    for (const company of extractionResult.companies) {
+      await this.createCompanyNode(company);
+      createdNodes.companies++;
+    }
+
+    // 处理人物节点
+    for (const person of extractionResult.persons) {
+      await this.createPersonNode(person);
+      createdNodes.persons++;
+    }
+
+    // 处理机构节点
+    for (const organization of extractionResult.organizations) {
+      await this.createOrganizationNode(organization);
+      createdNodes.organizations++;
+  }
+
+    // 处理地点节点
+    for (const location of extractionResult.locations) {
+      await this.createLocationNode(location);
+      createdNodes.locations++;
+    }
+
+    // 处理时间节点
+    for (const time of extractionResult.times) {
+      await this.createTimeNode(time);
+      createdNodes.times++;
+    }
+
+    return createdNodes;
   }
 
   /**
-   * 更新实体
+   * 创建事件节点
    */
-  async updateEntity(existingName, newEntity) {
+  async createEventNode(event) {
     const cypher = `
-      MATCH (e:Entity {name: $existingName})
-      SET e.aliases = e.aliases + [alias IN $newAliases WHERE NOT alias IN e.aliases],
-          e.description = CASE WHEN $newDescription <> '' THEN $newDescription ELSE e.description END,
-          e.confidence = ($confidence + e.confidence) / 2,
-          e.updatedAt = $updatedAt
+      MERGE (e:Event {id: $id})
+      SET e.event_name = $eventName,
+          e.event_description = $eventDescription,
+          e.event_date = $eventDate,
+          e.event_type = $eventType,
+          e.significance = $significance,
+          e.sentiment = $sentiment,
+          e.magnitude = $magnitude,
+          e.event_level = $eventLevel,
+          e.created_at = $createdAt,
+          e.updated_at = $updatedAt
       RETURN e
     `;
-
-    const newAliases = [newEntity.name, ...newEntity.aliases].filter(alias => alias !== existingName);
 
     await neo4jService.executeQuery(cypher, {
-      existingName,
-      newAliases,
-      newDescription: newEntity.description,
-      confidence: newEntity.confidence,
-      updatedAt: new Date().toISOString(),
+      id: event.id,
+      eventName: event.event_name,
+      eventDescription: event.event_description,
+      eventDate: event.event_date,
+      eventType: event.event_type,
+      significance: event.significance,
+      sentiment: event.sentiment,
+      magnitude: event.magnitude,
+      eventLevel: event.event_level,
+      createdAt: event.created_at,
+      updatedAt: event.updated_at,
     });
   }
 
   /**
-   * 处理事件
+   * 创建公司节点
    */
-  async processEvents(events, newsId) {
-    const createdEvents = [];
-
-    for (const event of events) {
-      try {
-        const eventNode = await this.createEvent(event, newsId);
-        createdEvents.push(eventNode);
-        logger.debug(`创建事件: "${event.description}"`);
-      } catch (error) {
-        logger.error(`处理事件失败:`, error);
-      }
-    }
-
-    return createdEvents;
-  }
-
-  /**
-   * 创建事件
-   */
-  async createEvent(event, newsId) {
-    const eventId = `${event.type}_${newsId}_${Date.now()}`;
-
+  async createCompanyNode(company) {
     const cypher = `
-      CREATE (e:Event {
-        id: $id,
-        type: $type,
-        description: $description,
-        sentiment: $sentiment,
-        magnitude: $magnitude,
-        timestamp: $timestamp,
-        location: $location,
-        source: $source,
-        createdAt: $createdAt
-      })
-      RETURN e
+      MERGE (c:Company {company_name: $companyName})
+      SET c.ticker = $ticker,
+          c.industry = $industry,
+          c.created_at = $createdAt,
+          c.updated_at = $updatedAt
+      RETURN c
     `;
 
-    const parameters = {
-      id: eventId,
-      type: event.type,
-      description: event.description,
-      sentiment: event.sentiment,
-      magnitude: event.magnitude,
-      timestamp: event.timestamp,
-      location: event.location,
-      source: newsId,
-      createdAt: event.createdAt,
-    };
-
-    const result = await neo4jService.executeQuery(cypher, parameters);
-    return result.records[0].get('e').properties;
+    await neo4jService.executeQuery(cypher, {
+      companyName: company.company_name,
+      ticker: company.ticker,
+      industry: company.industry,
+      createdAt: company.created_at,
+      updatedAt: company.updated_at,
+    });
   }
 
   /**
-   * 处理关系
+   * 创建人物节点
    */
-  async processRelationships(relationships, newsId) {
-    for (const rel of relationships) {
-      try {
-        await this.createRelationship(rel);
-        logger.debug(`创建关系: ${rel.from} ${rel.type} ${rel.to}`);
-      } catch (error) {
-        logger.error(`创建关系失败:`, error);
-      }
-    }
+  async createPersonNode(person) {
+    const cypher = `
+      MERGE (p:Person {person_name: $personName})
+      SET p.role = $role,
+          p.company = $company,
+          p.created_at = $createdAt,
+          p.updated_at = $updatedAt
+      RETURN p
+    `;
+
+    await neo4jService.executeQuery(cypher, {
+      personName: person.person_name,
+      role: person.role,
+      company: person.company,
+      createdAt: person.created_at,
+      updatedAt: person.updated_at,
+    });
+  }
+
+  /**
+   * 创建机构节点
+   */
+  async createOrganizationNode(organization) {
+    const cypher = `
+      MERGE (o:Organization {organization_name: $organizationName})
+      SET o.type = $type,
+          o.country = $country,
+          o.created_at = $createdAt,
+          o.updated_at = $updatedAt
+      RETURN o
+    `;
+
+    await neo4jService.executeQuery(cypher, {
+      organizationName: organization.organization_name,
+      type: organization.type,
+      country: organization.country,
+      createdAt: organization.created_at,
+      updatedAt: organization.updated_at,
+    });
+  }
+
+  /**
+   * 创建地点节点
+   */
+  async createLocationNode(location) {
+    const cypher = `
+      MERGE (l:Location {location_name: $locationName})
+      SET l.country = $country,
+          l.region = $region,
+          l.created_at = $createdAt,
+          l.updated_at = $updatedAt
+      RETURN l
+    `;
+
+    await neo4jService.executeQuery(cypher, {
+      locationName: location.location_name,
+      country: location.country,
+      region: location.region,
+      createdAt: location.created_at,
+      updatedAt: location.updated_at,
+    });
+  }
+
+  /**
+   * 创建时间节点
+   */
+  async createTimeNode(time) {
+    const cypher = `
+      MERGE (t:Time {timestamp: $timestamp})
+      SET t.date = $date,
+          t.hour = $hour,
+          t.time_of_day = $timeOfDay,
+          t.created_at = $createdAt
+      RETURN t
+    `;
+
+    await neo4jService.executeQuery(cypher, {
+      timestamp: time.timestamp,
+      date: time.date,
+      hour: time.hour,
+      timeOfDay: time.time_of_day,
+      createdAt: time.created_at,
+    });
   }
 
   /**
    * 创建关系
    */
-  async createRelationship(relationship) {
+  async createRelationships(extractionResult, newsId) {
+    // 事件与新闻的关系
+    for (const event of extractionResult.events) {
+      await this.createEventNewsRelation(event.id, newsId);
+    }
+
+    // 处理提取的关系
+    for (const rel of extractionResult.relationships) {
+      await this.createCustomRelationship(rel);
+    }
+
+    // 基于数据推断的自然关系
+    await this.createInferredRelationships(extractionResult);
+  }
+
+  /**
+   * 创建事件与新闻的关系
+   */
+  async createEventNewsRelation(eventId, newsId) {
     const cypher = `
-      MATCH (from:Entity {name: $fromName})
-      MATCH (to:Entity {name: $toName})
+      MATCH (e:Event {id: $eventId})
+      MATCH (n:News {id: $newsId})
+      MERGE (e)-[r:REPORTED_IN]->(n)
+      SET r.created_at = $createdAt
+    `;
+
+    await neo4jService.executeQuery(cypher, {
+      eventId,
+      newsId,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * 创建自定义关系
+   */
+  async createCustomRelationship(relationship) {
+    // 根据关系类型动态创建查询
+    const cypher = `
+      MATCH (from) WHERE from.event_name = $fromName OR from.company_name = $fromName OR from.person_name = $fromName
+      MATCH (to) WHERE to.event_name = $toName OR to.company_name = $toName OR to.person_name = $toName
       MERGE (from)-[r:${relationship.type}]->(to)
-      SET r.confidence = $confidence,
-          r.description = $description,
+      SET r.description = $description,
+          r.confidence = $confidence,
           r.source = $source,
-          r.createdAt = $createdAt
-      RETURN r
+          r.created_at = $createdAt
     `;
 
     await neo4jService.executeQuery(cypher, {
       fromName: relationship.from,
       toName: relationship.to,
-      confidence: relationship.confidence,
       description: relationship.description,
+      confidence: relationship.confidence,
       source: relationship.source,
       createdAt: new Date().toISOString(),
     });
   }
 
   /**
-   * 建立实体与新闻的关系
+   * 创建推断的自然关系
    */
-  async linkEntitiesToNews(entities, newsId) {
-    for (const entity of entities) {
-      const cypher = `
-        MATCH (e:Entity {name: $entityName})
-        MATCH (n:News {id: $newsId})
-        MERGE (e)-[r:MENTIONED_IN]->(n)
-        SET r.createdAt = $createdAt
-      `;
+  async createInferredRelationships(extractionResult) {
+    // 事件与公司的关系
+    for (const event of extractionResult.events) {
+      for (const company of extractionResult.companies) {
+        await this.createEventCompanyRelation(event.id, company.company_name);
+      }
+    }
 
-      await neo4jService.executeQuery(cypher, {
-        entityName: entity.name,
-        newsId,
-        createdAt: new Date().toISOString(),
-      });
+    // 事件与人物的关系
+    for (const event of extractionResult.events) {
+      for (const person of extractionResult.persons) {
+        await this.createEventPersonRelation(event.id, person.person_name, person.role);
+      }
+    }
+
+    // 事件与地点的关系
+    for (const event of extractionResult.events) {
+      for (const location of extractionResult.locations) {
+        await this.createEventLocationRelation(event.id, location.location_name);
+      }
+    }
+
+    // 事件与时间的关系
+    for (const event of extractionResult.events) {
+      for (const time of extractionResult.times) {
+        await this.createEventTimeRelation(event.id, time.timestamp);
+      }
     }
   }
 
   /**
-   * 建立事件与新闻的关系
+   * 创建事件与公司的关系
    */
-  async linkEventsToNews(events, newsId) {
-    for (const event of events) {
+  async createEventCompanyRelation(eventId, companyName) {
       const cypher = `
         MATCH (e:Event {id: $eventId})
-        MATCH (n:News {id: $newsId})
-        MERGE (e)-[r:REPORTED_IN]->(n)
-        SET r.createdAt = $createdAt
+      MATCH (c:Company {company_name: $companyName})
+      MERGE (e)-[r:OCCURRED_IN]->(c)
+      SET r.date = e.event_date,
+          r.significance = e.significance,
+          r.created_at = $createdAt
       `;
 
       await neo4jService.executeQuery(cypher, {
-        eventId: event.id,
-        newsId,
+      eventId,
+      companyName,
         createdAt: new Date().toISOString(),
       });
-    }
   }
 
   /**
-   * 查询实体相关的所有信息
+   * 创建事件与人物的关系
    */
-  async getEntityGraph(entityName, depth = 2) {
-    const cypher = `
-      MATCH path = (e:Entity {name: $entityName})-[*1..${depth}]-(connected)
-      RETURN path
-      LIMIT 100
-    `;
+  async createEventPersonRelation(eventId, personName, role) {
+      const cypher = `
+        MATCH (e:Event {id: $eventId})
+      MATCH (p:Person {person_name: $personName})
+      MERGE (e)-[r:INVOLVES]->(p)
+      SET r.role = $role,
+          r.created_at = $createdAt
+      `;
 
-    const result = await neo4jService.executeQuery(cypher, { entityName });
-    return this.buildGraphResult(result);
+      await neo4jService.executeQuery(cypher, {
+      eventId,
+      personName,
+      role,
+        createdAt: new Date().toISOString(),
+      });
   }
 
   /**
-   * 查询事件相关的实体
+   * 创建事件与地点的关系
    */
-  async getEventEntities(eventType, limit = 50) {
+  async createEventLocationRelation(eventId, locationName) {
     const cypher = `
-      MATCH (e:Event {type: $eventType})-[:REPORTED_IN]->(n:News)<-[:MENTIONED_IN]-(entity:Entity)
-      RETURN DISTINCT entity, e, n
-      ORDER BY e.timestamp DESC
-      LIMIT $limit
+      MATCH (e:Event {id: $eventId})
+      MATCH (l:Location {location_name: $locationName})
+      MERGE (e)-[r:OCCURRED_AT]->(l)
+      SET r.location_type = '发生地',
+          r.created_at = $createdAt
     `;
 
-    const result = await neo4jService.executeQuery(cypher, { eventType, limit });
-    return this.buildGraphResult(result);
-  }
-
-  /**
-   * 查询实体的事件时间线
-   */
-  async getEntityTimeline(entityName, startDate, endDate) {
-    const cypher = `
-      MATCH (entity:Entity {name: $entityName})-[:MENTIONED_IN]->(n:News)<-[:REPORTED_IN]-(e:Event)
-      WHERE e.timestamp >= $startDate AND e.timestamp <= $endDate
-      RETURN e, n
-      ORDER BY e.timestamp DESC
-    `;
-
-    const result = await neo4jService.executeQuery(cypher, {
-      entityName,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
+    await neo4jService.executeQuery(cypher, {
+      eventId,
+      locationName,
+      createdAt: new Date().toISOString(),
     });
-
-    return this.buildGraphResult(result);
   }
 
   /**
-   * 查询热门实体
+   * 创建事件与时间的关系
    */
-  async getPopularEntities(limit = 20) {
+  async createEventTimeRelation(eventId, timestamp) {
     const cypher = `
-      MATCH (e:Entity)-[:MENTIONED_IN]->(n:News)
-      WITH e, count(n) as mentions
-      ORDER BY mentions DESC
-      LIMIT $limit
-      RETURN e, mentions
+      MATCH (e:Event {id: $eventId})
+      MATCH (t:Time {timestamp: $timestamp})
+      MERGE (e)-[r:HAPPENED_AT]->(t)
+      SET r.created_at = $createdAt
     `;
 
-    const result = await neo4jService.executeQuery(cypher, { limit });
+    await neo4jService.executeQuery(cypher, {
+      eventId,
+      timestamp,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * 获取特定级别的新闻事件
+   * @param {string} newsLevel - 新闻级别 (Level 1/Level 2/Level 3/Level 4)
+   * @param {number} limit - 限制数量
+   * @returns {Array} - 指定级别的事件列表
+   */
+  async getNewsByLevel(newsLevel = 'Level 1', limit = 20) {
+    const cypher = `
+      MATCH (n:News {news_level: $newsLevel})-[:REPORTED_IN]-(e:Event)
+      RETURN e, n
+      ORDER BY n.timestamp DESC
+      LIMIT $limit
+    `;
+
+    const result = await neo4jService.executeQuery(cypher, { newsLevel, limit });
     return result.records.map(record => ({
-      entity: record.get('e').properties,
-      mentions: record.get('mentions').toNumber(),
+      event: record.get('e').properties,
+      news: record.get('n').properties,
     }));
   }
 
   /**
-   * 搜索实体
+   * 草蛇灰线功能 - 查询公司相关事件
+   * @param {string} companyName - 公司名称
+   * @param {number} limit - 限制数量
+   * @returns {Array} - 相关事件列表
    */
-  async searchEntities(searchTerm, entityType = null, limit = 20) {
-    let cypher = `
-      MATCH (e:Entity)
-      WHERE e.name CONTAINS $searchTerm 
-         OR ANY(alias IN e.aliases WHERE alias CONTAINS $searchTerm)
-    `;
-
-    const parameters = { searchTerm, limit };
-
-    if (entityType) {
-      cypher += ` AND e.type = $entityType`;
-      parameters.entityType = entityType;
-    }
-
-    cypher += `
+  async getCompanyEvents(companyName, limit = 50) {
+    const cypher = `
+      MATCH (c:Company {company_name: $companyName})<-[:OCCURRED_IN]-(e:Event)
       RETURN e
-      ORDER BY 
-        CASE 
-          WHEN e.name = $searchTerm THEN 1
-          WHEN e.name STARTS WITH $searchTerm THEN 2
-          ELSE 3
-        END,
-        e.name
+      ORDER BY e.event_date DESC
       LIMIT $limit
     `;
 
-    const result = await neo4jService.executeQuery(cypher, parameters);
+    const result = await neo4jService.executeQuery(cypher, { companyName, limit });
     return result.records.map(record => record.get('e').properties);
   }
 
   /**
-   * 构建图查询结果
+   * 草蛇灰线功能 - 查询多公司关联事件
+   * @param {Array} companyNames - 公司名称列表
+   * @param {number} limit - 限制数量
+   * @returns {Array} - 关联事件列表
    */
-  buildGraphResult(result) {
-    const graphResult = new GraphQueryResult({});
-    const nodeIds = new Set();
+  async getMultiCompanyEvents(companyNames, limit = 30) {
+    const cypher = `
+      MATCH (c1:Company)<-[:OCCURRED_IN]-(e:Event)-[:OCCURRED_IN]->(c2:Company)
+      WHERE c1.company_name IN $companyNames AND c2.company_name IN $companyNames
+      AND c1 <> c2
+      RETURN DISTINCT e, collect(DISTINCT c1.company_name) + collect(DISTINCT c2.company_name) as companies
+      ORDER BY e.event_date DESC
+      LIMIT $limit
+    `;
 
-    for (const record of result.records) {
-      // 处理路径或直接的节点/关系
-      if (record.has('path')) {
-        const path = record.get('path');
-        // 处理路径中的节点和关系
-        for (const segment of path.segments) {
-          // 添加起始节点
-          if (!nodeIds.has(segment.start.identity.toString())) {
-            graphResult.addNode({
-              id: segment.start.identity.toString(),
-              labels: segment.start.labels,
-              properties: segment.start.properties,
-            });
-            nodeIds.add(segment.start.identity.toString());
-          }
+    const result = await neo4jService.executeQuery(cypher, { companyNames, limit });
+    return result.records.map(record => ({
+      event: record.get('e').properties,
+      companies: record.get('companies'),
+    }));
+  }
 
-          // 添加结束节点
-          if (!nodeIds.has(segment.end.identity.toString())) {
-            graphResult.addNode({
-              id: segment.end.identity.toString(),
-              labels: segment.end.labels,
-              properties: segment.end.properties,
-            });
-            nodeIds.add(segment.end.identity.toString());
-          }
+  /**
+   * 草蛇灰线功能 - 查询某日所有事件
+   * @param {string} date - 日期 (YYYY-MM-DD)
+   * @returns {Array} - 当日事件列表
+   */
+  async getDayEvents(date) {
+    const cypher = `
+      MATCH (t:Time {date: $date})<-[:HAPPENED_AT]-(e:Event)
+      OPTIONAL MATCH (e)-[:OCCURRED_IN]->(c:Company)
+      OPTIONAL MATCH (e)-[:INVOLVES]->(p:Person)
+      OPTIONAL MATCH (e)-[:OCCURRED_AT]->(l:Location)
+      RETURN e, collect(DISTINCT c.company_name) as companies,
+             collect(DISTINCT p.person_name) as persons,
+             collect(DISTINCT l.location_name) as locations
+      ORDER BY t.timestamp
+    `;
 
-          // 添加关系
-          graphResult.addRelationship({
-            id: segment.relationship.identity.toString(),
-            type: segment.relationship.type,
-            startNode: segment.start.identity.toString(),
-            endNode: segment.end.identity.toString(),
-            properties: segment.relationship.properties,
-          });
-        }
-      } else {
-        // 处理直接返回的节点
-        for (const key of record.keys) {
-          const value = record.get(key);
-          if (value && value.labels) {
-            // 这是一个节点
-            if (!nodeIds.has(value.identity.toString())) {
-              graphResult.addNode({
-                id: value.identity.toString(),
-                labels: value.labels,
-                properties: value.properties,
-              });
-              nodeIds.add(value.identity.toString());
-            }
-          }
-        }
-      }
+    const result = await neo4jService.executeQuery(cypher, { date });
+    return result.records.map(record => ({
+      event: record.get('e').properties,
+      companies: record.get('companies'),
+      persons: record.get('persons'),
+      locations: record.get('locations'),
+    }));
+  }
+
+  /**
+   * 按小时总结功能 - 获取某小时的新闻统计
+   * @param {string} hourStart - 开始时间
+   * @param {string} hourEnd - 结束时间
+   * @returns {HourlySummary} - 小时总结
+   */
+  async getHourlySummary(hourStart, hourEnd) {
+    const cypher = `
+      MATCH (n:News)
+      WHERE n.timestamp >= $hourStart AND n.timestamp < $hourEnd
+      
+      OPTIONAL MATCH (n)<-[:REPORTED_IN]-(e:Event)
+      OPTIONAL MATCH (e)-[:OCCURRED_IN]->(c:Company)
+      
+      WITH n, e, c
+      RETURN 
+        count(DISTINCT n) as total_news_count,
+        count(DISTINCT CASE WHEN n.news_level = 'Level 1' THEN n END) as critical_news_count,
+        collect(DISTINCT {event: e.event_name, significance: e.significance}) as events,
+        collect(DISTINCT c.company_name) as companies
+    `;
+
+    const result = await neo4jService.executeQuery(cypher, {
+      hourStart,
+      hourEnd,
+    });
+
+    if (result.records.length === 0) {
+      return new HourlySummary({
+        hour_start: hourStart,
+        hour_end: hourEnd,
+      });
     }
 
-    return graphResult;
+    const record = result.records[0];
+    const events = record.get('events').filter(e => e.event !== null);
+    const companies = record.get('companies').filter(c => c !== null);
+
+    // 获取重要事件（按重要性排序）
+    const topEvents = events
+      .sort((a, b) => b.significance - a.significance)
+      .slice(0, 10);
+
+    // 获取最活跃的公司
+    const companyCount = {};
+    companies.forEach(company => {
+      companyCount[company] = (companyCount[company] || 0) + 1;
+    });
+    const topCompanies = Object.entries(companyCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 10)
+      .map(([company, count]) => ({ company, count }));
+
+    return new HourlySummary({
+      hour_start: hourStart,
+      hour_end: hourEnd,
+      total_news_count: record.get('total_news_count').toNumber(),
+      critical_news_count: record.get('critical_news_count').toNumber(),
+      top_events: topEvents,
+      top_companies: topCompanies,
+    });
+          }
+
+  /**
+   * 搜索实体
+   * @param {string} searchTerm - 搜索词
+   * @param {string} nodeType - 节点类型
+   * @param {number} limit - 限制数量
+   * @returns {Array} - 搜索结果
+   */
+  async searchEntities(searchTerm, nodeType = null, limit = 20) {
+    let cypher = '';
+    const parameters = { searchTerm: searchTerm.toLowerCase(), limit };
+
+    if (nodeType) {
+      cypher = `
+        MATCH (n:${nodeType})
+        WHERE toLower(n.${this.getMainProperty(nodeType)}) CONTAINS $searchTerm
+        RETURN n
+        ORDER BY n.${this.getMainProperty(nodeType)}
+        LIMIT $limit
+      `;
+      } else {
+      cypher = `
+        MATCH (n)
+        WHERE (
+          (n:Company AND toLower(n.${this.getMainProperty('Company')}) CONTAINS $searchTerm) OR
+          (n:Person AND toLower(n.${this.getMainProperty('Person')}) CONTAINS $searchTerm) OR
+          (n:Event AND toLower(n.${this.getMainProperty('Event')}) CONTAINS $searchTerm) OR
+          (n:Location AND toLower(n.${this.getMainProperty('Location')}) CONTAINS $searchTerm) OR
+          (n:Organization AND toLower(n.${this.getMainProperty('Organization')}) CONTAINS $searchTerm)
+        )
+        RETURN n, labels(n)[0] as nodeType
+        LIMIT $limit
+      `;
+    }
+
+    const result = await neo4jService.executeQuery(cypher, parameters);
+    return result.records.map(record => ({
+      node: record.get('n').properties,
+      nodeType: nodeType || record.get('nodeType'),
+    }));
+  }
+
+  /**
+   * 获取节点的主要属性名
+   */
+  getMainProperty(nodeType) {
+    const mapping = {
+      Company: 'company_name',
+      Person: 'person_name',
+      Event: 'event_name',
+      Location: 'location_name',
+      Organization: 'organization_name',
+      Time: 'date',
+    };
+    return mapping[nodeType] || 'name';
   }
 
   /**
    * 获取图谱统计信息
    */
   async getGraphStats() {
-    const stats = await neo4jService.getStats();
-
-    // 获取各类型节点数量
-    const nodeTypeStats = await neo4jService.executeQuery(`
+    const cypher = `
       MATCH (n)
-      RETURN labels(n) as labels, count(n) as count
-    `);
+      RETURN labels(n)[0] as nodeType, count(n) as count
+      ORDER BY count DESC
+    `;
 
-    // 获取关系类型统计
-    const relTypeStats = await neo4jService.executeQuery(`
-      MATCH ()-[r]->()
-      RETURN type(r) as type, count(r) as count
-    `);
-
-    return {
-      ...stats,
-      nodeTypes: nodeTypeStats.records.map(r => ({
-        labels: r.get('labels'),
-        count: r.get('count').toNumber(),
-      })),
-      relationshipTypes: relTypeStats.records.map(r => ({
-        type: r.get('type'),
-        count: r.get('count').toNumber(),
-      })),
-    };
+    const result = await neo4jService.executeQuery(cypher);
+    return result.records.map(record => ({
+      nodeType: record.get('nodeType'),
+      count: record.get('count').toNumber(),
+    }));
   }
 
   /**
@@ -599,20 +766,488 @@ class KnowledgeGraphService {
    */
   async healthCheck() {
     try {
-      const dbHealth = await neo4jService.healthCheck();
+      const stats = await this.getGraphStats();
+      const totalNodes = stats.reduce((sum, stat) => sum + stat.count, 0);
+      
       return {
-        status: dbHealth.status === 'healthy' && this.initialized ? 'healthy' : 'unhealthy',
-        database: dbHealth,
-        initialized: this.initialized,
+        status: 'healthy',
+        totalNodes,
+        nodeTypes: stats,
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         error: error.message,
-        initialized: this.initialized,
         timestamp: new Date().toISOString(),
       };
+    }
+  }
+
+  /**
+   * 批量处理新闻（真正的批量处理）
+   * @param {Array} newsItems - 新闻数组
+   * @param {number} batchSize - 批量大小，默认5
+   */
+  async batchProcessNews(newsItems, batchSize = 5) {
+    const startTime = Date.now();
+    const results = [];
+    
+    try {
+      logger.info(`开始批量处理${newsItems.length}条新闻，批量大小: ${batchSize}`);
+      
+      // 1. 批量提取实体信息
+      const extractionResults = await entityExtractionService.batchExtract(newsItems, batchSize);
+      
+      // 2. 批量创建新闻节点
+      await this.batchCreateNewsNodes(newsItems, extractionResults);
+      
+      // 3. 批量创建实体节点和关系
+      await this.batchCreateEntitiesAndRelationships(extractionResults);
+      
+      // 4. 准备返回结果
+      for (let i = 0; i < newsItems.length; i++) {
+        const newsItem = newsItems[i];
+        const extractionResult = extractionResults[i];
+        
+        const stats = {
+          events: extractionResult.events.length,
+          companies: extractionResult.companies.length,
+          persons: extractionResult.persons.length,
+          organizations: extractionResult.organizations.length,
+          locations: extractionResult.locations.length,
+          times: extractionResult.times.length,
+          news_level: extractionResult.news_level,
+          confidence: extractionResult.confidence
+        };
+        
+        results.push({
+          newsId: newsItem.id,
+          success: true,
+          stats,
+          extractionResult
+        });
+      }
+      
+      const totalTime = Date.now() - startTime;
+      logger.info(`批量处理完成，共处理${newsItems.length}条新闻，耗时${totalTime}ms，平均${Math.round(totalTime/newsItems.length)}ms/条`);
+      
+    } catch (error) {
+      logger.error('批量处理失败，回退到单条处理:', error);
+      
+      // 回退到单条处理
+      for (const newsItem of newsItems) {
+        try {
+          const result = await this.processNews(newsItem);
+          results.push({ newsId: newsItem.id, ...result });
+        } catch (singleError) {
+          logger.error(`单条处理失败: ${newsItem.id}`, singleError);
+          results.push({ 
+            newsId: newsItem.id, 
+            success: false, 
+            error: singleError.message 
+          });
+        }
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * 批量创建新闻节点
+   * @param {Array} newsItems - 新闻数组
+   * @param {Array} extractionResults - 提取结果数组
+   */
+  async batchCreateNewsNodes(newsItems, extractionResults) {
+    const queries = [];
+    
+    for (let i = 0; i < newsItems.length; i++) {
+      const newsItem = newsItems[i];
+      const extractionResult = extractionResults[i];
+      
+      const query = {
+        cypher: `
+          MERGE (n:News {id: $id})
+          SET n.title = $title,
+              n.content = $content,
+              n.timestamp = $timestamp,
+              n.source = $source,
+              n.url = $url,
+              n.level = $level,
+              n.news_level = $newsLevel,
+              n.processed = true,
+              n.created_at = $createdAt,
+              n.updated_at = $updatedAt
+          RETURN n.id as newsId
+        `,
+        parameters: {
+          id: newsItem.id,
+          title: newsItem.title,
+          content: newsItem.content,
+          timestamp: new Date(newsItem.time * 1000).toISOString(),
+          source: newsItem.source || '',
+          url: newsItem.url || '',
+          level: newsItem.level || 0,
+          newsLevel: extractionResult.news_level,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+      };
+      
+      queries.push(query);
+    }
+    
+    // 批量执行
+    await this.executeBatchQueries(queries, '新闻节点');
+  }
+
+  /**
+   * 批量创建实体节点和关系
+   * @param {Array} extractionResults - 提取结果数组
+   */
+  async batchCreateEntitiesAndRelationships(extractionResults) {
+    const allQueries = [];
+    
+    // 收集所有实体创建查询
+    for (const result of extractionResults) {
+      const queries = await this.collectEntityQueries(result);
+      allQueries.push(...queries);
+    }
+    
+    // 批量执行实体创建
+    if (allQueries.length > 0) {
+      await this.executeBatchQueries(allQueries, '实体节点');
+    }
+    
+    // 收集所有关系创建查询  
+    const relationshipQueries = [];
+    for (const result of extractionResults) {
+      const queries = await this.collectRelationshipQueries(result);
+      relationshipQueries.push(...queries);
+    }
+    
+    // 批量执行关系创建
+    if (relationshipQueries.length > 0) {
+      await this.executeBatchQueries(relationshipQueries, '关系');
+    }
+  }
+
+  /**
+   * 收集实体创建查询
+   * @param {NewsExtractionResult} extractionResult - 提取结果
+   * @returns {Array} - 查询数组
+   */
+  async collectEntityQueries(extractionResult) {
+    const queries = [];
+    
+    // 事件节点
+    for (const event of extractionResult.events) {
+      queries.push({
+        cypher: `
+          MERGE (e:Event {id: $id})
+                   SET e.event_name = $eventName,
+             e.event_description = $eventDescription,
+             e.event_date = $eventDate,
+             e.event_type = $eventType,
+             e.significance = $significance,
+             e.sentiment = $sentiment,
+             e.magnitude = $magnitude,
+             e.event_level = $eventLevel,
+             e.created_at = $createdAt,
+             e.updated_at = $updatedAt
+          RETURN e.id
+        `,
+                 parameters: {
+           id: event.id,
+           eventName: event.event_name,
+           eventDescription: event.event_description,
+           eventDate: event.event_date,
+           eventType: event.event_type,
+           significance: event.significance,
+           sentiment: event.sentiment,
+           magnitude: event.magnitude,
+           eventLevel: event.event_level,
+           createdAt: event.created_at,
+           updatedAt: event.updated_at,
+         }
+      });
+    }
+    
+    // 公司节点
+    for (const company of extractionResult.companies) {
+      queries.push({
+        cypher: `
+          MERGE (c:Company {company_name: $companyName})
+          SET c.ticker = $ticker,
+              c.industry = $industry,
+              c.created_at = $createdAt,
+              c.updated_at = $updatedAt
+          RETURN c.company_name
+        `,
+        parameters: {
+          companyName: company.company_name,
+          ticker: company.ticker,
+          industry: company.industry,
+          createdAt: company.created_at,
+          updatedAt: company.updated_at,
+        }
+      });
+    }
+    
+    // 人物节点
+    for (const person of extractionResult.persons) {
+      queries.push({
+        cypher: `
+          MERGE (p:Person {person_name: $personName})
+          SET p.role = $role,
+              p.company = $company,
+              p.created_at = $createdAt,
+              p.updated_at = $updatedAt
+          RETURN p.person_name
+        `,
+        parameters: {
+          personName: person.person_name,
+          role: person.role,
+          company: person.company,
+          createdAt: person.created_at,
+          updatedAt: person.updated_at,
+        }
+      });
+    }
+    
+    // 机构节点
+    for (const organization of extractionResult.organizations) {
+      queries.push({
+        cypher: `
+          MERGE (o:Organization {organization_name: $organizationName})
+          SET o.type = $type,
+              o.country = $country,
+              o.created_at = $createdAt,
+              o.updated_at = $updatedAt
+          RETURN o.organization_name
+        `,
+        parameters: {
+          organizationName: organization.organization_name,
+          type: organization.type,
+          country: organization.country,
+          createdAt: organization.created_at,
+          updatedAt: organization.updated_at,
+        }
+      });
+    }
+    
+    // 地点节点
+    for (const location of extractionResult.locations) {
+      queries.push({
+        cypher: `
+          MERGE (l:Location {location_name: $locationName})
+          SET l.country = $country,
+              l.region = $region,
+              l.created_at = $createdAt,
+              l.updated_at = $updatedAt
+          RETURN l.location_name
+        `,
+        parameters: {
+          locationName: location.location_name,
+          country: location.country,
+          region: location.region,
+          createdAt: location.created_at,
+          updatedAt: location.updated_at,
+        }
+      });
+    }
+    
+    // 时间节点
+    for (const time of extractionResult.times) {
+      queries.push({
+        cypher: `
+          MERGE (t:Time {timestamp: $timestamp})
+          SET t.date = $date,
+              t.hour = $hour,
+              t.time_of_day = $timeOfDay,
+              t.created_at = $createdAt
+          RETURN t.timestamp
+        `,
+        parameters: {
+          timestamp: time.timestamp,
+          date: time.date,
+          hour: time.hour,
+          timeOfDay: time.time_of_day,
+          createdAt: time.created_at,
+        }
+      });
+    }
+    
+    return queries;
+  }
+
+  /**
+   * 收集关系创建查询
+   * @param {NewsExtractionResult} extractionResult - 提取结果
+   * @returns {Array} - 查询数组
+   */
+  async collectRelationshipQueries(extractionResult) {
+    const queries = [];
+    const createdAt = new Date().toISOString();
+    
+    // 事件与新闻的关系
+    for (const event of extractionResult.events) {
+      queries.push({
+        cypher: `
+          MATCH (e:Event {id: $eventId})
+          MATCH (n:News {id: $newsId})
+          MERGE (e)-[r:REPORTED_IN]->(n)
+          SET r.created_at = $createdAt
+        `,
+        parameters: {
+          eventId: event.id,
+          newsId: extractionResult.news_id,
+          createdAt
+        }
+      });
+    }
+    
+    // 推断的关系
+    for (const event of extractionResult.events) {
+      // 事件与公司的关系
+      for (const company of extractionResult.companies) {
+        queries.push({
+          cypher: `
+            MATCH (e:Event {id: $eventId})
+            MATCH (c:Company {company_name: $companyName})
+            MERGE (e)-[r:OCCURRED_IN]->(c)
+            SET r.date = e.event_date,
+                r.significance = e.significance,
+                r.created_at = $createdAt
+          `,
+          parameters: {
+            eventId: event.id,
+            companyName: company.company_name,
+            createdAt
+          }
+        });
+      }
+      
+      // 事件与人物的关系
+      for (const person of extractionResult.persons) {
+        queries.push({
+          cypher: `
+            MATCH (e:Event {id: $eventId})
+            MATCH (p:Person {person_name: $personName})
+            MERGE (e)-[r:INVOLVES]->(p)
+            SET r.role = $role,
+                r.created_at = $createdAt
+          `,
+          parameters: {
+            eventId: event.id,
+            personName: person.person_name,
+            role: person.role,
+            createdAt
+          }
+        });
+      }
+      
+      // 事件与地点的关系
+      for (const location of extractionResult.locations) {
+        queries.push({
+          cypher: `
+            MATCH (e:Event {id: $eventId})
+            MATCH (l:Location {location_name: $locationName})
+            MERGE (e)-[r:OCCURRED_AT]->(l)
+            SET r.location_type = '发生地',
+                r.created_at = $createdAt
+          `,
+          parameters: {
+            eventId: event.id,
+            locationName: location.location_name,
+            createdAt
+          }
+        });
+      }
+      
+      // 事件与时间的关系
+      for (const time of extractionResult.times) {
+        queries.push({
+          cypher: `
+            MATCH (e:Event {id: $eventId})
+            MATCH (t:Time {timestamp: $timestamp})
+            MERGE (e)-[r:HAPPENED_AT]->(t)
+            SET r.created_at = $createdAt
+          `,
+          parameters: {
+            eventId: event.id,
+            timestamp: time.timestamp,
+            createdAt
+          }
+        });
+      }
+    }
+    
+    // 自定义关系
+    for (const rel of extractionResult.relationships) {
+      queries.push({
+        cypher: `
+          MATCH (from) WHERE from.event_name = $fromName OR from.company_name = $fromName OR from.person_name = $fromName
+          MATCH (to) WHERE to.event_name = $toName OR to.company_name = $toName OR to.person_name = $toName
+          MERGE (from)-[r:${rel.type}]->(to)
+          SET r.description = $description,
+              r.confidence = $confidence,
+              r.source = $source,
+              r.created_at = $createdAt
+        `,
+        parameters: {
+          fromName: rel.from,
+          toName: rel.to,
+          description: rel.description,
+          confidence: rel.confidence,
+          source: rel.source,
+          createdAt
+        }
+      });
+    }
+    
+    return queries;
+  }
+
+  /**
+   * 批量执行查询
+   * @param {Array} queries - 查询数组
+   * @param {string} queryType - 查询类型（用于日志）
+   */
+  async executeBatchQueries(queries, queryType) {
+    const batchSize = config.batch?.dbBatchSize || 20; // 每批处理的查询数量
+    
+    for (let i = 0; i < queries.length; i += batchSize) {
+      const batch = queries.slice(i, i + batchSize);
+      
+      try {
+        // 使用事务批量执行
+        const session = neo4jService.getDriver().session();
+        
+        const txc = session.beginTransaction();
+        const promises = batch.map(query => 
+          txc.run(query.cypher, query.parameters)
+        );
+        
+        await Promise.all(promises);
+        await txc.commit();
+        
+        logger.debug(`批量执行${queryType}查询成功: ${batch.length}条`);
+        
+      } catch (error) {
+        logger.error(`批量执行${queryType}查询失败:`, error);
+        // 回退到单条执行
+        for (const query of batch) {
+          try {
+            await neo4jService.executeQuery(query.cypher, query.parameters);
+          } catch (singleError) {
+            logger.warn(`单条${queryType}查询失败:`, singleError.message);
+          }
+        }
+      } finally {
+        await session.close();
+      }
     }
   }
 }

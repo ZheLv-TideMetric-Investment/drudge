@@ -1,221 +1,240 @@
-import cron from 'node-cron';
 import logger from './utils/logger.js';
-import newsService from './services/newsService.js';
-import aiService from './services/aiService.js';
+import schedulerManager from './services/schedulerManager.js';
+import workerManager from './services/workerManager.js';
 import webhookService from './services/webhookService.js';
-import ohnService from './services/ohnService.js';
-import hnsService from './services/hnsService.js';
-import overnightService from './services/overnightService.js';
-import snakeTrackingService from './services/snakeTrackingService.js';
 import moment from 'moment-timezone';
+import config from './config/config.js';
+import { NewsLevelDescription } from './models/GraphModels.js';
 
 // 设置默认时区为北京时间
 moment.tz.setDefault('Asia/Shanghai');
 
-// 启动新闻获取
-newsService.fetchNews();
+/**
+ * 新闻处理系统主控制器
+ * 使用调度器工作线程执行所有定时任务，主线程只负责管理和监控
+ */
+class NewsProcessingSystem {
+  constructor() {
+    this.initialized = false;
+    this.started = false;
+  }
 
-// 初始化草蛇灰线系统
-snakeTrackingService.initialize().catch(error => {
-  logger.error('草蛇灰线系统初始化失败:', error);
-});
+  /**
+   * 初始化系统
+   */
+  async initialize() {
+    try {
+      logger.info('开始初始化新闻处理系统主控制器...');
 
-// 错误通知函数
-async function sendErrorNotification(error, context) {
-  const errorMessage = `[系统异常] ${context}\n时间：${moment().format('YYYY-MM-DD HH:mm:ss')}\n错误信息：${error.message || error}\n${error.stack || ''}`;
-  try {
-    await webhookService.sendMessage(
-      moment().format('YYYY-MM-DD HH:mm:ss'),
-      moment().format('YYYY-MM-DD HH:mm:ss'),
-      errorMessage
-    );
-  } catch (sendError) {
-    logger.error('发送错误通知失败:', sendError);
+      // 初始化调度器管理器（包含所有服务的初始化）
+      await schedulerManager.initialize();
+      
+      // 设置调度器消息监听
+      this.setupSchedulerMessageListening();
+      
+      // 初始化新闻处理工作线程（如果启用）
+      if (config.workers.enabled) {
+        await workerManager.initialize();
+        logger.info('新闻处理工作线程已启用');
+      } else {
+        logger.info('新闻处理工作线程已禁用');
+      }
+
+      this.initialized = true;
+      logger.info('新闻处理系统主控制器初始化完成');
+    } catch (error) {
+      logger.error('系统初始化失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 设置调度器消息监听
+   */
+  setupSchedulerMessageListening() {
+    // 重写 schedulerManager 的 notifyMainThread 方法来处理消息
+    const originalNotifyMainThread = schedulerManager.constructor.prototype.notifyMainThread;
+    schedulerManager.notifyMainThread = (type, data) => {
+      if (type === 'TRIGGER_NEWS_PROCESSING') {
+        this.handleTriggerNewsProcessing(data);
+      }
+      // 调用原始方法（如果需要）
+      if (originalNotifyMainThread) {
+        originalNotifyMainThread.call(schedulerManager, type, data);
+      }
+    };
+  }
+
+  /**
+   * 处理触发新闻处理请求
+   */
+  async handleTriggerNewsProcessing(data) {
+    if (config.workers.enabled && workerManager.initialized) {
+      try {
+        logger.info(`收到新闻处理触发请求: ${data.reason}，通知新闻处理工作线程`);
+        await workerManager.triggerProcessing();
+      } catch (error) {
+        logger.error('触发新闻处理失败:', error);
+      }
+    } else {
+      logger.debug('新闻处理工作线程未启用或未初始化，忽略处理请求');
+    }
+  }
+
+  /**
+   * 启动定时任务
+   */
+  async startScheduledTasks() {
+    if (!this.initialized) {
+      throw new Error('系统未初始化');
+    }
+    
+    try {
+      await schedulerManager.startScheduledTasks();
+      this.started = true;
+      logger.info('所有定时任务已在调度器工作线程中启动');
+    } catch (error) {
+      logger.error('启动定时任务失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 停止定时任务
+   */
+  async stopScheduledTasks() {
+    if (!this.started) {
+      return;
+    }
+    
+    try {
+      await schedulerManager.stopScheduledTasks();
+      this.started = false;
+      logger.info('所有定时任务已停止');
+    } catch (error) {
+      logger.error('停止定时任务失败:', error);
+      throw error;
+    }
+  }
+
+
+
+
+
+  /**
+   * 错误通知
+   */
+  async sendErrorNotification(error, context) {
+    const errorMessage = `[系统异常] ${context}\n时间：${moment().format('YYYY-MM-DD HH:mm:ss')}\n错误信息：${error.message || error}\n${error.stack || ''}`;
+    try {
+      await webhookService.sendMessage(
+        moment().format('YYYY-MM-DD HH:mm:ss'),
+        moment().format('YYYY-MM-DD HH:mm:ss'),
+        errorMessage,
+        'ERROR'
+      );
+    } catch (sendError) {
+      logger.error('发送错误通知失败:', sendError);
+    }
+  }
+
+
+
+  /**
+   * 获取系统状态
+   */
+  async getSystemStatus() {
+    const schedulerStatus = await schedulerManager.getSchedulerStatus();
+    
+    return {
+      initialized: this.initialized,
+      started: this.started,
+      scheduler: schedulerStatus,
+      workers: {
+        enabled: config.workers.enabled,
+        status: config.workers.enabled ? workerManager.getStatus() : null
+      },
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    };
   }
 }
 
-// === 草蛇灰线系统调度任务 ===
+// 创建系统实例
+const system = new NewsProcessingSystem();
 
-// 每分钟检查捕猎对象的新进展
-cron.schedule(
-  '* * * * *',
-  async () => {
-    try {
-      await snakeTrackingService.runProgressCheck();
-    } catch (error) {
-      logger.error('草蛇灰线进展检查失败:', error);
-      await sendErrorNotification(error, '草蛇灰线进展检查失败');
-    }
-  },
-  {
-    timezone: 'Asia/Shanghai',
+// ===== 系统启动和调度 =====
+
+async function startSystem() {
+  try {
+    // 初始化系统（定时任务会在调度器工作线程中自动启动）
+    await system.initialize();
+    
+    // 🚨 定时任务最高优先级 - 已在调度器工作线程中自动启动，无需手动启动
+    system.started = true; // 标记为已启动
+    
+    logger.info('🚀 新闻处理系统完全启动完成');
+    logger.info('📊 所有定时任务已在调度器工作线程中自动启动');
+    
+  } catch (error) {
+    logger.error('系统启动失败:', error);
+    await system.sendErrorNotification(error, '系统启动失败');
+    process.exit(1);
   }
-);
+}
 
-// 每5分钟检查是否有新的特级事件需要捕猎
-cron.schedule(
-  '*/5 * * * *',
-  async () => {
-    try {
-      await snakeTrackingService.runHuntCheck();
-    } catch (error) {
-      logger.error('草蛇灰线事件捕猎检查失败:', error);
-      await sendErrorNotification(error, '草蛇灰线事件捕猎检查失败');
-    }
-  },
-  {
-    timezone: 'Asia/Shanghai',
-  }
-);
+// 启动系统
+startSystem();
 
-// 每小时检查是否有捕猎对象需要终止
-cron.schedule(
-  '0 * * * *',
-  async () => {
-    try {
-      await snakeTrackingService.runTerminationCheck();
-    } catch (error) {
-      logger.error('草蛇灰线终止检查失败:', error);
-      await sendErrorNotification(error, '草蛇灰线终止检查失败');
-    }
-  },
-  {
-    timezone: 'Asia/Shanghai',
-  }
-);
+// ===== 错误处理 =====
 
-// === 原有系统调度任务 ===
-
-// 每分钟执行新闻获取
-cron.schedule(
-  '* * * * *',
-  async () => {
-    try {
-      await newsService.fetchNews();
-    } catch (error) {
-      logger.error('新闻获取任务失败:', error);
-      await sendErrorNotification(error, '新闻获取任务失败');
-    }
-  },
-  {
-    timezone: 'Asia/Shanghai',
-  }
-);
-
-// 每小时HH:02执行OHN处理
-cron.schedule(
-  '2 * * * *',
-  async () => {
-    try {
-      await ohnService.runOriginalHour();
-    } catch (error) {
-      logger.error('OHN处理任务失败:', error);
-      await sendErrorNotification(error, 'OHN处理任务失败');
-    }
-  },
-  {
-    timezone: 'Asia/Shanghai',
-  }
-);
-
-// 每小时HH:05执行HNS生成
-cron.schedule(
-  '5 * * * *',
-  async () => {
-    try {
-      await hnsService.runHourSummary();
-    } catch (error) {
-      logger.error('HNS生成任务失败:', error);
-      await sendErrorNotification(error, 'HNS生成任务失败');
-    }
-  },
-  {
-    timezone: 'Asia/Shanghai',
-  }
-);
-
-// 每天10:05执行夜间汇总
-cron.schedule(
-  '5 10 * * *',
-  async () => {
-    try {
-      await overnightService.runOvernightSummary();
-    } catch (error) {
-      logger.error('夜间汇总任务失败:', error);
-      await sendErrorNotification(error, '夜间汇总任务失败');
-    }
-  },
-  {
-    timezone: 'Asia/Shanghai',
-  }
-);
-
-// === 保持现有的兼容性任务 ===
-
-// 每小时执行新闻总结（11:01-22:01）
-cron.schedule(
-  '1 11-22 * * *',
-  async () => {
-    try {
-      // 获取上一个小时的新闻（精确到整点）
-      const currentHour = moment().hour();
-      const startTime = moment()
-        .hour(currentHour - 1)
-        .minute(0)
-        .second(0);
-      const endTime = moment().hour(currentHour).minute(0).second(0);
-
-      logger.info(
-        `开始总结 ${startTime.format('YYYY-MM-DD HH:mm:ss')} 到 ${endTime.format('YYYY-MM-DD HH:mm:ss')} 的新闻`
-      );
-      const lastHourNews = await newsService.getNewsByTimeRange(startTime, endTime);
-
-      if (lastHourNews.length > 0) {
-        const summary = await aiService.summarizeNews(lastHourNews);
-        await webhookService.sendMessage(startTime, endTime, summary);
-      }
-    } catch (error) {
-      logger.error('新闻总结任务失败:', error);
-      await sendErrorNotification(error, '新闻总结任务失败');
-    }
-  },
-  {
-    timezone: 'Asia/Shanghai',
-  }
-);
-
-// 每天早上10:01总结前一天22点后的新闻
-cron.schedule(
-  '1 10 * * *',
-  async () => {
-    try {
-      const yesterday = moment().subtract(1, 'day');
-      const startTime = yesterday.hour(22).minute(0).second(0);
-      const endTime = moment().hour(10).minute(0).second(0);
-      const overnightNews = await newsService.getNewsByTimeRange(startTime, endTime);
-      if (overnightNews.length > 0) {
-        const summary = await aiService.summarizeNews(overnightNews);
-        await webhookService.sendMessage(startTime, endTime, summary);
-      }
-    } catch (error) {
-      logger.error('夜间新闻总结任务失败:', error);
-      await sendErrorNotification(error, '夜间新闻总结任务失败');
-    }
-  },
-  {
-    timezone: 'Asia/Shanghai',
-  }
-);
-
-// 错误处理
 process.on('uncaughtException', async error => {
   logger.error('未捕获的异常:', error);
-  await sendErrorNotification(error, '系统发生未捕获的异常');
+  await system.sendErrorNotification(error, '系统发生未捕获的异常');
 });
 
-process.on('unhandledRejection', async (_reason, _promise) => {
-  logger.error('未处理的Promise拒绝:', _reason);
-  await sendErrorNotification(_reason, '系统发生未处理的Promise拒绝');
+process.on('unhandledRejection', async (reason, promise) => {
+  logger.error('未处理的Promise拒绝:', reason);
+  await system.sendErrorNotification(reason, '系统发生未处理的Promise拒绝');
 });
 
-logger.info('服务已启动，包含草蛇灰线系统和分层处理功能');
+// 优雅关闭
+process.on('SIGINT', async () => {
+  logger.info('收到SIGINT信号，开始优雅关闭...');
+  await gracefulShutdown();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  logger.info('收到SIGTERM信号，开始优雅关闭...');
+  await gracefulShutdown();
+  process.exit(0);
+});
+
+async function gracefulShutdown() {
+  try {
+    // 停止定时任务
+    if (system.started) {
+      await system.stopScheduledTasks();
+    }
+    
+    // 关闭调度器管理器
+    await schedulerManager.shutdown();
+    
+    // 关闭新闻处理工作线程
+    if (config.workers.enabled) {
+      await workerManager.shutdown();
+    }
+    
+    logger.info('系统优雅关闭完成');
+  } catch (error) {
+    logger.error('优雅关闭过程中发生错误:', error);
+  }
+}
+
+logger.info('🚀 新闻处理与图数据库存储系统启动完成');
+logger.info('📊 支持功能：News Level分级、按小时总结、草蛇灰线追踪、知识图谱构建');
+logger.info('📈 系统状态: 调度器工作线程模式，支持5级新闻分类');
+
+// 导出系统实例供外部使用
+export { system };

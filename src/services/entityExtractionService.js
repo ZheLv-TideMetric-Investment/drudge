@@ -1,176 +1,235 @@
 import { callLLM } from '../utils/llm.js';
 import logger from '../utils/logger.js';
+import config from '../config/config.js';
 import {
-  EntityNode,
   EventNode,
-  EntityExtractionResult,
-  EntityTypes,
+  CompanyNode,
+  PersonNode,
+  OrganizationNode,
+  LocationNode,
+  TimeNode,
+  NewsExtractionResult,
   EventTypes,
+  SignificanceLevel,
   RelationshipTypes,
+  NewsLevel,
+  NewsLevelDescription,
 } from '../models/GraphModels.js';
 
 /**
- * 实体提取服务
- * 使用 AI 从新闻内容中提取实体、事件和关系
+ * 新闻六要素提取服务
+ * 基于5W1H原则从新闻中提取事件、公司、人物、机构、地点、时间信息
  */
 class EntityExtractionService {
   constructor() {
-    this.maxRetries = 3;
+    this.maxRetries = config.batch?.aiRetryAttempts || 3;
     this.retryDelay = 1000;
+    
+    // AI将直接判断新闻级别，不再使用关键词匹配和公司列表判断
   }
 
   /**
-   * 从新闻中提取实体和事件
+   * 从新闻中提取六要素信息
    * @param {Object} newsItem - 新闻对象
-   * @returns {EntityExtractionResult} - 提取结果
+   * @returns {NewsExtractionResult} - 提取结果
    */
   async extractFromNews(newsItem) {
     const startTime = Date.now();
     try {
-      logger.info(`开始提取新闻实体和事件: ${newsItem.id}`);
+      logger.info(`开始提取新闻六要素: ${newsItem.id}`);
 
-      // 使用 AI 提取实体和事件
+      // 使用AI提取六要素
       const extractionData = await this.callAIExtraction(newsItem);
-
-      // 解析和验证提取结果
+      
+      // 解析提取结果
       const result = this.parseExtractionResult(extractionData, newsItem);
-
+      
+      // 判断新闻级别
+      result.news_level = this.determineNewsLevel(newsItem, result);
+      
       // 计算处理时间
-      result.processingTime = Date.now() - startTime;
+      result.processing_time = Date.now() - startTime;
 
       logger.info(
-        `新闻 ${newsItem.id} 实体提取完成: 实体 ${result.entities.length}个, 事件 ${result.events.length}个, 关系 ${result.relationships.length}个`
+        `新闻 ${newsItem.id} 六要素提取完成: 事件${result.events.length}个, 公司${result.companies.length}个, ` +
+        `人物${result.persons.length}个, 机构${result.organizations.length}个, ` +
+        `地点${result.locations.length}个, 时间${result.times.length}个, ` +
+        `级别: ${result.news_level}`
       );
 
       return result;
     } catch (error) {
-      logger.error(`新闻 ${newsItem.id} 实体提取失败:`, error);
-      return new EntityExtractionResult({
+      logger.error(`新闻 ${newsItem.id} 六要素提取失败:`, error);
+      return new NewsExtractionResult({
+        news_id: newsItem.id,
         confidence: 0,
-        processingTime: Date.now() - startTime,
+        processing_time: Date.now() - startTime,
       });
     }
   }
 
   /**
-   * 批量提取多个新闻的实体和事件
-   * @param {Array} newsItems - 新闻对象数组
-   * @returns {Array} - 提取结果数组
-   */
-  async batchExtract(newsItems) {
-    const results = [];
-    for (const newsItem of newsItems) {
-      try {
-        const result = await this.extractFromNews(newsItem);
-        results.push(result);
-
-        // 添加延迟避免过度请求 AI 服务
-        await this.delay(200);
-      } catch (error) {
-        logger.error(`批量提取失败: ${newsItem.id}`, error);
-        results.push(
-          new EntityExtractionResult({
-            confidence: 0,
-            processingTime: 0,
-          })
-        );
-      }
-    }
-    return results;
-  }
-
-  /**
-   * 调用 AI 服务进行实体提取
+   * 调用AI进行六要素提取
    * @param {Object} newsItem - 新闻对象
-   * @returns {Object} - AI 返回的提取数据
+   * @returns {Object} - AI返回的提取数据
    */
   async callAIExtraction(newsItem) {
     const messages = [
       {
         role: 'system',
         content: `
-你是一个专业的新闻实体和事件提取系统。请从给定的新闻内容中提取以下信息：
+你是一个专业的新闻六要素提取系统。请根据新闻学的5W1H原则，从给定新闻中提取以下信息，并对每个事件进行准确的新闻级别判断：
 
-1. **实体（Entities）**：
-   - 人物（Person）：人名、职位
-   - 组织（Organization）：机构、组织名称
-   - 公司（Company）：公司名称、股票代码
-   - 地点（Location）：地理位置
-   - 产品（Product）：产品名称
-   - 货币（Currency）：货币名称
-   - 股票（Stock）：股票名称、代码
-   - 商品（Commodity）：商品名称
-   - 概念（Concept）：概念、主题
+## 六要素提取规则：
 
-2. **事件（Events）**：
-   - 价格变动（PriceChange）：涨跌、波动
-   - 收购并购（Acquisition）：收购、合并
-   - 合作（Partnership）：合作、协议
-   - 冲突争议（Conflict）：争议、冲突
-   - 公告发布（Announcement）：发布、公告
-   - 政策变化（PolicyChange）：政策调整
-   - 财务业绩（FinancialResult）：财报、业绩
-   - 市场动向（MarketMove）：市场趋势
-   - 人事变动（LeadershipChange）：人事任免
-   - 产品发布（ProductLaunch）：新品发布
-   - 经济指标（EconomicIndicator）：经济数据
+### 1. What（什么事件）- Event
+提取新闻中的主要事件，包括：
+- event_name: 事件简短名称
+- event_description: 事件详细描述
+- event_type: 事件类型（财经事件/政策事件/市场事件/企业事件/经济事件/政治事件/社会事件/科技事件/其他事件）
+- significance: 重要性级别（1-4，4为最高级别）
+- sentiment: 情感倾向（positive/negative/neutral）
+- magnitude: 影响程度（-1.0到1.0的数值）
+- event_level: 新闻级别（Level 1/Level 2/Level 3/Level 4/Level 5）
 
-3. **关系（Relationships）**：
-   - 实体间关系：CEO_OF, OWNS, PARTNER_OF, COMPETITOR_OF 等
-   - 实体与事件关系：PARTICIPATED_IN, AFFECTED_BY, CAUSED
+### 2. Who（涉及谁）- 分为三类：
+**Company（公司）:**
+- company_name: 公司全名
+- ticker: 股票代码（如有）
+- industry: 行业分类
 
-**输出格式要求**：
-请以 JSON 格式返回，结构如下：
+**Person（人物）:**
+- person_name: 人物姓名
+- role: 职位角色
+- company: 所在公司（如有）
+
+**Organization（机构）:**
+- organization_name: 机构名称
+- type: 机构类型（政府机构/金融机构/国际组织等）
+- country: 所属国家
+
+### 3. Where（在哪里）- Location
+- location_name: 地点名称
+- country: 所属国家
+- region: 地区
+
+### 4. When（什么时候）- Time
+- timestamp: 精确时间戳
+- date: 日期
+- hour: 小时（如有）
+- time_of_day: 时间段（上午/下午/晚上）
+
+### 5. How（如何发生）- 体现在事件描述中
+
+## News Level判断标准：
+请根据新闻内容的重要性、影响范围和市场冲击力判断级别：
+
+**Level 1 (紧急新闻) 🚨**
+- 全球性极大冲击的突发事件
+- 例子：全球经济危机、股市崩盘、国际战争、总统辞职、重大金融机构破产
+- 特征：立即对全球金融市场产生重大冲击
+
+**Level 2 (高优先级新闻) ⚠️**  
+- 重要的金融、政策类事件
+- 例子：央行政策调整、重大企业并购、贸易战、主要股指大跌超10%
+- 特征：对重要经济体或行业产生显著影响
+
+**Level 3 (中等优先级新闻) 📊**
+- 对特定行业或公司有较大影响的事件
+- 例子：重要公司财报、经济数据发布、高管变动、技术突破、政策解读
+- 特征：对特定领域或公司产生中等程度影响
+
+**Level 4 (低优先级新闻) 📋**
+- 影响较小的局部性事件
+- 例子：公司新产品发布、市场分析报告、地方政策变化、一般性商业活动
+- 特征：局部影响，背景性信息
+
+**Level 5 (信息性新闻) 📝**
+- 纯信息性内容，无直接市场影响
+- 例子：例行数据更新、统计信息、会议纪要、背景介绍、历史回顾
+- 特征：无直接市场影响，纯信息补充
+
+请在每个事件的 event_level 字段中准确标注对应级别。
+
+## 输出格式：
+请严格按照以下JSON格式返回：
 
 \`\`\`json
 {
-  "entities": [
-    {
-      "name": "实体名称",
-      "type": "实体类型",
-      "aliases": ["别名1", "别名2"],
-      "description": "实体描述",
-      "confidence": 0.9
-    }
-  ],
   "events": [
     {
-      "type": "事件类型",
-      "description": "事件描述",
-      "sentiment": "positive/negative/neutral",
-      "magnitude": 0.5,
-      "entities": ["相关实体名称"]
+      "event_name": "事件名称",
+      "event_description": "事件详细描述",
+      "event_type": "事件类型",
+      "significance": 2,
+      "sentiment": "neutral",
+      "magnitude": 0.0,
+      "event_level": "Level 5"
+    }
+  ],
+  "companies": [
+    {
+      "company_name": "公司名称",
+      "ticker": "股票代码",
+      "industry": "行业"
+    }
+  ],
+  "persons": [
+    {
+      "person_name": "人物姓名",
+      "role": "职位",
+      "company": "所在公司"
+    }
+  ],
+  "organizations": [
+    {
+      "organization_name": "机构名称",
+      "type": "机构类型",
+      "country": "国家"
+    }
+  ],
+  "locations": [
+    {
+      "location_name": "地点名称",
+      "country": "国家",
+      "region": "地区"
+    }
+  ],
+  "times": [
+    {
+      "timestamp": "2025-01-19T10:00:00Z",
+      "date": "2025-01-19",
+      "hour": 10,
+      "time_of_day": "上午"
     }
   ],
   "relationships": [
     {
-      "type": "关系类型",
-      "from": "源实体",
-      "to": "目标实体",
-      "description": "关系描述",
-      "confidence": 0.8
+      "type": "OCCURRED_IN",
+      "from": "事件名称",
+      "to": "公司名称",
+      "description": "关系描述"
     }
   ]
 }
 \`\`\`
 
-**注意事项**：
-- 确保提取的实体名称规范化（去除多余空格）
-- 识别实体的不同表达方式作为别名
-- 事件的sentiment：positive（正面）、negative（负面）、neutral（中性）
-- magnitude：事件影响程度，-1到1的数值
-- confidence：识别置信度，0到1的数值
-- 只提取明确出现在新闻中的信息，不要推测
+## 重要提醒：
+- 只提取新闻中明确提到的信息，不要推测
+- 公司名称要标准化（如"苹果公司"统一为"Apple Inc."）
+- **必须为每个事件都提供event_level字段**，根据上述判断标准准确分级
+- 时间信息要尽可能精确
+- 关系要准确反映新闻中的实际关联
         `,
       },
       {
         role: 'user',
         content: `
-请提取以下新闻的实体、事件和关系：
+请提取以下新闻的六要素信息：
 
 标题：${newsItem.title}
 内容：${newsItem.content}
-时间：${new Date(newsItem.time * 1000).toISOString()}
+发布时间：${new Date(newsItem.time * 1000).toISOString()}
         `,
       },
     ];
@@ -182,7 +241,7 @@ class EntityExtractionService {
         return this.parseAIResponse(response);
       } catch (error) {
         lastError = error;
-        logger.warn(`AI 提取尝试 ${attempt} 失败:`, error.message);
+        logger.warn(`AI六要素提取尝试 ${attempt} 失败:`, error.message);
 
         if (attempt < this.maxRetries) {
           await this.delay(this.retryDelay * attempt);
@@ -194,79 +253,147 @@ class EntityExtractionService {
   }
 
   /**
-   * 解析 AI 响应
-   * @param {string} response - AI 响应文本
+   * 解析AI响应
+   * @param {string} response - AI响应文本
    * @returns {Object} - 解析后的数据
    */
   parseAIResponse(response) {
     try {
-      // 尝试直接解析 JSON
+      // 尝试直接解析JSON
       const cleaned = response.trim();
       if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
         return JSON.parse(cleaned);
       }
 
-      // 尝试提取 JSON 代码块
+      // 尝试提取JSON代码块
       const jsonMatch = cleaned.match(/```json\s*([\s\S]*?)\s*```/);
       if (jsonMatch) {
         return JSON.parse(jsonMatch[1]);
       }
 
-      // 尝试提取 {} 包围的内容
+      // 尝试提取{}包围的内容
       const objectMatch = cleaned.match(/\{[\s\S]*\}/);
       if (objectMatch) {
         return JSON.parse(objectMatch[0]);
       }
 
-      throw new Error('无法解析 AI 响应为 JSON 格式');
+      throw new Error('无法解析AI响应为JSON格式');
     } catch (error) {
-      logger.error('解析 AI 响应失败:', error);
+      logger.error('解析AI响应失败:', error);
       logger.error('原始响应:', response);
-      throw new Error(`AI 响应解析失败: ${error.message}`);
+      throw new Error(`AI响应解析失败: ${error.message}`);
     }
   }
 
   /**
    * 解析提取结果
-   * @param {Object} extractionData - AI 提取的原始数据
+   * @param {Object} extractionData - AI提取的原始数据
    * @param {Object} newsItem - 原始新闻
-   * @returns {EntityExtractionResult} - 格式化的提取结果
+   * @returns {NewsExtractionResult} - 格式化的提取结果
    */
   parseExtractionResult(extractionData, newsItem) {
-    const result = new EntityExtractionResult({});
-
-    // 解析实体
-    if (extractionData.entities && Array.isArray(extractionData.entities)) {
-      for (const entityData of extractionData.entities) {
-        try {
-          const entity = new EntityNode({
-            name: this.normalizeName(entityData.name),
-            type: this.validateEntityType(entityData.type),
-            aliases: entityData.aliases || [],
-            description: entityData.description || '',
-            confidence: entityData.confidence || 0.8,
-          });
-          result.addEntity(entity);
-        } catch (error) {
-          logger.warn('解析实体失败:', entityData, error.message);
-        }
-      }
-    }
+    const result = new NewsExtractionResult({
+      news_id: newsItem.id,
+    });
 
     // 解析事件
     if (extractionData.events && Array.isArray(extractionData.events)) {
       for (const eventData of extractionData.events) {
         try {
           const event = new EventNode({
-            type: this.validateEventType(eventData.type),
-            description: eventData.description || '',
+            event_name: eventData.event_name || '',
+            event_description: eventData.event_description || '',
+            event_date: this.parseDate(newsItem.time),
+            event_type: this.validateEventType(eventData.event_type),
+            significance: this.validateSignificance(eventData.significance),
             sentiment: this.validateSentiment(eventData.sentiment),
             magnitude: this.validateMagnitude(eventData.magnitude),
-            timestamp: new Date(newsItem.time * 1000).toISOString(),
+            event_level: this.validateNewsLevel(eventData.event_level),
           });
           result.addEvent(event);
         } catch (error) {
           logger.warn('解析事件失败:', eventData, error.message);
+        }
+      }
+    }
+
+    // 解析公司
+    if (extractionData.companies && Array.isArray(extractionData.companies)) {
+      for (const companyData of extractionData.companies) {
+        try {
+          const company = new CompanyNode({
+            company_name: companyData.company_name || '',
+            ticker: companyData.ticker || null,
+            industry: companyData.industry || null,
+          });
+          result.addCompany(company);
+        } catch (error) {
+          logger.warn('解析公司失败:', companyData, error.message);
+        }
+      }
+    }
+
+    // 解析人物
+    if (extractionData.persons && Array.isArray(extractionData.persons)) {
+      for (const personData of extractionData.persons) {
+        try {
+          const person = new PersonNode({
+            person_name: personData.person_name || '',
+            role: personData.role || null,
+            company: personData.company || null,
+          });
+          result.addPerson(person);
+        } catch (error) {
+          logger.warn('解析人物失败:', personData, error.message);
+        }
+      }
+    }
+
+    // 解析机构
+    if (extractionData.organizations && Array.isArray(extractionData.organizations)) {
+      for (const orgData of extractionData.organizations) {
+        try {
+          const organization = new OrganizationNode({
+            organization_name: orgData.organization_name || '',
+            type: orgData.type || null,
+            country: orgData.country || null,
+          });
+          result.addOrganization(organization);
+        } catch (error) {
+          logger.warn('解析机构失败:', orgData, error.message);
+        }
+      }
+    }
+
+    // 解析地点
+    if (extractionData.locations && Array.isArray(extractionData.locations)) {
+      for (const locationData of extractionData.locations) {
+        try {
+          const location = new LocationNode({
+            location_name: locationData.location_name || '',
+            country: locationData.country || null,
+            region: locationData.region || null,
+          });
+          result.addLocation(location);
+        } catch (error) {
+          logger.warn('解析地点失败:', locationData, error.message);
+        }
+      }
+    }
+
+    // 解析时间
+    if (extractionData.times && Array.isArray(extractionData.times)) {
+      for (const timeData of extractionData.times) {
+        try {
+          const time = new TimeNode({
+            timestamp: timeData.timestamp || new Date(newsItem.time * 1000).toISOString(),
+            date: timeData.date || this.parseDate(newsItem.time),
+            hour: timeData.hour || null,
+            time_of_day: timeData.time_of_day || null,
+          });
+          result.addTime(time);
+        } catch (error) {
+          logger.warn('解析时间失败:', timeData, error.message);
         }
       }
     }
@@ -277,10 +404,10 @@ class EntityExtractionService {
         try {
           const relationship = {
             type: this.validateRelationshipType(relData.type),
-            from: this.normalizeName(relData.from),
-            to: this.normalizeName(relData.to),
+            from: relData.from || '',
+            to: relData.to || '',
             description: relData.description || '',
-            confidence: relData.confidence || 0.8,
+            confidence: 0.8,
             source: newsItem.id,
           };
           result.addRelationship(relationship);
@@ -291,32 +418,65 @@ class EntityExtractionService {
     }
 
     // 计算整体置信度
-    const totalItems = result.entities.length + result.events.length + result.relationships.length;
-    if (totalItems > 0) {
-      const totalConfidence =
-        result.entities.reduce((sum, e) => sum + e.confidence, 0) +
-        result.events.length * 0.8 +
-        result.relationships.reduce((sum, r) => sum + r.confidence, 0);
-      result.confidence = totalConfidence / totalItems;
-    }
+    const totalItems = result.events.length + result.companies.length +
+                      result.persons.length + result.organizations.length +
+                      result.locations.length + result.times.length;
+    result.confidence = totalItems > 0 ? 0.8 : 0;
 
     return result;
   }
 
   /**
-   * 规范化名称
+   * 判断新闻级别（完全基于AI判断结果）
+   * @param {Object} newsItem - 新闻对象
+   * @param {NewsExtractionResult} result - 提取结果
+   * @returns {string} - 新闻级别
    */
-  normalizeName(name) {
-    if (!name || typeof name !== 'string') return '';
-    return name.trim().replace(/\s+/g, ' ');
+  determineNewsLevel(newsItem, result) {
+    // 直接使用AI判断的事件级别
+    if (result.events.length > 0) {
+      // 获取最高级别的事件作为整体新闻级别
+      const highestEventLevel = result.events.reduce((highest, event) => {
+        const currentLevel = event.event_level || NewsLevel.LEVEL_5;
+        const highestLevel = highest || NewsLevel.LEVEL_5;
+        
+        // 数值越小级别越高（Level 1 > Level 2 > ... > Level 5）
+        const currentValue = this.getLevelValue(currentLevel);
+        const highestValue = this.getLevelValue(highestLevel);
+        
+        return currentValue < highestValue ? currentLevel : highestLevel;
+      }, NewsLevel.LEVEL_5);
+      
+      logger.debug(`新闻 ${newsItem.id} AI判断级别: ${highestEventLevel}，事件级别: ${result.events.map(e => e.event_level).join(', ')}`);
+      return highestEventLevel;
+    }
+
+    // 默认级别 - 信息性新闻
+    logger.debug(`新闻 ${newsItem.id} 无事件，使用默认级别: ${NewsLevel.LEVEL_5}`);
+    return NewsLevel.LEVEL_5;
   }
 
   /**
-   * 验证实体类型
+   * 获取级别数值（用于比较，数值越小级别越高）
    */
-  validateEntityType(type) {
-    const validTypes = Object.values(EntityTypes);
-    return validTypes.includes(type) ? type : EntityTypes.OTHER;
+  getLevelValue(level) {
+    const levelMap = {
+      [NewsLevel.LEVEL_1]: 1,
+      [NewsLevel.LEVEL_2]: 2,
+      [NewsLevel.LEVEL_3]: 3,
+      [NewsLevel.LEVEL_4]: 4,
+      [NewsLevel.LEVEL_5]: 5,
+    };
+    return levelMap[level] || 5;
+  }
+
+
+
+  /**
+   * 解析日期
+   */
+  parseDate(timestamp) {
+    return new Date(timestamp * 1000).toISOString().split('T')[0];
   }
 
   /**
@@ -328,15 +488,16 @@ class EntityExtractionService {
   }
 
   /**
-   * 验证关系类型
+   * 验证重要性级别
    */
-  validateRelationshipType(type) {
-    const validTypes = Object.values(RelationshipTypes);
-    return validTypes.includes(type) ? type : RelationshipTypes.RELATED_TO;
+  validateSignificance(significance) {
+    const num = parseInt(significance);
+    if (isNaN(num) || num < 1 || num > 4) return SignificanceLevel.MEDIUM;
+    return num;
   }
 
   /**
-   * 验证情感值
+   * 验证情感倾向
    */
   validateSentiment(sentiment) {
     const validSentiments = ['positive', 'negative', 'neutral'];
@@ -353,10 +514,285 @@ class EntityExtractionService {
   }
 
   /**
+   * 验证关系类型
+   */
+  validateRelationshipType(type) {
+    const validTypes = Object.values(RelationshipTypes);
+    return validTypes.includes(type) ? type : RelationshipTypes.MENTIONED_IN;
+  }
+
+  /**
+   * 验证新闻级别
+   */
+  validateNewsLevel(level) {
+    const validLevels = Object.values(NewsLevel);
+    return validLevels.includes(level) ? level : NewsLevel.LEVEL_5;
+  }
+
+  /**
    * 延迟函数
    */
   async delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 批量提取多个新闻的六要素（真正的批量AI调用）
+   * @param {Array} newsItems - 新闻对象数组
+   * @param {number} batchSize - 批量大小，默认5
+   * @returns {Array} - 提取结果数组
+   */
+  async batchExtract(newsItems, batchSize = 5) {
+    const startTime = Date.now();
+    const results = [];
+    
+    // 按批次处理
+    for (let i = 0; i < newsItems.length; i += batchSize) {
+      const batch = newsItems.slice(i, i + batchSize);
+      try {
+        logger.info(`开始批量提取第${Math.floor(i/batchSize) + 1}批，共${batch.length}条新闻`);
+        
+        // 真正的批量AI调用
+        const batchResults = await this.callBatchAIExtraction(batch);
+        results.push(...batchResults);
+        
+        logger.info(`第${Math.floor(i/batchSize) + 1}批提取完成，成功处理${batchResults.length}条新闻`);
+        
+        // 批次间短暂延迟
+        if (i + batchSize < newsItems.length) {
+          await this.delay(config.batch?.delayBetweenBatches || 500);
+        }
+      } catch (error) {
+        logger.error(`批量提取第${Math.floor(i/batchSize) + 1}批失败:`, error);
+        
+        // 失败时回退到单条处理
+        for (const newsItem of batch) {
+          try {
+            const result = await this.extractFromNews(newsItem);
+            results.push(result);
+          } catch (singleError) {
+            logger.error(`单条提取失败: ${newsItem.id}`, singleError);
+            results.push(new NewsExtractionResult({
+              news_id: newsItem.id,
+              confidence: 0,
+              processing_time: 0,
+            }));
+          }
+        }
+      }
+    }
+    
+    const totalTime = Date.now() - startTime;
+    logger.info(`批量提取完成，共处理${newsItems.length}条新闻，耗时${totalTime}ms，平均${Math.round(totalTime/newsItems.length)}ms/条`);
+    
+    return results;
+  }
+
+  /**
+   * 真正的批量AI调用 - 一次性处理多条新闻
+   * @param {Array} newsItems - 新闻对象数组
+   * @returns {Array} - 提取结果数组
+   */
+  async callBatchAIExtraction(newsItems) {
+    const messages = [
+      {
+        role: 'system',
+        content: `
+你是一个专业的新闻六要素批量提取系统。请根据新闻学的5W1H原则，从给定的多条新闻中提取以下信息，并对每个事件进行准确的新闻级别判断：
+
+## 六要素提取规则：
+
+### 1. What（什么事件）- Event
+提取新闻中的主要事件，包括：
+- event_name: 事件简短名称
+- event_description: 事件详细描述
+- event_type: 事件类型（财经事件/政策事件/市场事件/企业事件/经济事件/政治事件/社会事件/科技事件/其他事件）
+- significance: 重要性级别（1-4，4为最高级别）
+- sentiment: 情感倾向（positive/negative/neutral）
+- magnitude: 影响程度（-1.0到1.0的数值）
+- event_level: 新闻级别（Level 1/Level 2/Level 3/Level 4/Level 5）
+
+### 2. Who（涉及谁）- 分为三类：
+**Company（公司）:**
+- company_name: 公司全名
+- ticker: 股票代码（如有）
+- industry: 行业分类
+
+**Person（人物）:**
+- person_name: 人物姓名
+- role: 职位角色
+- company: 所在公司（如有）
+
+**Organization（机构）:**
+- organization_name: 机构名称
+- type: 机构类型（政府机构/金融机构/国际组织等）
+- country: 所属国家
+
+### 3. Where（在哪里）- Location
+- location_name: 地点名称
+- country: 所属国家
+- region: 地区
+
+### 4. When（什么时候）- Time
+- timestamp: 精确时间戳
+- date: 日期
+- hour: 小时（如有）
+- time_of_day: 时间段（上午/下午/晚上）
+
+### 5. How（如何发生）- 体现在事件描述中
+
+## News Level判断标准：
+请根据新闻内容的重要性、影响范围和市场冲击力判断级别：
+
+**Level 1 (紧急新闻) 🚨**
+- 全球性极大冲击的突发事件
+- 例子：全球经济危机、股市崩盘、国际战争、总统辞职、重大金融机构破产
+- 特征：立即对全球金融市场产生重大冲击
+
+**Level 2 (高优先级新闻) ⚠️**  
+- 重要的金融、政策类事件
+- 例子：央行政策调整、重大企业并购、贸易战、主要股指大跌超10%
+- 特征：对重要经济体或行业产生显著影响
+
+**Level 3 (中等优先级新闻) 📊**
+- 对特定行业或公司有较大影响的事件
+- 例子：重要公司财报、经济数据发布、高管变动、技术突破、政策解读
+- 特征：对特定领域或公司产生中等程度影响
+
+**Level 4 (低优先级新闻) 📋**
+- 影响较小的局部性事件
+- 例子：公司新产品发布、市场分析报告、地方政策变化、一般性商业活动
+- 特征：局部影响，背景性信息
+
+**Level 5 (信息性新闻) 📝**
+- 纯信息性内容，无直接市场影响
+- 例子：例行数据更新、统计信息、会议纪要、背景介绍、历史回顾
+- 特征：无直接市场影响，纯信息补充
+
+请在每个事件的 event_level 字段中准确标注对应级别。
+
+## 批量输出格式：
+请为每条新闻返回一个独立的提取结果，按照以下JSON格式：
+
+\`\`\`json
+{
+  "results": [
+    {
+      "news_id": "新闻ID",
+      "events": [
+        {
+          "event_name": "事件名称",
+          "event_description": "事件详细描述",
+          "event_type": "事件类型",
+          "significance": 2,
+          "sentiment": "neutral",
+          "magnitude": 0.0,
+          "event_level": "Level 5"
+        }
+      ],
+      "companies": [...],
+      "persons": [...],
+      "organizations": [...],
+      "locations": [...],
+      "times": [...],
+      "relationships": [...]
+    },
+    ... // 其他新闻的结果
+  ]
+}
+\`\`\`
+
+## 重要提醒：
+- 为每条新闻提供完整的独立提取结果
+- 只提取新闻中明确提到的信息，不要推测
+- 公司名称要标准化
+- **必须为每个事件都提供event_level字段**，根据上述判断标准准确分级
+- 保持结果的准确性和一致性
+        `,
+      },
+      {
+        role: 'user',
+        content: `
+请批量提取以下${newsItems.length}条新闻的六要素信息：
+
+${newsItems.map((item, index) => `
+### 新闻 ${index + 1} (ID: ${item.id})
+标题：${item.title}
+内容：${item.content}
+发布时间：${new Date(item.time * 1000).toISOString()}
+---
+`).join('\n')}
+        `,
+      },
+    ];
+
+    let lastError;
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        const response = await callLLM(messages);
+        const batchData = this.parseBatchAIResponse(response);
+        
+        // 解析每条新闻的结果，确保按顺序对应
+        const results = [];
+        for (let i = 0; i < newsItems.length; i++) {
+          const newsItem = newsItems[i];
+          // 先尝试按ID匹配，再按索引匹配
+          let extractionData = batchData.results?.find(r => r.news_id === newsItem.id);
+          if (!extractionData && batchData.results && batchData.results[i]) {
+            extractionData = batchData.results[i];
+            // 确保news_id正确设置
+            extractionData.news_id = newsItem.id;
+          }
+          
+          const result = this.parseExtractionResult(extractionData || {}, newsItem);
+          results.push(result);
+        }
+        
+        return results;
+      } catch (error) {
+        lastError = error;
+        logger.warn(`批量AI提取尝试 ${attempt} 失败:`, error.message);
+
+        if (attempt < this.maxRetries) {
+          await this.delay(this.retryDelay * attempt);
+        }
+      }
+    }
+
+    throw lastError;
+  }
+
+  /**
+   * 解析批量AI响应
+   * @param {string} response - AI响应文本
+   * @returns {Object} - 解析后的批量数据
+   */
+  parseBatchAIResponse(response) {
+    try {
+      // 尝试直接解析JSON
+      const cleaned = response.trim();
+      if (cleaned.startsWith('{') && cleaned.endsWith('}')) {
+        return JSON.parse(cleaned);
+      }
+
+      // 尝试提取JSON代码块
+      const jsonMatch = cleaned.match(/```json\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        return JSON.parse(jsonMatch[1]);
+      }
+
+      // 尝试提取{}包围的内容
+      const objectMatch = cleaned.match(/\{[\s\S]*\}/);
+      if (objectMatch) {
+        return JSON.parse(objectMatch[0]);
+      }
+
+      throw new Error('无法解析批量AI响应为JSON格式');
+    } catch (error) {
+      logger.error('解析批量AI响应失败:', error);
+      logger.error('原始响应:', response);
+      throw new Error(`批量AI响应解析失败: ${error.message}`);
+    }
   }
 }
 

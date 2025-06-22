@@ -172,6 +172,68 @@ class StorageService {
       return [];
     }
   }
+
+  async getAll(limit = null) {
+    try {
+      let allData = [];
+      
+      // 获取所有年份目录
+      const years = await fs.readdir(this.basePath);
+      if (years.length === 0) return [];
+
+      // 按年份倒序排序（最新的优先）
+      years.sort().reverse();
+
+      outerLoop: for (const year of years) {
+        const yearPath = path.join(this.basePath, year);
+        const months = await fs.readdir(yearPath);
+        months.sort().reverse();
+
+        for (const month of months) {
+          const monthPath = path.join(yearPath, month);
+          const days = await fs.readdir(monthPath);
+          days.sort().reverse();
+
+          for (const day of days) {
+            const dayPath = path.join(monthPath, day);
+            const files = await fs.readdir(dayPath);
+            const newsFiles = files.filter(file => file.startsWith('news_') && file.endsWith('.json'));
+
+            // 按文件名倒序排序（最新的优先）
+            newsFiles.sort().reverse();
+
+            for (const file of newsFiles) {
+              const filePath = path.join(dayPath, file);
+              const content = await fs.readFile(filePath, 'utf-8');
+              const data = JSON.parse(content);
+
+              allData = [...allData, ...data];
+
+              // 如果设置了限制并且达到了限制，停止读取
+              if (limit && allData.length >= limit) {
+                allData = allData.slice(0, limit);
+                break outerLoop;
+              }
+            }
+          }
+        }
+      }
+
+      // 按时间排序（最新的优先）
+      allData.sort((a, b) => b.time - a.time);
+      
+      // 应用限制
+      if (limit && allData.length > limit) {
+        allData = allData.slice(0, limit);
+      }
+
+      logger.info(`读取所有存储数据: 共${allData.length}条新闻${limit ? ` (限制${limit}条)` : ''}`);
+      return allData;
+    } catch (error) {
+      logger.error('读取所有数据失败:', error);
+      return [];
+    }
+  }
 }
 
 export default new StorageService();
