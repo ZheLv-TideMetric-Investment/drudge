@@ -1,10 +1,11 @@
 import moment from 'moment-timezone';
-import logger from '../utils/logger.js';
-import newsService from './newsService.js';
-import webhookService from './webhookService.js';
+import logger from '../../shared/utils/logger.js';
+import newsService from '../../infrastructure/external/NewsApiService.js';
+import webhookService from '../../infrastructure/external/WebhookService.js';
 import knowledgeGraphService from './knowledgeGraphService.js';
-import { callLLM } from '../utils/llm.js';
-import { SnakeTrackingQuery, SignificanceLevel } from '../models/GraphModels.js';
+import { callLLM } from '../../shared/utils/llm.js';
+import { SnakeTrackingQuery } from '../../domain/entities/index.js';
+import { SignificanceLevel } from '../../shared/types/enums.js';
 
 // 设置默认时区为北京时间
 moment.tz.setDefault('Asia/Shanghai');

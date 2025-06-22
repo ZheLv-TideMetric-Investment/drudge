@@ -1,6 +1,6 @@
 import neo4j from 'neo4j-driver';
-import config from '../config/config.js';
-import logger from '../utils/logger.js';
+import config from '../../shared/config/config.js';
+import logger from '../../shared/utils/logger.js';
 
 /**
  * Neo4j 数据库连接服务

@@ -1,11 +1,11 @@
 import { parentPort } from 'worker_threads';
 import fs from 'fs';
 import path from 'path';
-import logger from '../utils/logger.js';
-import knowledgeGraphService from '../services/knowledgeGraphService.js';
-import newsLevelService from '../services/newsLevelService.js';
-import storageService from '../services/storageService.js';
-import config from '../config/config.js';
+import logger from '../shared/utils/logger.js';
+import storageService from '../infrastructure/storage/FileStorage.js';
+import newsLevelService from '../application/services/newsLevelService.js';
+import knowledgeGraphService from '../application/services/knowledgeGraphService.js';
+import config from '../shared/config/config.js';
 
 /**
  * 新闻处理工作线程

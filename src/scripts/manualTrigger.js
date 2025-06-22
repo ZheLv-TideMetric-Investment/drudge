@@ -1,5 +1,5 @@
 import moment from 'moment-timezone';
-import logger from '../utils/logger.js';
+import logger from '../../shared/utils/logger.js';
 import newsService from '../services/newsService.js';
 import aiService from '../services/aiService.js';
 import webhookService from '../services/webhookService.js';
@@ -7,7 +7,7 @@ import knowledgeGraphService from '../services/knowledgeGraphService.js';
 import newsLevelService from '../services/newsLevelService.js';
 import storageService from '../services/storageService.js';
 import workerManager from '../services/workerManager.js';
-import config from '../config/config.js';
+import config from '../../shared/config/config.js';
 
 // 设置默认时区为北京时间
 moment.tz.setDefault('Asia/Shanghai');

@@ -1,6 +1,6 @@
 import moment from 'moment-timezone';
-import { callLLM } from '../utils/llm.js';
-import logger from '../utils/logger.js';
+import { callLLM } from '../../shared/utils/llm.js';
+import logger from '../../shared/utils/logger.js';
 
 // 设置默认时区为北京时间
 moment.tz.setDefault('Asia/Shanghai');

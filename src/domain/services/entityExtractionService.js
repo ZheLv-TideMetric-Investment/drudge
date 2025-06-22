@@ -1,20 +1,22 @@
-import { callLLM } from '../utils/llm.js';
-import logger from '../utils/logger.js';
-import config from '../config/config.js';
+import { callLLM } from '../../shared/utils/llm.js';
+import logger from '../../shared/utils/logger.js';
+import config from '../../shared/config/config.js';
 import {
-  EventNode,
-  CompanyNode,
-  PersonNode,
-  OrganizationNode,
-  LocationNode,
-  TimeNode,
+  Event,
+  Company,
+  Person,
+  Organization,
+  Location,
+  Time,
   NewsExtractionResult,
-  EventTypes,
-  SignificanceLevel,
+} from '../entities/index.js';
+import { 
+  NewsLevel, 
+  NewsLevelDescription, 
+  SignificanceLevel, 
   RelationshipTypes,
-  NewsLevel,
-  NewsLevelDescription,
-} from '../models/GraphModels.js';
+  EventTypes
+} from '../../shared/types/enums.js';
 
 /**
  * 新闻六要素提取服务
@@ -300,7 +302,7 @@ class EntityExtractionService {
     if (extractionData.events && Array.isArray(extractionData.events)) {
       for (const eventData of extractionData.events) {
         try {
-          const event = new EventNode({
+          const event = new Event({
             event_name: eventData.event_name || '',
             event_description: eventData.event_description || '',
             event_date: this.parseDate(newsItem.time),
@@ -321,7 +323,7 @@ class EntityExtractionService {
     if (extractionData.companies && Array.isArray(extractionData.companies)) {
       for (const companyData of extractionData.companies) {
         try {
-          const company = new CompanyNode({
+          const company = new Company({
             company_name: companyData.company_name || '',
             ticker: companyData.ticker || null,
             industry: companyData.industry || null,
@@ -337,7 +339,7 @@ class EntityExtractionService {
     if (extractionData.persons && Array.isArray(extractionData.persons)) {
       for (const personData of extractionData.persons) {
         try {
-          const person = new PersonNode({
+          const person = new Person({
             person_name: personData.person_name || '',
             role: personData.role || null,
             company: personData.company || null,
@@ -353,7 +355,7 @@ class EntityExtractionService {
     if (extractionData.organizations && Array.isArray(extractionData.organizations)) {
       for (const orgData of extractionData.organizations) {
         try {
-          const organization = new OrganizationNode({
+          const organization = new Organization({
             organization_name: orgData.organization_name || '',
             type: orgData.type || null,
             country: orgData.country || null,
@@ -369,7 +371,7 @@ class EntityExtractionService {
     if (extractionData.locations && Array.isArray(extractionData.locations)) {
       for (const locationData of extractionData.locations) {
         try {
-          const location = new LocationNode({
+          const location = new Location({
             location_name: locationData.location_name || '',
             country: locationData.country || null,
             region: locationData.region || null,
@@ -385,7 +387,7 @@ class EntityExtractionService {
     if (extractionData.times && Array.isArray(extractionData.times)) {
       for (const timeData of extractionData.times) {
         try {
-          const time = new TimeNode({
+          const time = new Time({
             timestamp: timeData.timestamp || new Date(newsItem.time * 1000).toISOString(),
             date: timeData.date || this.parseDate(newsItem.time),
             hour: timeData.hour || null,

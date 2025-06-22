@@ -1,10 +1,10 @@
-import logger from './utils/logger.js';
-import schedulerManager from './services/schedulerManager.js';
-import workerManager from './services/workerManager.js';
-import webhookService from './services/webhookService.js';
+import logger from './shared/utils/logger.js';
+import schedulerManager from './interfaces/schedulers/schedulerManager.js';
+import workerManager from './interfaces/schedulers/workerManager.js';
+import webhookService from './infrastructure/external/WebhookService.js';
 import moment from 'moment-timezone';
-import config from './config/config.js';
-import { NewsLevelDescription } from './models/GraphModels.js';
+import config from './shared/config/config.js';
+import { NewsLevelDescription } from './shared/types/enums.js';
 
 // 设置默认时区为北京时间
 moment.tz.setDefault('Asia/Shanghai');

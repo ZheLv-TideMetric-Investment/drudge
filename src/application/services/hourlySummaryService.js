@@ -1,9 +1,9 @@
-import logger from '../utils/logger.js';
+import logger from '../../shared/utils/logger.js';
 import knowledgeGraphService from './knowledgeGraphService.js';
-import aiService from './aiService.js';
-import webhookService from './webhookService.js';
-import { callLLM } from '../utils/llm.js';
-import { HourlySummary } from '../models/GraphModels.js';
+import aiService from '../../infrastructure/external/AiService.js';
+import webhookService from '../../infrastructure/external/WebhookService.js';
+import { callLLM } from '../../shared/utils/llm.js';
+import { HourlySummary } from '../../domain/entities/index.js';
 import moment from 'moment-timezone';
 
 /**

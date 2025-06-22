@@ -1,8 +1,8 @@
-import logger from '../utils/logger.js';
-import config from '../config/config.js';
-import webhookService from './webhookService.js';
-import neo4jService from './neo4jService.js';
-import { NewsLevel, NewsLevelDescription } from '../models/GraphModels.js';
+import logger from '../../shared/utils/logger.js';
+import config from '../../shared/config/config.js';
+import webhookService from '../../infrastructure/external/WebhookService.js';
+import neo4jService from '../../infrastructure/database/Neo4jRepository.js';
+import { NewsLevel, NewsLevelDescription } from '../../shared/types/enums.js';
 import moment from 'moment-timezone';
 
 /**

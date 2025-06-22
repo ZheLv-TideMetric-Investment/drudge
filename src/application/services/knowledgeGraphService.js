@@ -1,23 +1,25 @@
-import neo4jService from './neo4jService.js';
-import entityExtractionService from './entityExtractionService.js';
-import logger from '../utils/logger.js';
-import config from '../config/config.js';
+import neo4jService from '../../infrastructure/database/Neo4jRepository.js';
+import entityExtractionService from '../../domain/services/entityExtractionService.js';
+import logger from '../../shared/utils/logger.js';
+import config from '../../shared/config/config.js';
 import {
-  EventNode,
-  CompanyNode,
-  PersonNode,
-  OrganizationNode,
-  LocationNode,
-  TimeNode,
-  NewsNode,
+  Event,
+  Company,
+  Person,
+  Organization,
+  Location,
+  Time,
+  News,
   Relationship,
   GraphQueryResult,
-  RelationshipTypes,
-  NodeTypes,
-  SignificanceLevel,
   SnakeTrackingQuery,
   HourlySummary,
-} from '../models/GraphModels.js';
+} from '../../domain/entities/index.js';
+import { 
+  RelationshipTypes,
+  NodeTypes,
+  SignificanceLevel 
+} from '../../shared/types/enums.js';
 
 /**
  * 新闻处理与图数据库存储系统 - 知识图谱服务

@@ -1,5 +1,5 @@
 import snakeTrackingService from '../services/snakeTrackingService.js';
-import logger from '../utils/logger.js';
+import logger from '../../shared/utils/logger.js';
 import moment from 'moment-timezone';
 
 // 设置默认时区为北京时间

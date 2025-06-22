@@ -1,7 +1,7 @@
 import axios from 'axios';
-import config from '../config/config.js';
-import logger from '../utils/logger.js';
-import storageService from './storageService.js';
+import config from '../../shared/config/config.js';
+import logger from '../../shared/utils/logger.js';
+import storageService from '../storage/FileStorage.js';
 import moment from 'moment-timezone';
 
 // 设置默认时区为北京时间

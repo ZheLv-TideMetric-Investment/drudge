@@ -1,10 +1,10 @@
 import { parentPort } from 'worker_threads';
 import cron from 'node-cron';
-import logger from '../utils/logger.js';
-import newsService from '../services/newsService.js';
-import hourlySummaryService from '../services/hourlySummaryService.js';
-import snakeTrackingService from '../services/snakeTrackingService.js';
-import newsLevelService from '../services/newsLevelService.js';
+import logger from '../shared/utils/logger.js';
+import newsService from '../infrastructure/external/NewsApiService.js';
+import hourlySummaryService from '../application/services/hourlySummaryService.js';
+import snakeTrackingService from '../application/services/snakeTrackingService.js';
+import newsLevelService from '../application/services/newsLevelService.js';
 import moment from 'moment-timezone';
 
 /**

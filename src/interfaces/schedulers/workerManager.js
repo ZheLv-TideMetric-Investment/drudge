@@ -1,8 +1,8 @@
 import { Worker } from 'worker_threads';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import logger from '../utils/logger.js';
-import config from '../config/config.js';
+import logger from '../../shared/utils/logger.js';
+import config from '../../shared/config/config.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,7 +52,7 @@ class WorkerManager {
    */
   async createNewsProcessor() {
     return new Promise((resolve, reject) => {
-      const workerPath = path.join(__dirname, '../workers/newsProcessorWorker.js');
+      const workerPath = path.join(__dirname, '../../workers/newsProcessorWorker.js');
       const worker = new Worker(workerPath);
       
       worker.lastActivity = Date.now();
