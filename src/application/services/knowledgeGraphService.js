@@ -804,35 +804,35 @@ class KnowledgeGraphService {
       // 3. 构建返回结果
       for (const extractionResult of extractionResults) {
         if (extractionResult && extractionResult.news_id) {
-          const stats = {
+        const stats = {
             events: extractionResult.events?.length || 0,
             companies: extractionResult.companies?.length || 0,
             persons: extractionResult.persons?.length || 0,
             organizations: extractionResult.organizations?.length || 0,
             locations: extractionResult.locations?.length || 0,
             times: extractionResult.times?.length || 0,
-            news_level: extractionResult.news_level,
-            confidence: extractionResult.confidence
-          };
-          
-          results.push({
+          news_level: extractionResult.news_level,
+          confidence: extractionResult.confidence
+        };
+        
+        results.push({
             newsId: extractionResult.news_id,
-            success: true,
-            stats,
+          success: true,
+          stats,
             extractionResult,
             processed_at: new Date().toISOString()
           });
         } else {
-          results.push({
+          results.push({ 
             newsId: extractionResult?.news_id || 'unknown',
-            success: false,
+            success: false, 
             error: '实体提取失败或缺少news_id',
             processed_at: new Date().toISOString()
           });
-        }
       }
-      
-      return results;
+    }
+    
+    return results;
     } catch (error) {
       logger.error('批量创建图数据失败:', error);
       // 返回错误结果
@@ -888,7 +888,7 @@ class KnowledgeGraphService {
     
     // 批量执行
     if (queries.length > 0) {
-      await this.executeBatchQueries(queries, '新闻节点');
+    await this.executeBatchQueries(queries, '新闻节点');
     }
   }
 

@@ -519,7 +519,7 @@ class EntityExtractionService {
 
     const startTime = Date.now();
     logger.info(`开始批量AI提取${newsItems.length}条新闻的六要素`);
-
+        
     try {
       // 调用批量AI提取
       const batchResults = await this.callBatchAIExtraction(newsItems);
@@ -528,26 +528,26 @@ class EntityExtractionService {
       logger.info(`批量AI提取完成，${newsItems.length}条新闻，耗时${processingTime}ms，平均${Math.round(processingTime/newsItems.length)}ms/条`);
       
       return batchResults;
-    } catch (error) {
+      } catch (error) {
       logger.error(`批量AI提取失败，回退到单条处理:`, error);
-      
+        
       // 回退到单条处理
       const results = [];
       for (const newsItem of newsItems) {
-        try {
-          const result = await this.extractFromNews(newsItem);
-          results.push(result);
-        } catch (singleError) {
-          logger.error(`单条提取失败: ${newsItem.id}`, singleError);
-          results.push(new NewsExtractionResult({
-            news_id: newsItem.id,
-            confidence: 0,
-            processing_time: 0,
-          }));
+          try {
+            const result = await this.extractFromNews(newsItem);
+            results.push(result);
+          } catch (singleError) {
+            logger.error(`单条提取失败: ${newsItem.id}`, singleError);
+            results.push(new NewsExtractionResult({
+              news_id: newsItem.id,
+              confidence: 0,
+              processing_time: 0,
+            }));
+          }
         }
-      }
-      
-      return results;
+    
+    return results;
     }
   }
 
