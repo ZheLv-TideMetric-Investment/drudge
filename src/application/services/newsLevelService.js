@@ -4,6 +4,7 @@ import webhookService from '../../infrastructure/external/WebhookService.js';
 import neo4jService from '../../infrastructure/database/Neo4jRepository.js';
 import { NewsLevel, NewsLevelDescription } from '../../shared/types/enums.js';
 import moment from 'moment-timezone';
+import neo4j from 'neo4j-driver';
 
 /**
  * 新闻级别处理服务
@@ -302,7 +303,7 @@ class NewsLevelService {
       `;
 
       const since = moment().subtract(24, 'hours').toISOString();
-      const result = await neo4jService.executeQuery(cypher, { level, limit: limitInt, since });
+      const result = await neo4jService.executeQuery(cypher, { level, limit: neo4j.int(limitInt), since });
       
       return result.records.map(record => ({
         newsId: record.get('newsId'),

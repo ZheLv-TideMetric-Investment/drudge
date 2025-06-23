@@ -2,6 +2,7 @@ import neo4jService from '../../infrastructure/database/Neo4jRepository.js';
 import entityExtractionService from '../../domain/services/entityExtractionService.js';
 import logger from '../../shared/utils/logger.js';
 import config from '../../shared/config/config.js';
+import neo4j from 'neo4j-driver';
 import {
   Event,
   Company,
@@ -556,7 +557,7 @@ class KnowledgeGraphService {
       LIMIT $limit
     `;
 
-    const result = await neo4jService.executeQuery(cypher, { newsLevel, limit: limitInt });
+    const result = await neo4jService.executeQuery(cypher, { newsLevel, limit: neo4j.int(limitInt) });
     return result.records.map(record => ({
       event: record.get('e').properties,
       news: record.get('n').properties,
@@ -580,7 +581,7 @@ class KnowledgeGraphService {
       LIMIT $limit
     `;
 
-    const result = await neo4jService.executeQuery(cypher, { companyName, limit: limitInt });
+    const result = await neo4jService.executeQuery(cypher, { companyName, limit: neo4j.int(limitInt) });
     return result.records.map(record => record.get('e').properties);
   }
 
@@ -603,7 +604,7 @@ class KnowledgeGraphService {
       LIMIT $limit
     `;
 
-    const result = await neo4jService.executeQuery(cypher, { companyNames, limit: limitInt });
+    const result = await neo4jService.executeQuery(cypher, { companyNames, limit: neo4j.int(limitInt) });
     return result.records.map(record => ({
       event: record.get('e').properties,
       companies: record.get('companies'),
@@ -711,7 +712,7 @@ class KnowledgeGraphService {
     const limitInt = parseInt(limit) || 20;
     
     let cypher = '';
-    const parameters = { searchTerm: searchTerm.toLowerCase(), limit: limitInt };
+    const parameters = { searchTerm: searchTerm.toLowerCase(), limit: neo4j.int(limitInt) };
 
     if (nodeType) {
       cypher = `
