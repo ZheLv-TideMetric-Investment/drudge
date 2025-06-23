@@ -233,7 +233,7 @@ async function gracefulShutdown() {
 }
 
 logger.info('🚀 新闻处理与图数据库存储系统启动完成');
-logger.info('📊 支持功能：News Level分级、按小时总结、草蛇灰线追踪、知识图谱构建');
+logger.info('📊 支持功能：News Level分级、按小时总结、知识图谱构建');
 logger.info('📈 系统状态: 调度器工作线程模式，支持5级新闻分类');
 
 // 导出系统实例供外部使用

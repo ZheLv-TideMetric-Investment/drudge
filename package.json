@@ -21,7 +21,6 @@
     "news": "node src/scripts/newsAcquisition.js",
     "graph": "node src/scripts/knowledgeGraph.js",
     "level": "node src/scripts/newsLevelCheck.js",
-    "snake": "node src/scripts/snakeTracking.js",
     "health": "node src/scripts/systemHealth.js",
     
     "schema:apply": "cypher-shell -f neo4j/schema.cypher",

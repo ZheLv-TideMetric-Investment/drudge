@@ -31,10 +31,7 @@
 - 生成结构化的小时总结报告
 - 识别当前时段的热点话题和趋势
 
-#### 3. 草蛇灰线追踪服务
-- 基于关键词和实体进行深度关联分析
-- 追踪事件发展脉络和潜在影响
-- 发现隐藏的关联关系和趋势模式
+
 
 ### 🔧 系统特性
 - **工作线程架构**: 主线程负责管理，工作线程处理具体任务
@@ -52,7 +49,7 @@ drudge/
 │   │   └── services/         # 核心业务服务
 │   │       ├── NewsProcessingService.js     # 新闻处理服务
 │   │       ├── hourlySummaryService.js      # 按小时总结服务
-│   │       ├── snakeTrackingService.js      # 草蛇灰线追踪服务
+
 │   │       ├── knowledgeGraphService.js     # 知识图谱服务
 │   │       └── newsLevelService.js          # 新闻等级服务
 │   ├── domain/               # 领域层
@@ -192,14 +189,7 @@ npm run level break-news 3       # 查找Break News
 npm run level stats 7            # 获取等级统计
 ```
 
-#### 🐍 草蛇灰线追踪
-```bash
-npm run snake                    # 显示帮助信息
-npm run snake hunt               # 开始追踪分析
-npm run snake progress           # 查看追踪进度
-npm run snake report 3           # 生成3天报告
-npm run snake status             # 追踪系统状态
-```
+
 
 #### 🩺 系统健康检查
 ```bash

@@ -25,7 +25,6 @@ class SchedulerManager {
       totalNewsProcessed: 0,
       totalHighLevelNews: 0,
       totalSummariesGenerated: 0,
-      totalTrackingRuns: 0,
       lastActivity: null,
       errors: []
     };
@@ -126,9 +125,7 @@ class SchedulerManager {
         this.handleSummaryGenerated(data);
         break;
         
-      case 'TRACKING_COMPLETED':
-        this.handleTrackingCompleted(data);
-        break;
+
         
       case 'TASK_ERROR':
         this.handleScheduledTaskError(data);
@@ -201,15 +198,7 @@ class SchedulerManager {
     logger.info(`📊 总结生成完成: ${data.hour}，总计生成${this.stats.totalSummariesGenerated}份总结`);
   }
 
-  /**
-   * 处理追踪完成事件
-   */
-  handleTrackingCompleted(data) {
-    this.stats.totalTrackingRuns++;
-    this.stats.lastActivity = new Date(data.timestamp);
-    
-    logger.info(`🐍 草蛇灰线追踪完成，总计执行${this.stats.totalTrackingRuns}次`);
-  }
+
 
   /**
    * 处理定时任务错误

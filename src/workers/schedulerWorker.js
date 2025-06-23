@@ -3,7 +3,6 @@ import cron from 'node-cron';
 import logger from '../shared/utils/logger.js';
 import newsService from '../infrastructure/external/NewsApiService.js';
 import hourlySummaryService from '../application/services/hourlySummaryService.js';
-import snakeTrackingService from '../application/services/snakeTrackingService.js';
 import newsLevelService from '../application/services/newsLevelService.js';
 import moment from 'moment-timezone';
 
@@ -24,7 +23,6 @@ class SchedulerWorker {
       
       // 只初始化数据获取相关的服务
       await hourlySummaryService.initialize();
-      await snakeTrackingService.initialize();
       await newsLevelService.initialize();
       
       this.initialized = true;
@@ -117,33 +115,7 @@ class SchedulerWorker {
       timezone: 'Asia/Shanghai'
     });
 
-    // 3. 每10分钟执行草蛇灰线追踪
-    const trackingTask = cron.schedule('*/10 * * * *', async () => {
-      try {
-        logger.info('定时任务：开始草蛇灰线追踪');
-        const startTime = Date.now();
-        
-        await snakeTrackingService.performTracking();
-        
-        const duration = Date.now() - startTime;
-        logger.info(`定时任务：草蛇灰线追踪完成，耗时${duration}ms`);
-        
-        this.notifyMainThread('TRACKING_COMPLETED', {
-          timestamp: Date.now()
-        });
-        
-      } catch (error) {
-        logger.error('草蛇灰线追踪任务失败:', error);
-        this.notifyMainThread('TASK_ERROR', {
-          taskType: 'snake_tracking',
-          error: error.message,
-          timestamp: Date.now()
-        });
-      }
-    }, {
-      scheduled: false,
-      timezone: 'Asia/Shanghai'
-    });
+
 
     // 4. 每5分钟执行高级别新闻扫描
     const levelScanTask = cron.schedule('*/5 * * * *', async () => {
@@ -212,11 +184,10 @@ class SchedulerWorker {
     // 启动所有任务
     newsTask.start();
     summaryTask.start();
-    trackingTask.start();
     levelScanTask.start();
     dailyStatsTask.start();
 
-    this.cronJobs = [newsTask, summaryTask, trackingTask, levelScanTask, dailyStatsTask];
+    this.cronJobs = [newsTask, summaryTask, levelScanTask, dailyStatsTask];
     logger.info(`所有定时任务已启动，共${this.cronJobs.length}个任务`);
   }
 

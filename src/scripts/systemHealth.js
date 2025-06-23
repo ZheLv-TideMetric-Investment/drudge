@@ -5,7 +5,7 @@ import newsApiService from '../infrastructure/external/NewsApiService.js';
 import fileStorage from '../infrastructure/storage/FileStorage.js';
 import knowledgeGraphService from '../application/services/knowledgeGraphService.js';
 import newsLevelService from '../application/services/newsLevelService.js';
-import snakeTrackingService from '../application/services/snakeTrackingService.js';
+
 import webhookService from '../infrastructure/external/WebhookService.js';
 
 // 设置默认时区为北京时间
@@ -23,7 +23,6 @@ class SystemHealthChecker {
       storage: fileStorage,
       knowledgeGraph: knowledgeGraphService,
       newsLevel: newsLevelService,
-      snakeTracking: snakeTrackingService,
       webhook: webhookService
     };
     this.commands = {
@@ -371,8 +370,7 @@ class SystemHealthChecker {
     console.log('⚙️  检查应用服务...');
 
     const serviceChecks = [
-      { name: '新闻等级服务', service: 'newsLevel' },
-      { name: '草蛇灰线服务', service: 'snakeTracking' }
+      { name: '新闻等级服务', service: 'newsLevel' }
     ];
 
     for (const check of serviceChecks) {

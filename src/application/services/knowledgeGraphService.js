@@ -13,7 +13,7 @@ import {
   News,
   Relationship,
   GraphQueryResult,
-  SnakeTrackingQuery,
+
   HourlySummary,
 } from '../../domain/entities/index.js';
 import { 
@@ -565,7 +565,7 @@ class KnowledgeGraphService {
   }
 
   /**
-   * 草蛇灰线功能 - 查询公司相关事件
+   * 查询公司相关事件
    * @param {string} companyName - 公司名称
    * @param {number} limit - 限制数量
    * @returns {Array} - 相关事件列表
@@ -586,7 +586,7 @@ class KnowledgeGraphService {
   }
 
   /**
-   * 草蛇灰线功能 - 查询多公司关联事件
+   * 查询多公司关联事件
    * @param {Array} companyNames - 公司名称列表
    * @param {number} limit - 限制数量
    * @returns {Array} - 关联事件列表
@@ -612,7 +612,7 @@ class KnowledgeGraphService {
   }
 
   /**
-   * 草蛇灰线功能 - 查询某日所有事件
+   * 查询某日所有事件
    * @param {string} date - 日期 (YYYY-MM-DD)
    * @returns {Array} - 当日事件列表
    */

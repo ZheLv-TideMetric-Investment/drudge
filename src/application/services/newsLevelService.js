@@ -642,6 +642,27 @@ class NewsLevelService {
     }
   }
 
+  /**
+   * 健康检查
+   * @returns {Object} - 健康状态
+   */
+  async healthCheck() {
+    try {
+      return {
+        status: 'healthy',
+        initialized: this.initialized,
+        cacheSize: this.processedCache.size,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
 }
 
 export default new NewsLevelService(); 

@@ -160,37 +160,7 @@ export class HourlySummary {
   }
 }
 
-/**
- * 草蛇灰线查询参数实体
- */
-export class SnakeTrackingQuery {
-  constructor({
-    keywords = [],       // 关键词
-    entities = [],       // 实体
-    date_range = null,   // 日期范围
-    event_types = [],    // 关注的事件类型
-    significance_level = 2, // 最低重要性级别
-    depth = 2,           // 查询深度
-  }) {
-    this.keywords = keywords;
-    this.entities = entities;
-    this.date_range = date_range;
-    this.event_types = event_types;
-    this.significance_level = significance_level;
-    this.depth = depth;
-  }
 
-  toPlainObject() {
-    return {
-      keywords: this.keywords,
-      entities: this.entities,
-      date_range: this.date_range,
-      event_types: this.event_types,
-      significance_level: this.significance_level,
-      depth: this.depth,
-    };
-  }
-}
 
 /**
  * 图查询结果实体
