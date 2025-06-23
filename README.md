@@ -367,7 +367,7 @@ npm run pm2:stop
 
 如有问题或建议，请：
 - 提交 [Issue](../../issues)
-- 发送邮件到 [your-email@example.com]
+- 发送邮件到 [micrott526@gmail.com]
 - 查看 [Wiki](../../wiki) 文档
 
 ---
