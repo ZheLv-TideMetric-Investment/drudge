@@ -379,6 +379,24 @@ ${summary.top_companies.map((company, index) =>
     
     return await this.runHourlySummary(lastHour.toDate(), thisHour.toDate());
   }
+
+  /**
+   * 生成小时总结（用于定时任务调用）
+   * @param {Date} hourStart - 开始时间
+   * @param {Date} hourEnd - 结束时间
+   */
+  async generateHourlySummary(hourStart, hourEnd) {
+    try {
+      if (!this.initialized) {
+        await this.initialize();
+      }
+      
+      return await this.runHourlySummary(hourStart, hourEnd);
+    } catch (error) {
+      logger.error('生成小时总结失败:', error);
+      throw error;
+    }
+  }
 }
 
 export default new HourlySummaryService(); 

@@ -321,6 +321,52 @@ ${
   }
 
   /**
+   * 执行追踪任务（用于定时任务调用）
+   * 综合执行事件捕猎、进展检查等功能
+   */
+  async performTracking() {
+    try {
+      if (!this.isInitialized) {
+        await this.initialize();
+      }
+
+      logger.info('🐍 开始执行草蛇灰线追踪任务...');
+
+      // 执行事件捕猎检查
+      await this.runHuntCheck();
+
+      // 执行进展跟踪检查
+      await this.runProgressCheck();
+
+      // 执行终止条件检查（降低频率）
+      const currentMinute = moment().minute();
+      if (currentMinute === 0) { // 每小时执行一次
+        await this.runTerminationCheck();
+      }
+
+      logger.info('🐍 草蛇灰线追踪任务执行完成');
+      
+      return {
+        success: true,
+        timestamp: moment().toISOString(),
+        message: '追踪任务执行完成'
+      };
+    } catch (error) {
+      logger.error('草蛇灰线追踪任务执行失败:', error);
+      await this.sendSystemNotification(
+        '⚠️ 草蛇灰线系统异常',
+        `追踪任务执行失败: ${error.message}`
+      );
+      
+      return {
+        success: false,
+        error: error.message,
+        timestamp: moment().toISOString()
+      };
+    }
+  }
+
+  /**
    * 健康检查
    * @returns {Promise<Object>} 健康状态
    */

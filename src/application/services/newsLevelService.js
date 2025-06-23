@@ -276,6 +276,9 @@ class NewsLevelService {
    */
   async getNewsItemsByLevel(level, limit = 20) {
     try {
+      // 确保limit是整数
+      const limitInt = parseInt(limit) || 20;
+      
       const cypher = `
         MATCH (n:News)-[:REPORTED_IN]-(e:Event)
         WHERE e.event_level = $level
@@ -299,7 +302,7 @@ class NewsLevelService {
       `;
 
       const since = moment().subtract(24, 'hours').toISOString();
-      const result = await neo4jService.executeQuery(cypher, { level, limit, since });
+      const result = await neo4jService.executeQuery(cypher, { level, limit: limitInt, since });
       
       return result.records.map(record => ({
         newsId: record.get('newsId'),
@@ -312,6 +315,8 @@ class NewsLevelService {
       }));
     } catch (error) {
       logger.error(`获取${level}级别新闻失败:`, error);
+      logger.error('查询语句:');
+      logger.error('参数:', { level, limit, since: moment().subtract(24, 'hours').toISOString() });
       return [];
     }
   }

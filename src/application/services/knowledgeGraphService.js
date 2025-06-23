@@ -546,6 +546,9 @@ class KnowledgeGraphService {
    * @returns {Array} - 指定级别的事件列表
    */
   async getNewsByLevel(newsLevel = 'Level 1', limit = 20) {
+    // 确保limit是整数
+    const limitInt = parseInt(limit) || 20;
+    
     const cypher = `
       MATCH (n:News {news_level: $newsLevel})-[:REPORTED_IN]-(e:Event)
       RETURN e, n
@@ -553,7 +556,7 @@ class KnowledgeGraphService {
       LIMIT $limit
     `;
 
-    const result = await neo4jService.executeQuery(cypher, { newsLevel, limit });
+    const result = await neo4jService.executeQuery(cypher, { newsLevel, limit: limitInt });
     return result.records.map(record => ({
       event: record.get('e').properties,
       news: record.get('n').properties,
@@ -567,6 +570,9 @@ class KnowledgeGraphService {
    * @returns {Array} - 相关事件列表
    */
   async getCompanyEvents(companyName, limit = 50) {
+    // 确保limit是整数
+    const limitInt = parseInt(limit) || 50;
+    
     const cypher = `
       MATCH (c:Company {company_name: $companyName})<-[:OCCURRED_IN]-(e:Event)
       RETURN e
@@ -574,7 +580,7 @@ class KnowledgeGraphService {
       LIMIT $limit
     `;
 
-    const result = await neo4jService.executeQuery(cypher, { companyName, limit });
+    const result = await neo4jService.executeQuery(cypher, { companyName, limit: limitInt });
     return result.records.map(record => record.get('e').properties);
   }
 
@@ -585,6 +591,9 @@ class KnowledgeGraphService {
    * @returns {Array} - 关联事件列表
    */
   async getMultiCompanyEvents(companyNames, limit = 30) {
+    // 确保limit是整数
+    const limitInt = parseInt(limit) || 30;
+    
     const cypher = `
       MATCH (c1:Company)<-[:OCCURRED_IN]-(e:Event)-[:OCCURRED_IN]->(c2:Company)
       WHERE c1.company_name IN $companyNames AND c2.company_name IN $companyNames
@@ -594,7 +603,7 @@ class KnowledgeGraphService {
       LIMIT $limit
     `;
 
-    const result = await neo4jService.executeQuery(cypher, { companyNames, limit });
+    const result = await neo4jService.executeQuery(cypher, { companyNames, limit: limitInt });
     return result.records.map(record => ({
       event: record.get('e').properties,
       companies: record.get('companies'),
@@ -698,8 +707,11 @@ class KnowledgeGraphService {
    * @returns {Array} - 搜索结果
    */
   async searchEntities(searchTerm, nodeType = null, limit = 20) {
+    // 确保limit是整数
+    const limitInt = parseInt(limit) || 20;
+    
     let cypher = '';
-    const parameters = { searchTerm: searchTerm.toLowerCase(), limit };
+    const parameters = { searchTerm: searchTerm.toLowerCase(), limit: limitInt };
 
     if (nodeType) {
       cypher = `
