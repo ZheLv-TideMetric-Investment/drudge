@@ -320,12 +320,12 @@ class NewsAcquisition {
   help           - 显示帮助信息
 
 使用示例:
-  npm run news:fetch                    # 获取最新新闻
-  npm run news:fetch-batch 3            # 获取最近3天新闻
-  npm run news:list 20                  # 列出最新20条新闻
-  npm run news:count                    # 查看新闻统计
-  npm run news:clean 7                  # 清理7天前的新闻
-  npm run news:status                   # 查看模块状态
+  npm run news fetch                    # 获取最新新闻
+  npm run news fetch-batch 3            # 获取最近3天新闻
+  npm run news list 20                  # 列出最新20条新闻
+  npm run news count                    # 查看新闻统计
+  npm run news clean 7                  # 清理7天前的新闻
+  npm run news status                   # 查看模块状态
 `;
 
     console.log(helpText);

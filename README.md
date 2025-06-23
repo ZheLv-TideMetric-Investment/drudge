@@ -158,39 +158,56 @@ npm run pm2:start
 
 ## 📖 使用指南
 
-### 手动触发功能
+### 脚本使用指南
 
+本系统使用简化的脚本命令，通过基本命令加参数的方式执行功能：
+
+#### 📰 新闻管理
 ```bash
-# 获取最新新闻
-npm run manual:fetch
-
-# 处理所有未处理新闻
-npm run manual:process
-
-# 处理最近1小时新闻
-npm run manual:recent
-
-# 系统健康检查
-npm run health-check
-
-# 查看系统状态
-npm run manual:status
+npm run news                     # 显示帮助信息
+npm run news fetch               # 获取最新新闻
+npm run news fetch-batch 3       # 获取最近3天新闻
+npm run news list 20             # 列出最新20条新闻
+npm run news count               # 查看新闻统计
+npm run news status              # 查看模块状态
 ```
 
-### 草蛇灰线追踪功能
-
+#### 🧠 知识图谱处理
 ```bash
-# 开始追踪分析
-npm run snake:hunt
+npm run graph                    # 显示帮助信息
+npm run graph process            # 处理未处理的新闻
+npm run graph process-batch 30   # 批量处理30条新闻
+npm run graph process-recent 12  # 处理最近12小时新闻
+npm run graph query "苹果公司" 15 # 查询相关新闻
+npm run graph stats              # 查看图谱统计
+npm run graph status             # 查看模块状态
+```
 
-# 查看追踪进度
-npm run snake:progress
+#### 📊 新闻等级检查
+```bash
+npm run level                    # 显示帮助信息
+npm run level check 100          # 检查新闻等级
+npm run level check-recent 24    # 检查最近24小时新闻
+npm run level break-news 3       # 查找Break News
+npm run level stats 7            # 获取等级统计
+```
 
-# 生成追踪报告
-npm run snake:report
+#### 🐍 草蛇灰线追踪
+```bash
+npm run snake                    # 显示帮助信息
+npm run snake hunt               # 开始追踪分析
+npm run snake progress           # 查看追踪进度
+npm run snake report 3           # 生成3天报告
+npm run snake status             # 追踪系统状态
+```
 
-# 追踪系统状态
-npm run snake:status
+#### 🩺 系统健康检查
+```bash
+npm run health                   # 完整健康检查
+npm run health quick             # 快速检查
+npm run health services          # 检查服务状态
+npm run health database          # 检查数据库
+npm run health stats             # 系统统计
 ```
 
 ### 数据库管理

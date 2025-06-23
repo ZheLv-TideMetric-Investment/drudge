@@ -81,31 +81,28 @@ class KnowledgeGraphProcessor {
 
       // 流式批量处理
       const batchSize = 5;
-      for (let i = 0; i < newsToProcess.length; i += batchSize) {
-        const batch = newsToProcess.slice(i, i + batchSize);
+      
+      // 定义批次完成回调函数
+      const onBatchComplete = async (batchInfo) => {
+        const { batchResults, batchSummary, overallProgress } = batchInfo;
         
-        try {
-          const results = await this.newsProcessing.batchProcessNews(batch);
-          
-          for (const result of results) {
-            if (result.success && !result.skipped) {
-              processedCount++;
-            } else if (result.error) {
-              errorCount++;
-            }
+        // 统计结果
+        for (const result of batchResults) {
+          if (result.success && !result.skipped) {
+            processedCount++;
+          } else if (result.error) {
+            errorCount++;
           }
-
-          console.log(`📊 批次完成: ${Math.min(i + batchSize, newsToProcess.length)}/${newsToProcess.length}`);
-          
-        } catch (error) {
-          logger.error(`批次处理失败:`, error);
-          errorCount += batch.length;
         }
 
-        // 批次间延迟
-        if (i + batchSize < newsToProcess.length) {
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
+        console.log(`📊 批次完成: ${overallProgress.processed}/${overallProgress.total} (成功: ${batchSummary.success}, 失败: ${batchSummary.failed})`);
+      };
+
+      try {
+        await this.newsProcessing.batchProcessNews(newsToProcess, batchSize, onBatchComplete);
+      } catch (error) {
+        logger.error(`批次处理失败:`, error);
+        errorCount += newsToProcess.length;
       }
 
       const message = `✅ 图谱化处理完成: 成功 ${processedCount} 条，失败 ${errorCount} 条`;
@@ -148,21 +145,30 @@ class KnowledgeGraphProcessor {
       const newsToProcess = allNews.slice(0, countNum);
       console.log(`📊 将处理 ${newsToProcess.length} 条新闻`);
 
-      const results = await this.newsProcessing.batchProcessNews(newsToProcess);
-      
       let processedCount = 0;
       let errorCount = 0;
       let skippedCount = 0;
 
-      for (const result of results) {
-        if (result.success && !result.skipped) {
-          processedCount++;
-        } else if (result.skipped) {
-          skippedCount++;
-        } else {
-          errorCount++;
+      // 定义批次完成回调函数
+      const onBatchComplete = async (batchInfo) => {
+        const { batchResults, batchSummary, overallProgress } = batchInfo;
+        
+        // 统计结果
+        for (const result of batchResults) {
+          if (result.success && !result.skipped) {
+            processedCount++;
+          } else if (result.skipped) {
+            skippedCount++;
+          } else {
+            errorCount++;
+          }
         }
-      }
+
+        console.log(`📊 批次进度: ${overallProgress.processed}/${overallProgress.total} (成功: ${batchSummary.success}, 失败: ${batchSummary.failed})`);
+      };
+
+      const batchSize = 5;
+      await this.newsProcessing.batchProcessNews(newsToProcess, batchSize, onBatchComplete);
 
       const message = `✅ 批量处理完成: 成功 ${processedCount} 条，跳过 ${skippedCount} 条，失败 ${errorCount} 条`;
       console.log(message);
@@ -204,21 +210,30 @@ class KnowledgeGraphProcessor {
 
       console.log(`📊 找到 ${recentNews.length} 条最近的新闻`);
 
-      const results = await this.newsProcessing.batchProcessNews(recentNews);
-      
       let processedCount = 0;
       let errorCount = 0;
       let skippedCount = 0;
 
-      for (const result of results) {
-        if (result.success && !result.skipped) {
-          processedCount++;
-        } else if (result.skipped) {
-          skippedCount++;
-        } else {
-          errorCount++;
+      // 定义批次完成回调函数
+      const onBatchComplete = async (batchInfo) => {
+        const { batchResults, batchSummary, overallProgress } = batchInfo;
+        
+        // 统计结果
+        for (const result of batchResults) {
+          if (result.success && !result.skipped) {
+            processedCount++;
+          } else if (result.skipped) {
+            skippedCount++;
+          } else {
+            errorCount++;
+          }
         }
-      }
+
+        console.log(`📊 批次进度: ${overallProgress.processed}/${overallProgress.total} (成功: ${batchSummary.success}, 失败: ${batchSummary.failed})`);
+      };
+
+      const batchSize = 5;
+      await this.newsProcessing.batchProcessNews(recentNews, batchSize, onBatchComplete);
 
       const message = `✅ 最近新闻处理完成: 成功 ${processedCount} 条，跳过 ${skippedCount} 条，失败 ${errorCount} 条`;
       console.log(message);
@@ -468,14 +483,14 @@ class KnowledgeGraphProcessor {
   help                 - 显示帮助信息
 
 使用示例:
-  npm run graph:process                    # 处理未处理的新闻
-  npm run graph:process-batch 30          # 批量处理30条新闻
-  npm run graph:process-recent 12         # 处理最近12小时新闻
-  npm run graph:reprocess news_12345      # 重新处理指定新闻
-  npm run graph:query "苹果公司" 15        # 查询苹果公司相关新闻
-  npm run graph:stats                     # 查看图谱统计
-  npm run graph:export json               # 导出JSON格式数据
-  npm run graph:status                    # 查看模块状态
+  npm run graph process                    # 处理未处理的新闻
+  npm run graph process-batch 30          # 批量处理30条新闻
+  npm run graph process-recent 12         # 处理最近12小时新闻
+  npm run graph reprocess news_12345      # 重新处理指定新闻
+  npm run graph query "苹果公司" 15        # 查询苹果公司相关新闻
+  npm run graph stats                     # 查看图谱统计
+  npm run graph export json               # 导出JSON格式数据
+  npm run graph status                    # 查看模块状态
 `;
 
     console.log(helpText);

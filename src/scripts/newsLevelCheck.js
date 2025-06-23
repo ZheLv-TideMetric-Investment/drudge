@@ -660,10 +660,10 @@ class NewsLevelChecker {
   help                   显示此帮助信息
 
 示例:
-  node src/scripts/newsLevelCheck.js check 100
-  node src/scripts/newsLevelCheck.js check-recent 24
-  node src/scripts/newsLevelCheck.js break-news 3
-  node src/scripts/newsLevelCheck.js check-single news_123456
+  npm run level check 100
+  npm run level check-recent 24
+  npm run level break-news 3
+  npm run level check-single news_123456
 `);
   }
 

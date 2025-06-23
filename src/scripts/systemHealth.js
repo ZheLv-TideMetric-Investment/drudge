@@ -663,12 +663,12 @@ class SystemHealthChecker {
 
 使用示例:
   npm run health                    # 完整健康检查
-  npm run health:quick              # 快速检查
-  npm run health:services           # 检查服务
-  npm run health:database           # 检查数据库
-  npm run health:stats              # 系统统计
-  npm run health:fix                # 自动修复
-  npm run health:report             # 生成报告
+  npm run health quick              # 快速检查
+  npm run health services           # 检查服务
+  npm run health database           # 检查数据库
+  npm run health stats              # 系统统计
+  npm run health fix                # 自动修复
+  npm run health report             # 生成报告
 `;
 
     console.log(helpText);

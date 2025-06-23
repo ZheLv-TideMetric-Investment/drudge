@@ -558,15 +558,15 @@ class SnakeTracker {
   help                    - 显示帮助信息
 
 使用示例:
-  npm run snake:hunt                         # 触发捕猎检查
-  npm run snake:progress                     # 触发进展检查
-  npm run snake:status                       # 查看系统状态
-  npm run snake:report 3                     # 生成3天报告
-  npm run snake:terminate hunt_12345         # 终止指定捕猎
-  npm run snake:create "新闻标题" "科技" "high"  # 创建捕猎目标
-  npm run snake:search "苹果公司" 5           # 搜索相关捕猎
-  npm run snake:analyze hunt_12345           # 分析捕猎目标
-  npm run snake:health                       # 健康检查
+npm run snake hunt                         # 触发捕猎检查
+npm run snake progress                     # 触发进展检查
+npm run snake status                       # 查看系统状态
+npm run snake report 3                     # 生成3天报告
+npm run snake terminate hunt_12345         # 终止指定捕猎
+npm run snake create "新闻标题" "科技" "high"  # 创建捕猎目标
+npm run snake search "苹果公司" 5           # 搜索相关捕猎
+npm run snake analyze hunt_12345           # 分析捕猎目标
+npm run snake health                       # 健康检查
 `;
 
     console.log(helpText);

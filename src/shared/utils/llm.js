@@ -35,8 +35,8 @@ export async function callDeepSeekV3(messages) {
 }
 
 export async function callSimpleLLM(messages) {
-  return callDeepSeekV3(messages);
-  // return callGemi(messages);
+  // return callDeepSeekV3(messages);
+  return callGemi(messages);
 }
 
 export async function callLLM(messages) {
