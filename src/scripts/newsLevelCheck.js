@@ -58,9 +58,9 @@ class NewsLevelChecker {
       logger.info(`📊 开始检查新闻等级，限制: ${limitNum} 条`);
 
       // 获取最新新闻
-      const latestNews = await this.storage.getLatest(limitNum);
+      const latestNews = await this.storage.getAll(limitNum);
 
-      if (latestNews.length === 0) {
+      if (!latestNews || latestNews.length === 0) {
         console.log('📰 没有找到新闻');
         return { success: true, checked: 0 };
       }
@@ -396,9 +396,9 @@ class NewsLevelChecker {
       const limitNum = parseInt(limit) || 100;
       logger.info(`🔄 重新扫描新闻等级，限制: ${limitNum} 条`);
 
-      const latestNews = await this.storage.getLatest(limitNum);
+      const latestNews = await this.storage.getAll(limitNum);
       
-      if (latestNews.length === 0) {
+      if (!latestNews || latestNews.length === 0) {
         console.log('📰 没有找到新闻');
         return { success: true, rescanned: 0 };
       }

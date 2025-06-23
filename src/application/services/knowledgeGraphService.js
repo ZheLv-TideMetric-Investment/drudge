@@ -764,6 +764,98 @@ class KnowledgeGraphService {
   }
 
   /**
+   * 获取新闻的提取结果（用于等级检查等）
+   * @param {string} newsId - 新闻ID
+   * @returns {Object|null} - 新闻提取结果
+   */
+  async getNewsExtractionResult(newsId) {
+    try {
+      // 查询新闻基本信息
+      const newsCypher = `
+        MATCH (n:News {id: $newsId, processed: true})
+        RETURN n
+      `;
+      
+      const newsResult = await neo4jService.executeQuery(newsCypher, { newsId });
+      
+      if (newsResult.records.length === 0) {
+        return null; // 新闻不存在或未处理
+      }
+      
+      const newsNode = newsResult.records[0].get('n').properties;
+      
+      // 查询相关实体
+      const entitiesCypher = `
+        MATCH (n:News {id: $newsId})
+        OPTIONAL MATCH (n)<-[:REPORTED_IN]-(e:Event)
+        OPTIONAL MATCH (e)-[:OCCURRED_IN]->(c:Company)
+        OPTIONAL MATCH (e)-[:INVOLVES]->(p:Person)
+        OPTIONAL MATCH (e)-[:OCCURRED_AT]->(l:Location)
+        OPTIONAL MATCH (e)-[:HAPPENED_AT]->(t:Time)
+        OPTIONAL MATCH (e)-[:RELATED_TO]->(o:Organization)
+        
+        RETURN 
+          collect(DISTINCT e.event_name) as events,
+          collect(DISTINCT c.company_name) as companies,
+          collect(DISTINCT p.person_name) as persons,
+          collect(DISTINCT o.organization_name) as organizations,
+          collect(DISTINCT l.location_name) as locations,
+          collect(DISTINCT t.date) as times
+      `;
+      
+      const entitiesResult = await neo4jService.executeQuery(entitiesCypher, { newsId });
+      
+      if (entitiesResult.records.length === 0) {
+        // 如果没有关联实体，返回基本信息
+        return {
+          news_id: newsId,
+          news_level: newsNode.news_level || 'Level 5',
+          confidence: newsNode.confidence || 0,
+          entities: [],
+          events: [],
+          companies: [],
+          persons: [],
+          organizations: [],
+          locations: [],
+          times: [],
+          processed_at: newsNode.updated_at
+        };
+      }
+      
+      const entitiesRecord = entitiesResult.records[0];
+      
+      // 过滤空值
+      const events = entitiesRecord.get('events').filter(e => e !== null);
+      const companies = entitiesRecord.get('companies').filter(c => c !== null);
+      const persons = entitiesRecord.get('persons').filter(p => p !== null);
+      const organizations = entitiesRecord.get('organizations').filter(o => o !== null);
+      const locations = entitiesRecord.get('locations').filter(l => l !== null);
+      const times = entitiesRecord.get('times').filter(t => t !== null);
+      
+      // 构建实体列表（用于兼容性）
+      const entities = [...events, ...companies, ...persons, ...organizations, ...locations];
+      
+      return {
+        news_id: newsId,
+        news_level: newsNode.news_level || 'Level 5',
+        confidence: newsNode.confidence || 0,
+        entities,
+        events,
+        companies,
+        persons,
+        organizations,
+        locations,
+        times,
+        processed_at: newsNode.updated_at
+      };
+      
+    } catch (error) {
+      logger.error(`获取新闻提取结果失败: ${newsId}`, error);
+      return null;
+    }
+  }
+
+  /**
    * 健康检查
    */
   async healthCheck() {

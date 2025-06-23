@@ -135,7 +135,7 @@ class KnowledgeGraphProcessor {
       const countNum = parseInt(count) || 50;
       logger.info(`🔄 开始批量处理 ${countNum} 条新闻...`);
 
-      const allNews = await this.storage.getLatest(countNum * 2);
+      const allNews = await this.storage.getAll(countNum * 2);
       
       if (allNews.length === 0) {
         console.log('📰 没有找到新闻');

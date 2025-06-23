@@ -138,7 +138,7 @@ class NewsAcquisition {
   async listStoredNews(limit = 10) {
     try {
       const limitNum = parseInt(limit) || 10;
-      const newsItems = await this.storage.getLatest(limitNum);
+      const newsItems = await this.storage.getAll(limitNum);
 
       if (newsItems.length === 0) {
         console.log('📰 本地没有存储的新闻');
