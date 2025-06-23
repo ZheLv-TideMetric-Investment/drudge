@@ -41,12 +41,19 @@ class NewsAcquisition {
 
       // 保存到本地存储
       let savedCount = 0;
-      for (const newsItem of newsItems) {
-        try {
-          await this.storage.save(newsItem);
-          savedCount++;
-        } catch (error) {
-          logger.warn(`保存新闻失败: ${newsItem.id}`, error);
+      try {
+        await this.storage.save(newsItems);
+        savedCount = newsItems.length;
+      } catch (error) {
+        logger.warn(`批量保存新闻失败，尝试逐个保存`, error);
+        // 如果批量保存失败，尝试逐个保存（需要修改 storage 支持单个对象）
+        for (const newsItem of newsItems) {
+          try {
+            await this.storage.save([newsItem]); // 包装成数组
+            savedCount++;
+          } catch (error) {
+            logger.warn(`保存新闻失败: ${newsItem.id}`, error);
+          }
         }
       }
 
@@ -94,12 +101,19 @@ class NewsAcquisition {
       for (let i = 0; i < newsItems.length; i += batchSize) {
         const batch = newsItems.slice(i, i + batchSize);
         
-        for (const newsItem of batch) {
-          try {
-            await this.storage.save(newsItem);
-            savedCount++;
-          } catch (error) {
-            logger.warn(`保存新闻失败: ${newsItem.id}`, error);
+        try {
+          await this.storage.save(batch);
+          savedCount += batch.length;
+        } catch (error) {
+          logger.warn(`批量保存失败，尝试逐个保存`, error);
+          // 如果批量保存失败，尝试逐个保存
+          for (const newsItem of batch) {
+            try {
+              await this.storage.save([newsItem]); // 包装成数组
+              savedCount++;
+            } catch (error) {
+              logger.warn(`保存新闻失败: ${newsItem.id}`, error);
+            }
           }
         }
 

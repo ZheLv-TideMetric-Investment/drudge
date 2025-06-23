@@ -206,6 +206,99 @@ class NewsService {
   async getNewsByTimeRange(startTime, endTime) {
     return await storageService.getByTimeRange(startTime, endTime);
   }
+
+  /**
+   * 获取最新新闻（为兼容 newsAcquisition.js）
+   * @returns {Array} - 新闻列表
+   */
+  async fetchLatestNews() {
+    try {
+      logger.info('开始获取最新新闻...');
+      const news = await this.fetchNews();
+      return news || [];
+    } catch (error) {
+      logger.error('获取最新新闻失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 按时间范围获取新闻（为兼容 newsAcquisition.js）
+   * @param {moment} startTime - 开始时间
+   * @param {moment} endTime - 结束时间
+   * @returns {Array} - 新闻列表
+   */
+  async fetchNewsByTimeRange(startTime, endTime) {
+    try {
+      logger.info(`获取时间范围新闻: ${startTime.format('YYYY-MM-DD HH:mm:ss')} 到 ${endTime.format('YYYY-MM-DD HH:mm:ss')}`);
+      return await this.getNewsByTimeRange(startTime, endTime);
+    } catch (error) {
+      logger.error('按时间范围获取新闻失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 健康检查
+   * @returns {Object} - 健康状态
+   */
+  async healthCheck() {
+    try {
+      // 尝试做一个简单的请求来检查 API 状态
+      const response = await this.makeRequest();
+      
+      if (response && response.status === 200) {
+        return {
+          status: 'healthy',
+          message: '新闻API连接正常',
+          timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+          lastRequestTime: moment(this.lastRequestTime).format('YYYY-MM-DD HH:mm:ss')
+        };
+      } else {
+        return {
+          status: 'unhealthy',
+          message: '新闻API连接异常',
+          timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+          error: '请求失败'
+        };
+      }
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        message: '新闻API健康检查失败',
+        timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * 获取服务统计信息
+   * @returns {Object} - 统计信息
+   */
+  async getStats() {
+    try {
+      const allNews = await storageService.getAll();
+      
+      return {
+        totalNews: allNews.length,
+        isFirstRun: this.isFirstRun,
+        lastRequestTime: this.lastRequestTime ? moment(this.lastRequestTime).format('YYYY-MM-DD HH:mm:ss') : null,
+        minRequestInterval: this.minRequestInterval,
+        latestNews: allNews.length > 0 ? {
+          id: allNews[0].id,
+          title: allNews[0].title,
+          time: moment(allNews[0].time * 1000).format('YYYY-MM-DD HH:mm:ss')
+        } : null
+      };
+    } catch (error) {
+      logger.error('获取新闻服务统计失败:', error);
+      return {
+        totalNews: 0,
+        error: error.message
+      };
+    }
+  }
 }
 
 export default new NewsService();

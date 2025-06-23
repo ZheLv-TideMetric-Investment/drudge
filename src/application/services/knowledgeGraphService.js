@@ -856,6 +856,269 @@ class KnowledgeGraphService {
   }
 
   /**
+   * 获取统计信息（用于脚本调用）
+   * @returns {Object} - 图谱统计信息
+   */
+  async getStats() {
+    try {
+      const graphStats = await this.getGraphStats();
+      
+      // 计算总节点数和关系数
+      const totalNodes = graphStats.reduce((sum, stat) => sum + stat.count, 0);
+      
+      // 获取关系数量
+      const relationshipCypher = `
+        MATCH ()-[r]->()
+        RETURN count(r) as relationshipCount
+      `;
+      const relationshipResult = await neo4jService.executeQuery(relationshipCypher);
+      const totalRelationships = relationshipResult.records[0].get('relationshipCount').toNumber();
+      
+      // 构建实体类型分布
+      const entityTypes = {};
+      for (const stat of graphStats) {
+        if (stat.nodeType !== 'News') {
+          entityTypes[stat.nodeType] = stat.count;
+        }
+      }
+      
+      // 获取新闻和实体数量
+      const newsCount = graphStats.find(stat => stat.nodeType === 'News')?.count || 0;
+      const entitiesCount = Object.values(entityTypes).reduce((sum, count) => sum + count, 0);
+      
+      return {
+        nodes: totalNodes,
+        relationships: totalRelationships,
+        news: newsCount,
+        entities: entitiesCount,
+        entity_types: entityTypes,
+        node_distribution: graphStats.reduce((acc, stat) => {
+          acc[stat.nodeType] = stat.count;
+          return acc;
+        }, {}),
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      logger.error('获取图谱统计信息失败:', error);
+      return {
+        nodes: 0,
+        relationships: 0,
+        news: 0,
+        entities: 0,
+        entity_types: {},
+        error: error.message,
+        timestamp: new Date().toISOString()
+      };
+    }
+  }
+
+  /**
+   * 导出图谱数据
+   * @param {string} format - 导出格式 ('json', 'cypher', 'csv')
+   * @returns {string|Object} - 导出的数据
+   */
+  async exportGraph(format = 'json') {
+    try {
+      logger.info(`开始导出图谱数据，格式: ${format}`);
+      
+      const timestamp = new Date().toISOString();
+      
+      switch (format.toLowerCase()) {
+        case 'json':
+          return await this.exportAsJson();
+          
+        case 'cypher':
+          return await this.exportAsCypher();
+          
+        case 'csv':
+          return await this.exportAsCsv();
+          
+        default:
+          throw new Error(`不支持的导出格式: ${format}`);
+      }
+      
+    } catch (error) {
+      logger.error('导出图谱数据失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 导出为JSON格式
+   * @returns {Object} - JSON格式的图谱数据
+   */
+  async exportAsJson() {
+    const nodesCypher = `
+      MATCH (n)
+      RETURN labels(n)[0] as nodeType, properties(n) as properties, id(n) as nodeId
+      ORDER BY nodeType, nodeId
+    `;
+    
+    const relationshipsCypher = `
+      MATCH (a)-[r]->(b)
+      RETURN 
+        labels(a)[0] as sourceType, 
+        properties(a) as sourceProps,
+        type(r) as relationshipType,
+        properties(r) as relationshipProps,
+        labels(b)[0] as targetType,
+        properties(b) as targetProps
+      ORDER BY sourceType, relationshipType, targetType
+    `;
+    
+    const [nodesResult, relationshipsResult] = await Promise.all([
+      neo4jService.executeQuery(nodesCypher),
+      neo4jService.executeQuery(relationshipsCypher)
+    ]);
+    
+    const nodes = nodesResult.records.map(record => ({
+      type: record.get('nodeType'),
+      properties: record.get('properties'),
+      id: record.get('nodeId').toNumber()
+    }));
+    
+    const relationships = relationshipsResult.records.map(record => ({
+      source: {
+        type: record.get('sourceType'),
+        properties: record.get('sourceProps')
+      },
+      relationship: {
+        type: record.get('relationshipType'),
+        properties: record.get('relationshipProps')
+      },
+      target: {
+        type: record.get('targetType'),
+        properties: record.get('targetProps')
+      }
+    }));
+    
+    return {
+      metadata: {
+        exportTime: new Date().toISOString(),
+        nodeCount: nodes.length,
+        relationshipCount: relationships.length,
+        version: '1.0'
+      },
+      nodes,
+      relationships
+    };
+  }
+
+  /**
+   * 导出为Cypher语句格式
+   * @returns {string} - Cypher语句
+   */
+  async exportAsCypher() {
+    const nodesCypher = `
+      MATCH (n)
+      RETURN labels(n)[0] as nodeType, properties(n) as properties
+      ORDER BY nodeType
+    `;
+    
+    const relationshipsCypher = `
+      MATCH (a)-[r]->(b)
+      RETURN 
+        labels(a)[0] as sourceType, 
+        properties(a) as sourceProps,
+        type(r) as relationshipType,
+        properties(r) as relationshipProps,
+        labels(b)[0] as targetType,
+        properties(b) as targetProps
+      ORDER BY sourceType, relationshipType, targetType
+    `;
+    
+    const [nodesResult, relationshipsResult] = await Promise.all([
+      neo4jService.executeQuery(nodesCypher),
+      neo4jService.executeQuery(relationshipsCypher)
+    ]);
+    
+    let cypherStatements = [];
+    
+    // 添加注释头
+    cypherStatements.push(`// 知识图谱数据导出`);
+    cypherStatements.push(`// 导出时间: ${new Date().toISOString()}`);
+    cypherStatements.push(`// 节点数量: ${nodesResult.records.length}`);
+    cypherStatements.push(`// 关系数量: ${relationshipsResult.records.length}`);
+    cypherStatements.push('');
+    
+    // 清理数据库（可选）
+    cypherStatements.push('// 清理现有数据（可选）');
+    cypherStatements.push('// MATCH (n) DETACH DELETE n;');
+    cypherStatements.push('');
+    
+    // 生成节点创建语句
+    cypherStatements.push('// 创建节点');
+    const nodesByType = {};
+    nodesResult.records.forEach(record => {
+      const nodeType = record.get('nodeType');
+      const props = record.get('properties');
+      
+      if (!nodesByType[nodeType]) {
+        nodesByType[nodeType] = [];
+      }
+      nodesByType[nodeType].push(props);
+    });
+    
+    Object.entries(nodesByType).forEach(([nodeType, nodes]) => {
+      nodes.forEach(props => {
+        const propsStr = Object.entries(props)
+          .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+          .join(', ');
+        cypherStatements.push(`CREATE (:${nodeType} {${propsStr}});`);
+      });
+    });
+    
+    cypherStatements.push('');
+    cypherStatements.push('// 创建关系');
+    
+    // 生成关系创建语句
+    relationshipsResult.records.forEach(record => {
+      const sourceProps = record.get('sourceProps');
+      const targetProps = record.get('targetProps');
+      const relationshipType = record.get('relationshipType');
+      const relationshipProps = record.get('relationshipProps');
+      
+      const sourceKey = this.getMainProperty(record.get('sourceType'));
+      const targetKey = this.getMainProperty(record.get('targetType'));
+      
+      const sourceMatch = `${record.get('sourceType')} {${sourceKey}: ${JSON.stringify(sourceProps[sourceKey])}}`;
+      const targetMatch = `${record.get('targetType')} {${targetKey}: ${JSON.stringify(targetProps[targetKey])}}`;
+      
+      const relPropsStr = Object.keys(relationshipProps).length > 0 
+        ? ` {${Object.entries(relationshipProps).map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(', ')}}` 
+        : '';
+      
+      cypherStatements.push(`MATCH (a:${sourceMatch}), (b:${targetMatch}) CREATE (a)-[:${relationshipType}${relPropsStr}]->(b);`);
+    });
+    
+    return cypherStatements.join('\n');
+  }
+
+  /**
+   * 导出为CSV格式
+   * @returns {string} - CSV格式数据
+   */
+  async exportAsCsv() {
+    const nodesCypher = `
+      MATCH (n)
+      RETURN labels(n)[0] as nodeType, properties(n) as properties
+      ORDER BY nodeType
+    `;
+    
+    const result = await neo4jService.executeQuery(nodesCypher);
+    
+    const csvLines = ['NodeType,Properties'];
+    
+    result.records.forEach(record => {
+      const nodeType = record.get('nodeType');
+      const props = JSON.stringify(record.get('properties')).replace(/"/g, '""');
+      csvLines.push(`"${nodeType}","${props}"`);
+    });
+    
+    return csvLines.join('\n');
+  }
+
+  /**
    * 健康检查
    */
   async healthCheck() {

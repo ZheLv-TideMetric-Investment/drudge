@@ -441,6 +441,8 @@ class KnowledgeGraphProcessor {
    */
   async getStatus() {
     try {
+      await this.initialize();
+
       const healthCheck = await this.knowledgeGraph.healthCheck();
       const stats = await this.knowledgeGraph.getStats();
 

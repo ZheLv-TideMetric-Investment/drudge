@@ -72,22 +72,31 @@ class NewsLevelService {
    * 检查并处理新闻级别
    * @param {Object} newsItem - 新闻对象
    * @param {Object} extractionResult - 提取结果
+   * @param {boolean} forceUpdate - 是否强制更新
    * @returns {Object} - 处理结果
    */
-  async checkAndHandleNewsLevel(newsItem, extractionResult) {
+  async checkAndHandleNewsLevel(newsItem, extractionResult, forceUpdate = false) {
     try {
       const newsLevel = extractionResult.news_level || NewsLevel.LEVEL_5;
       const cacheKey = `${newsItem.id}_${newsLevel}`;
 
       // 检查是否已处理过
-      if (this.processedCache.has(cacheKey)) {
+      if (!forceUpdate && this.processedCache.has(cacheKey)) {
+        const cached = this.processedCache.get(cacheKey);
         return {
-          newsLevel,
+          newsLevel: cached.newsLevel,
           alreadyProcessed: true,
           shouldPush: false,
+          isHighLevel: this.isHighLevel(cached.newsLevel),
+          isBreakNews: this.isBreakNews(cached.newsLevel),
+          updated: false
         };
       }
 
+      // 判断级别特性
+      const isHighLevel = this.isHighLevel(newsLevel);
+      const isBreakNews = this.isBreakNews(newsLevel);
+      
       // 判断是否需要推送
       const shouldPush = this.shouldPushNews(newsLevel);
       
@@ -108,6 +117,9 @@ class NewsLevelService {
         newsLevel,
         alreadyProcessed: false,
         shouldPush,
+        isHighLevel,
+        isBreakNews,
+        updated: forceUpdate || !this.processedCache.has(cacheKey)
       };
     } catch (error) {
       logger.error(`新闻级别处理失败: ${newsItem.id}`, error);
@@ -115,6 +127,9 @@ class NewsLevelService {
         newsLevel: NewsLevel.LEVEL_5,
         alreadyProcessed: false,
         shouldPush: false,
+        isHighLevel: false,
+        isBreakNews: false,
+        updated: false,
         error: error.message,
       };
     }
@@ -386,6 +401,240 @@ class NewsLevelService {
     };
   }
 
+  /**
+   * 判断是否为高级别新闻
+   * @param {string} newsLevel - 新闻级别
+   * @returns {boolean} - 是否为高级别
+   */
+  isHighLevel(newsLevel) {
+    return newsLevel === NewsLevel.LEVEL_1 || newsLevel === NewsLevel.LEVEL_2;
+  }
+
+  /**
+   * 判断是否为Break News
+   * @param {string} newsLevel - 新闻级别
+   * @returns {boolean} - 是否为Break News
+   */
+  isBreakNews(newsLevel) {
+    return newsLevel === NewsLevel.LEVEL_1;
+  }
+
+  /**
+   * 获取指定时间范围内的Break News
+   * @param {moment} startTime - 开始时间
+   * @param {moment} endTime - 结束时间
+   * @returns {Array} - Break News列表
+   */
+  async getBreakNewsByTimeRange(startTime, endTime) {
+    try {
+      const cypher = `
+        MATCH (n:News)-[:REPORTED_IN]-(e:Event)
+        WHERE e.event_level = $breakLevel
+          AND n.timestamp >= $startTime 
+          AND n.timestamp <= $endTime
+        OPTIONAL MATCH (e)-[:OCCURRED_IN]->(c:Company)
+        RETURN DISTINCT n.id as newsId,
+               n.title as title,
+               n.timestamp as detectedAt,
+               e.event_level as level,
+               e.significance as impactScore,
+               e.event_description as reason,
+               collect(DISTINCT c.company_name) as companies
+        ORDER BY n.timestamp DESC
+      `;
+
+      const result = await neo4jService.executeQuery(cypher, {
+        breakLevel: NewsLevel.LEVEL_1,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+      });
+
+      return result.records.map(record => ({
+        newsId: record.get('newsId'),
+        title: record.get('title'),
+        detectedAt: record.get('detectedAt'),
+        level: record.get('level'),
+        impactScore: record.get('impactScore'),
+        reason: record.get('reason'),
+        companies: record.get('companies').filter(c => c !== null),
+        isBreakNews: true
+      }));
+    } catch (error) {
+      logger.error('获取Break News失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 获取指定时间范围内的高级别新闻
+   * @param {moment} startTime - 开始时间
+   * @param {moment} endTime - 结束时间
+   * @returns {Array} - 高级别新闻列表
+   */
+  async getHighLevelNewsByTimeRange(startTime, endTime) {
+    try {
+      const cypher = `
+        MATCH (n:News)-[:REPORTED_IN]-(e:Event)
+        WHERE (e.event_level = $level1 OR e.event_level = $level2)
+          AND n.timestamp >= $startTime 
+          AND n.timestamp <= $endTime
+        OPTIONAL MATCH (e)-[:OCCURRED_IN]->(c:Company)
+        RETURN DISTINCT n.id as newsId,
+               n.title as title,
+               n.timestamp as detectedAt,
+               e.event_level as level,
+               e.significance as impactScore,
+               e.event_description as reason,
+               collect(DISTINCT c.company_name) as companies
+        ORDER BY n.timestamp DESC
+      `;
+
+      const result = await neo4jService.executeQuery(cypher, {
+        level1: NewsLevel.LEVEL_1,
+        level2: NewsLevel.LEVEL_2,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+      });
+
+      return result.records.map(record => ({
+        newsId: record.get('newsId'),
+        title: record.get('title'),
+        detectedAt: record.get('detectedAt'),
+        level: record.get('level'),
+        impactScore: record.get('impactScore'),
+        reason: record.get('reason'),
+        companies: record.get('companies').filter(c => c !== null),
+        isBreakNews: record.get('level') === NewsLevel.LEVEL_1,
+        isHighLevel: true
+      }));
+    } catch (error) {
+      logger.error('获取高级别新闻失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 获取级别统计信息
+   * @param {moment} startTime - 开始时间
+   * @param {moment} endTime - 结束时间
+   * @returns {Object} - 统计信息
+   */
+  async getLevelStatistics(startTime, endTime) {
+    try {
+      const cypher = `
+        MATCH (n:News)-[:REPORTED_IN]-(e:Event)
+        WHERE n.timestamp >= $startTime AND n.timestamp <= $endTime
+        RETURN 
+          count(DISTINCT n) as total,
+          count(DISTINCT CASE WHEN e.event_level = $level1 OR e.event_level = $level2 THEN n END) as highLevel,
+          count(DISTINCT CASE WHEN e.event_level = $level1 THEN n END) as breakNews,
+          avg(e.significance) as avgImpactScore,
+          e.event_level as level,
+          count(DISTINCT CASE WHEN e.event_level IS NOT NULL THEN n END) as levelCount
+        ORDER BY levelCount DESC
+      `;
+
+      const result = await neo4jService.executeQuery(cypher, {
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        level1: NewsLevel.LEVEL_1,
+        level2: NewsLevel.LEVEL_2,
+      });
+
+      if (result.records.length === 0) {
+        return {
+          total: 0,
+          highLevel: 0,
+          breakNews: 0,
+          avgImpactScore: 0,
+          levelDistribution: {}
+        };
+      }
+
+      const record = result.records[0];
+      
+      // 获取级别分布
+      const levelDistCypher = `
+        MATCH (n:News)-[:REPORTED_IN]-(e:Event)
+        WHERE n.timestamp >= $startTime AND n.timestamp <= $endTime
+        RETURN e.event_level as level, count(DISTINCT n) as count
+        ORDER BY count DESC
+      `;
+
+      const levelDistResult = await neo4jService.executeQuery(levelDistCypher, {
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+      });
+
+      const levelDistribution = {};
+      levelDistResult.records.forEach(rec => {
+        const level = rec.get('level') || 'Unknown';
+        levelDistribution[level] = rec.get('count').toNumber();
+      });
+
+      return {
+        total: record.get('total').toNumber(),
+        highLevel: record.get('highLevel').toNumber(),
+        breakNews: record.get('breakNews').toNumber(),
+        avgImpactScore: record.get('avgImpactScore'),
+        levelDistribution
+      };
+    } catch (error) {
+      logger.error('获取级别统计失败:', error);
+      return {
+        total: 0,
+        highLevel: 0,
+        breakNews: 0,
+        avgImpactScore: 0,
+        levelDistribution: {}
+      };
+    }
+  }
+
+  /**
+   * 获取Break News历史
+   * @param {moment} startTime - 开始时间
+   * @param {moment} endTime - 结束时间
+   * @returns {Array} - Break News历史列表
+   */
+  async getBreakNewsHistory(startTime, endTime) {
+    try {
+      const cypher = `
+        MATCH (n:News)-[:REPORTED_IN]-(e:Event)
+        WHERE e.event_level = $breakLevel
+          AND n.timestamp >= $startTime 
+          AND n.timestamp <= $endTime
+        OPTIONAL MATCH (e)-[:OCCURRED_IN]->(c:Company)
+        RETURN DISTINCT n.id as newsId,
+               n.title as title,
+               n.timestamp as detectedAt,
+               e.event_level as level,
+               e.significance as impactScore,
+               e.event_description as reason,
+               collect(DISTINCT c.company_name) as companies
+        ORDER BY n.timestamp DESC
+      `;
+
+      const result = await neo4jService.executeQuery(cypher, {
+        breakLevel: NewsLevel.LEVEL_1,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+      });
+
+      return result.records.map(record => ({
+        newsId: record.get('newsId'),
+        title: record.get('title'),
+        detectedAt: record.get('detectedAt'),
+        level: record.get('level'),
+        impactScore: record.get('impactScore'),
+        reason: record.get('reason'),
+        companies: record.get('companies').filter(c => c !== null)
+      }));
+    } catch (error) {
+      logger.error('获取Break News历史失败:', error);
+      return [];
+    }
+  }
 
 }
 

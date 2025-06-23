@@ -716,6 +716,8 @@ async function main() {
     const result = await checker.runCommand(command, ...args);
     if (result && !result.success) {
       process.exit(1);
+    } else {
+      process.exit(0);
     }
   } catch (error) {
     console.error(`❌ 程序执行失败: ${error.message}`);
