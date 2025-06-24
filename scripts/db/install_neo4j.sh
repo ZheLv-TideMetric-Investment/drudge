@@ -289,20 +289,27 @@ elif [ "$OS" = "amazonlinux" ] || [ "$OS" = "centos" ]; then
     # 安装依赖 - 修复 Java 包名
     print_info "安装必要的依赖..."
     if [ "$OS" = "amazonlinux" ]; then
+        # 先清理缓存
+        sudo $PKG_MANAGER clean all
+        
+        # 安装 rpm 工具以支持 GPG 验证
+        print_info "安装 RPM 工具..."
+        sudo $PKG_MANAGER install -y rpm --nogpgcheck
+        
         # Amazon Linux 的 Java 包名
         # 跳过 curl，因为系统已经有 curl-minimal
         print_info "检查 curl..."
         if command -v curl &> /dev/null; then
             print_info "curl 已安装，跳过安装"
         else
-            sudo $PKG_MANAGER install -y curl --skip-broken
+            sudo $PKG_MANAGER install -y curl --skip-broken --nogpgcheck
         fi
         
         print_info "安装 wget..."
-        sudo $PKG_MANAGER install -y wget --skip-broken
+        sudo $PKG_MANAGER install -y wget --skip-broken --nogpgcheck
         
         print_info "安装 Java..."
-        sudo $PKG_MANAGER install -y java-11-amazon-corretto java-11-amazon-corretto-devel --skip-broken
+        sudo $PKG_MANAGER install -y java-11-amazon-corretto java-11-amazon-corretto-devel --skip-broken --nogpgcheck
     else
         # CentOS/RHEL 的 Java 包名
         sudo $PKG_MANAGER install -y curl wget java-11-openjdk java-11-openjdk-devel --skip-broken
@@ -314,19 +321,26 @@ elif [ "$OS" = "amazonlinux" ] || [ "$OS" = "centos" ]; then
         if [ "$OS" = "amazonlinux" ]; then
             # 尝试安装 OpenJDK
             print_info "尝试安装 OpenJDK..."
-            sudo $PKG_MANAGER install -y java-11-openjdk java-11-openjdk-devel --skip-broken
+            sudo $PKG_MANAGER install -y java-11-openjdk java-11-openjdk-devel --skip-broken --nogpgcheck
             
             # 如果还是没有，尝试安装 java-latest
             if ! command -v java &> /dev/null; then
                 print_info "尝试安装 java-latest..."
-                sudo $PKG_MANAGER install -y java-latest-openjdk java-latest-openjdk-devel --skip-broken
+                sudo $PKG_MANAGER install -y java-latest-openjdk java-latest-openjdk-devel --skip-broken --nogpgcheck
+            fi
+            
+            # 最后尝试使用 amazon-linux-extras（如果可用）
+            if ! command -v java &> /dev/null && command -v amazon-linux-extras &> /dev/null; then
+                print_info "尝试使用 amazon-linux-extras 安装 Java..."
+                sudo amazon-linux-extras install java-openjdk11 -y
             fi
         fi
         
         # 最后检查
         if ! command -v java &> /dev/null; then
             print_error "Java 安装失败，请手动安装 Java 11"
-            print_info "可以尝试运行: sudo dnf install -y java-11-amazon-corretto"
+            print_info "可以尝试运行: sudo dnf install -y java-11-amazon-corretto --nogpgcheck"
+            print_info "或者: sudo dnf clean all && sudo dnf install -y java-11-amazon-corretto --nogpgcheck"
             exit 1
         fi
     fi
