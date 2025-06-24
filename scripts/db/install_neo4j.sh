@@ -290,16 +290,45 @@ elif [ "$OS" = "amazonlinux" ] || [ "$OS" = "centos" ]; then
     print_info "安装必要的依赖..."
     if [ "$OS" = "amazonlinux" ]; then
         # Amazon Linux 的 Java 包名
-        sudo $PKG_MANAGER install -y curl wget java-11-amazon-corretto java-11-amazon-corretto-devel
+        # 跳过 curl，因为系统已经有 curl-minimal
+        print_info "检查 curl..."
+        if command -v curl &> /dev/null; then
+            print_info "curl 已安装，跳过安装"
+        else
+            sudo $PKG_MANAGER install -y curl --skip-broken
+        fi
+        
+        print_info "安装 wget..."
+        sudo $PKG_MANAGER install -y wget --skip-broken
+        
+        print_info "安装 Java..."
+        sudo $PKG_MANAGER install -y java-11-amazon-corretto java-11-amazon-corretto-devel --skip-broken
     else
         # CentOS/RHEL 的 Java 包名
-        sudo $PKG_MANAGER install -y curl wget java-11-openjdk java-11-openjdk-devel
+        sudo $PKG_MANAGER install -y curl wget java-11-openjdk java-11-openjdk-devel --skip-broken
     fi
     
     # 验证 Java 安装
     if ! command -v java &> /dev/null; then
-        print_error "Java 安装失败，请手动安装 Java 11"
-        exit 1
+        print_warning "Java 未找到，尝试其他安装方法..."
+        if [ "$OS" = "amazonlinux" ]; then
+            # 尝试安装 OpenJDK
+            print_info "尝试安装 OpenJDK..."
+            sudo $PKG_MANAGER install -y java-11-openjdk java-11-openjdk-devel --skip-broken
+            
+            # 如果还是没有，尝试安装 java-latest
+            if ! command -v java &> /dev/null; then
+                print_info "尝试安装 java-latest..."
+                sudo $PKG_MANAGER install -y java-latest-openjdk java-latest-openjdk-devel --skip-broken
+            fi
+        fi
+        
+        # 最后检查
+        if ! command -v java &> /dev/null; then
+            print_error "Java 安装失败，请手动安装 Java 11"
+            print_info "可以尝试运行: sudo dnf install -y java-11-amazon-corretto"
+            exit 1
+        fi
     fi
     
     print_info "Java 版本: $(java -version 2>&1 | head -n 1)"
