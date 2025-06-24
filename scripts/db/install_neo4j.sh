@@ -28,6 +28,46 @@ check_command() {
     return 0
 }
 
+# 检测 Linux 发行版
+detect_linux_distro() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        case "$ID" in
+            "ubuntu"|"debian")
+                echo "ubuntu"
+                ;;
+            "amzn"|"amazonlinux")
+                echo "amazonlinux"
+                ;;
+            "centos"|"rhel"|"fedora")
+                echo "centos"
+                ;;
+            *)
+                # 尝试从 ID_LIKE 判断
+                if [[ "$ID_LIKE" == *"debian"* ]]; then
+                    echo "ubuntu"
+                elif [[ "$ID_LIKE" == *"rhel"* ]] || [[ "$ID_LIKE" == *"fedora"* ]]; then
+                    echo "centos"
+                else
+                    echo "unknown"
+                fi
+                ;;
+        esac
+    elif [ -f /etc/redhat-release ]; then
+        if grep -q "Amazon Linux" /etc/redhat-release; then
+            echo "amazonlinux"
+        elif grep -q -E "(CentOS|Red Hat|Fedora)" /etc/redhat-release; then
+            echo "centos"
+        else
+            echo "unknown"
+        fi
+    elif [ -f /etc/debian_version ]; then
+        echo "ubuntu"
+    else
+        echo "unknown"
+    fi
+}
+
 # 安装 APOC 插件
 install_apoc() {
     print_info "安装 APOC 插件..."
@@ -150,7 +190,26 @@ load_env() {
 if [[ "$OSTYPE" == "darwin"* ]]; then
     OS="macos"
 elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-    OS="ubuntu"
+    DISTRO=$(detect_linux_distro)
+    case "$DISTRO" in
+        "ubuntu")
+            OS="ubuntu"
+            ;;
+        "amazonlinux")
+            OS="amazonlinux"
+            ;;
+        "centos")
+            OS="centos"
+            ;;
+        "unknown")
+            print_error "不支持的 Linux 发行版，请手动安装 Neo4j"
+            exit 1
+            ;;
+        *)
+            print_error "未知的 Linux 发行版: $DISTRO"
+            exit 1
+            ;;
+    esac
 else
     print_error "不支持的操作系统: $OSTYPE"
     exit 1
@@ -180,7 +239,7 @@ if [ "$OS" = "macos" ]; then
     brew services start neo4j
     
 elif [ "$OS" = "ubuntu" ]; then
-    print_info "在 Ubuntu 上安装 Neo4j..."
+    print_info "在 Ubuntu/Debian 上安装 Neo4j..."
     
     # 更新系统
     print_info "更新系统包..."
@@ -207,6 +266,93 @@ elif [ "$OS" = "ubuntu" ]; then
     print_info "启动 Neo4j 服务..."
     sudo systemctl start neo4j
     sudo systemctl enable neo4j
+
+elif [ "$OS" = "amazonlinux" ] || [ "$OS" = "centos" ]; then
+    print_info "在 Amazon Linux/CentOS 上安装 Neo4j..."
+    
+    # 检查使用哪个包管理器
+    if command -v dnf &> /dev/null; then
+        PKG_MANAGER="dnf"
+    elif command -v yum &> /dev/null; then
+        PKG_MANAGER="yum"
+    else
+        print_error "找不到 yum 或 dnf 包管理器"
+        exit 1
+    fi
+    
+    print_info "使用包管理器: $PKG_MANAGER"
+    
+    # 更新系统
+    print_info "更新系统包..."
+    sudo $PKG_MANAGER update -y
+    
+    # 安装依赖
+    print_info "安装必要的依赖..."
+    sudo $PKG_MANAGER install -y curl wget java-11-openjdk java-11-openjdk-devel
+    
+    # 安装 Neo4j - 使用直接下载方式，因为 yum 仓库配置比较复杂
+    print_info "下载并安装 Neo4j..."
+    NEO4J_VERSION="4.4.21"
+    NEO4J_TARBALL="neo4j-community-${NEO4J_VERSION}-unix.tar.gz"
+    NEO4J_URL="https://dist.neo4j.org/neo4j-community-${NEO4J_VERSION}-unix.tar.gz"
+    
+    # 下载 Neo4j
+    cd /tmp
+    curl -L "$NEO4J_URL" -o "$NEO4J_TARBALL"
+    
+    if [ $? -ne 0 ]; then
+        print_error "下载 Neo4j 失败"
+        exit 1
+    fi
+    
+    # 解压并安装
+    sudo tar -xzf "$NEO4J_TARBALL" -C /opt/
+    sudo mv "/opt/neo4j-community-${NEO4J_VERSION}" /opt/neo4j
+    sudo chown -R neo4j:neo4j /opt/neo4j 2>/dev/null || sudo chown -R root:root /opt/neo4j
+    
+    # 创建 neo4j 用户（如果不存在）
+    if ! id "neo4j" &>/dev/null; then
+        sudo useradd -r -s /bin/false neo4j
+        sudo chown -R neo4j:neo4j /opt/neo4j
+    fi
+    
+    # 创建 systemd 服务文件
+    sudo tee /etc/systemd/system/neo4j.service > /dev/null <<EOF
+[Unit]
+Description=Neo4j Graph Database
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+ExecStart=/opt/neo4j/bin/neo4j start
+ExecStop=/opt/neo4j/bin/neo4j stop
+ExecReload=/opt/neo4j/bin/neo4j restart
+TimeoutSec=120
+Restart=on-failure
+User=neo4j
+Group=neo4j
+Environment=NEO4J_HOME=/opt/neo4j
+Environment=NEO4J_CONF=/opt/neo4j/conf
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # 重新加载 systemd 并启动服务
+    sudo systemctl daemon-reload
+    sudo systemctl enable neo4j
+    sudo systemctl start neo4j
+    
+    # 添加到 PATH
+    if ! grep -q "/opt/neo4j/bin" /etc/environment; then
+        echo 'PATH="/opt/neo4j/bin:$PATH"' | sudo tee -a /etc/environment
+    fi
+    
+    # 为当前会话添加到 PATH
+    export PATH="/opt/neo4j/bin:$PATH"
+    
+    print_info "Neo4j 已安装到 /opt/neo4j"
 fi
 
 # 等待 Neo4j 启动
@@ -221,6 +367,9 @@ print_info "设置默认密码..."
 if [ "$OS" = "macos" ]; then
     NEO4J_CONF="/opt/homebrew/etc/neo4j/neo4j.conf"
     NEO4J_BIN="/opt/homebrew/bin/neo4j"
+elif [ "$OS" = "amazonlinux" ] || [ "$OS" = "centos" ]; then
+    NEO4J_CONF="/opt/neo4j/conf/neo4j.conf"
+    NEO4J_BIN="/opt/neo4j/bin/neo4j"
 else
     NEO4J_CONF="/etc/neo4j/neo4j.conf"
     NEO4J_BIN="/usr/bin/neo4j"
