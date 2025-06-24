@@ -286,9 +286,23 @@ elif [ "$OS" = "amazonlinux" ] || [ "$OS" = "centos" ]; then
     print_info "更新系统包..."
     sudo $PKG_MANAGER update -y
     
-    # 安装依赖
+    # 安装依赖 - 修复 Java 包名
     print_info "安装必要的依赖..."
-    sudo $PKG_MANAGER install -y curl wget java-11-openjdk java-11-openjdk-devel
+    if [ "$OS" = "amazonlinux" ]; then
+        # Amazon Linux 的 Java 包名
+        sudo $PKG_MANAGER install -y curl wget java-11-amazon-corretto java-11-amazon-corretto-devel
+    else
+        # CentOS/RHEL 的 Java 包名
+        sudo $PKG_MANAGER install -y curl wget java-11-openjdk java-11-openjdk-devel
+    fi
+    
+    # 验证 Java 安装
+    if ! command -v java &> /dev/null; then
+        print_error "Java 安装失败，请手动安装 Java 11"
+        exit 1
+    fi
+    
+    print_info "Java 版本: $(java -version 2>&1 | head -n 1)"
     
     # 安装 Neo4j - 使用直接下载方式，因为 yum 仓库配置比较复杂
     print_info "下载并安装 Neo4j..."
@@ -308,15 +322,25 @@ elif [ "$OS" = "amazonlinux" ] || [ "$OS" = "centos" ]; then
     # 解压并安装
     sudo tar -xzf "$NEO4J_TARBALL" -C /opt/
     sudo mv "/opt/neo4j-community-${NEO4J_VERSION}" /opt/neo4j
-    sudo chown -R neo4j:neo4j /opt/neo4j 2>/dev/null || sudo chown -R root:root /opt/neo4j
     
     # 创建 neo4j 用户（如果不存在）
     if ! id "neo4j" &>/dev/null; then
         sudo useradd -r -s /bin/false neo4j
-        sudo chown -R neo4j:neo4j /opt/neo4j
     fi
     
-    # 创建 systemd 服务文件
+    # 设置正确的权限
+    sudo chown -R neo4j:neo4j /opt/neo4j
+    sudo chmod +x /opt/neo4j/bin/neo4j
+    sudo chmod +x /opt/neo4j/bin/cypher-shell
+    
+    # 创建必要的目录
+    sudo mkdir -p /var/lib/neo4j/data
+    sudo mkdir -p /var/lib/neo4j/logs
+    sudo mkdir -p /var/run/neo4j
+    sudo chown -R neo4j:neo4j /var/lib/neo4j
+    sudo chown -R neo4j:neo4j /var/run/neo4j
+    
+    # 创建 systemd 服务文件 - 改进版本
     sudo tee /etc/systemd/system/neo4j.service > /dev/null <<EOF
 [Unit]
 Description=Neo4j Graph Database
@@ -334,15 +358,58 @@ User=neo4j
 Group=neo4j
 Environment=NEO4J_HOME=/opt/neo4j
 Environment=NEO4J_CONF=/opt/neo4j/conf
+Environment=JAVA_HOME=/usr/lib/jvm/java-11-amazon-corretto
+PIDFile=/var/run/neo4j/neo4j.pid
+LimitNOFILE=60000
 
 [Install]
 WantedBy=multi-user.target
 EOF
     
+    # 配置 Neo4j
+    if [ -f "/opt/neo4j/conf/neo4j.conf" ]; then
+        sudo cp "/opt/neo4j/conf/neo4j.conf" "/opt/neo4j/conf/neo4j.conf.backup"
+        
+        # 基本配置
+        sudo sed -i 's|#dbms.default_listen_address=0.0.0.0|dbms.default_listen_address=0.0.0.0|' /opt/neo4j/conf/neo4j.conf
+        sudo sed -i 's|#dbms.connector.http.listen_address=:7474|dbms.connector.http.listen_address=0.0.0.0:7474|' /opt/neo4j/conf/neo4j.conf
+        sudo sed -i 's|#dbms.connector.bolt.listen_address=:7687|dbms.connector.bolt.listen_address=0.0.0.0:7687|' /opt/neo4j/conf/neo4j.conf
+        
+        # 设置数据目录
+        sudo sed -i 's|#dbms.directories.data=data|dbms.directories.data=/var/lib/neo4j/data|' /opt/neo4j/conf/neo4j.conf
+        sudo sed -i 's|#dbms.directories.logs=logs|dbms.directories.logs=/var/lib/neo4j/logs|' /opt/neo4j/conf/neo4j.conf
+        
+        # 内存设置
+        sudo sed -i 's|#dbms.memory.heap.initial_size=512m|dbms.memory.heap.initial_size=512m|' /opt/neo4j/conf/neo4j.conf
+        sudo sed -i 's|#dbms.memory.heap.max_size=512m|dbms.memory.heap.max_size=512m|' /opt/neo4j/conf/neo4j.conf
+    fi
+    
     # 重新加载 systemd 并启动服务
     sudo systemctl daemon-reload
     sudo systemctl enable neo4j
-    sudo systemctl start neo4j
+    
+    # 尝试直接启动而不是通过 systemd（用于调试）
+    print_info "尝试直接启动 Neo4j..."
+    sudo -u neo4j /opt/neo4j/bin/neo4j start
+    
+    # 检查启动状态
+    sleep 5
+    if sudo -u neo4j /opt/neo4j/bin/neo4j status; then
+        print_info "Neo4j 直接启动成功，现在配置 systemd 服务..."
+        sudo -u neo4j /opt/neo4j/bin/neo4j stop
+        sleep 3
+        sudo systemctl start neo4j
+    else
+        print_error "Neo4j 启动失败，检查日志..."
+        if [ -f "/var/lib/neo4j/logs/neo4j.log" ]; then
+            print_info "Neo4j 日志内容："
+            sudo tail -20 /var/lib/neo4j/logs/neo4j.log
+        fi
+        if [ -f "/opt/neo4j/logs/neo4j.log" ]; then
+            print_info "Neo4j 日志内容："
+            sudo tail -20 /opt/neo4j/logs/neo4j.log
+        fi
+    fi
     
     # 添加到 PATH
     if ! grep -q "/opt/neo4j/bin" /etc/environment; then
