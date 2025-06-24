@@ -116,6 +116,7 @@ install_apoc() {
 # 查找 cypher-shell 的位置
 find_cypher_shell() {
     local possible_paths=(
+        "/opt/neo4j/bin/cypher-shell"
         "/usr/local/bin/cypher-shell"
         "/usr/bin/cypher-shell"
         "/opt/neo4j/bin/cypher-shell"
@@ -135,6 +136,15 @@ find_cypher_shell() {
     if [ ! -z "$which_path" ]; then
         echo "$which_path"
         return 0
+    fi
+    
+    # 最后尝试在 /opt/neo4j 目录下查找
+    if [ -d "/opt/neo4j" ]; then
+        local found_path=$(find /opt/neo4j -name "cypher-shell" -type f 2>/dev/null | head -1)
+        if [ ! -z "$found_path" ]; then
+            echo "$found_path"
+            return 0
+        fi
     fi
     
     return 1
@@ -292,9 +302,13 @@ elif [ "$OS" = "amazonlinux" ] || [ "$OS" = "centos" ]; then
         # 先清理缓存
         sudo $PKG_MANAGER clean all
         
+        # 安装基本工具
+        print_info "安装基本工具..."
+        sudo $PKG_MANAGER install -y gzip tar bash coreutils util-linux --nogpgcheck --skip-broken
+        
         # 安装 rpm 工具以支持 GPG 验证
         print_info "安装 RPM 工具..."
-        sudo $PKG_MANAGER install -y rpm --nogpgcheck
+        sudo $PKG_MANAGER install -y rpm --nogpgcheck --skip-broken
         
         # Amazon Linux 的 Java 包名
         # 跳过 curl，因为系统已经有 curl-minimal
@@ -355,6 +369,11 @@ elif [ "$OS" = "amazonlinux" ] || [ "$OS" = "centos" ]; then
     
     # 下载 Neo4j
     cd /tmp
+    
+    # 清理可能存在的旧文件
+    sudo rm -f "$NEO4J_TARBALL"
+    sudo rm -rf "neo4j-community-${NEO4J_VERSION}"
+    
     curl -L "$NEO4J_URL" -o "$NEO4J_TARBALL"
     
     if [ $? -ne 0 ]; then
@@ -362,9 +381,49 @@ elif [ "$OS" = "amazonlinux" ] || [ "$OS" = "centos" ]; then
         exit 1
     fi
     
+    # 验证下载的文件
+    if [ ! -f "$NEO4J_TARBALL" ]; then
+        print_error "Neo4j 文件下载不完整"
+        exit 1
+    fi
+    
+    print_info "验证下载文件..."
+    file "$NEO4J_TARBALL"
+    
     # 解压并安装
-    sudo tar -xzf "$NEO4J_TARBALL" -C /opt/
-    sudo mv "/opt/neo4j-community-${NEO4J_VERSION}" /opt/neo4j
+    print_info "解压 Neo4j..."
+    if command -v gzip &> /dev/null; then
+        tar -xzf "$NEO4J_TARBALL" -C /tmp/
+    else
+        print_warning "gzip 不可用，尝试其他方法..."
+        gunzip -c "$NEO4J_TARBALL" | tar -xf - -C /tmp/
+    fi
+    
+    if [ $? -ne 0 ]; then
+        print_error "解压 Neo4j 失败"
+        print_info "尝试查看文件内容..."
+        ls -la "$NEO4J_TARBALL"
+        file "$NEO4J_TARBALL"
+        exit 1
+    fi
+    
+    # 检查解压是否成功
+    if [ ! -d "/tmp/neo4j-community-${NEO4J_VERSION}" ]; then
+        print_error "Neo4j 解压目录不存在"
+        print_info "当前目录内容："
+        ls -la /tmp/
+        exit 1
+    fi
+    
+    # 移动到安装目录
+    print_info "安装 Neo4j 到 /opt/neo4j..."
+    sudo rm -rf /opt/neo4j
+    sudo mv "/tmp/neo4j-community-${NEO4J_VERSION}" /opt/neo4j
+    
+    if [ ! -d "/opt/neo4j" ]; then
+        print_error "Neo4j 安装失败"
+        exit 1
+    fi
     
     # 创建 neo4j 用户（如果不存在）
     if ! id "neo4j" &>/dev/null; then
