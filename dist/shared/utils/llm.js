@@ -1,0 +1,103 @@
+// @ts-nocheck
+// @ts-nocheck
+import { generateText } from 'ai';
+import { deepseek } from '@ai-sdk/deepseek';
+import config from '../config/config.js';
+import logger from './logger.js';
+/**
+ * 调用LLM并返回文本响应
+ */
+export async function callLLM(prompt, options = {}) {
+    try {
+        // 确保prompt是字符串类型
+        if (typeof prompt !== 'string') {
+            const errorMsg = `prompt参数必须是字符串，但收到: ${typeof prompt}`;
+            logger.error(errorMsg, { prompt });
+            return {
+                success: false,
+                error: errorMsg
+            };
+        }
+        const { temperature = 0.7, maxTokens = 2000, system = '你是一个专业的AI助手。' } = options;
+        logger.debug('调用LLM:', { prompt: prompt.substring(0, 100) + '...', options });
+        const result = await generateText({
+            model: deepseek(config.ai.model),
+            prompt,
+            temperature,
+            maxTokens,
+            system,
+        });
+        logger.debug('LLM响应成功:', {
+            textLength: result.text.length,
+            usage: result.usage
+        });
+        return {
+            success: true,
+            data: result.text,
+            usage: result.usage ? {
+                promptTokens: result.usage.promptTokens,
+                completionTokens: result.usage.completionTokens,
+                totalTokens: result.usage.totalTokens
+            } : undefined
+        };
+    }
+    catch (error) {
+        logger.error('LLM调用失败:', error);
+        return {
+            success: false,
+            error: error.message || 'LLM调用失败'
+        };
+    }
+}
+/**
+ * 调用LLM并返回JSON响应
+ */
+export async function callLLMWithJsonResponse(prompt, options = {}) {
+    try {
+        const response = await callLLM(prompt, options);
+        if (!response.success || !response.data) {
+            return {
+                success: false,
+                error: response.error || 'LLM响应为空'
+            };
+        }
+        // 尝试解析JSON
+        let jsonData;
+        try {
+            jsonData = JSON.parse(response.data);
+        }
+        catch (parseError) {
+            logger.error('JSON解析失败:', parseError);
+            logger.error('原始响应:', response.data);
+            return {
+                success: false,
+                error: `JSON解析失败: ${parseError.message}`
+            };
+        }
+        return {
+            success: true,
+            data: jsonData,
+            usage: response.usage
+        };
+    }
+    catch (error) {
+        logger.error('LLM JSON调用失败:', error);
+        return {
+            success: false,
+            error: error.message || 'LLM JSON调用失败'
+        };
+    }
+}
+/**
+ * 调用LLM进行批量处理
+ */
+export async function callLLMBatch(prompts, options = {}) {
+    const results = [];
+    for (const prompt of prompts) {
+        const result = await callLLM(prompt, options);
+        results.push(result);
+        // 添加延迟避免API限流
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return results;
+}
