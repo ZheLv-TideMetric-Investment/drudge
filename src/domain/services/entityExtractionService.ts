@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { callLLMWithJsonResponse } from '../../shared/utils/llm';
+import { callLLMWithJsonResponse, LLMMessage, createEntityExtractionSchema, createBatchEntityExtractionSchema } from '../../shared/utils/llm';
 import logger from '../../shared/utils/logger';
 import config from '../../shared/config/config';
 import {
@@ -77,7 +77,7 @@ class EntityExtractionService {
    * @returns {Object} - AI返回的提取数据
    */
   async callAIExtraction(newsItem) {
-    const messages = [
+    const messages: LLMMessage[] = [
       {
         role: 'system',
         content: `
@@ -100,11 +100,14 @@ class EntityExtractionService {
 - company_name: 公司全名
 - ticker: 股票代码（如有）
 - industry: 行业分类
+- market: 所属市场（如有）
+- country: 所属国家（如有）
 
 **Person（人物）:**
 - person_name: 人物姓名
-- role: 职位角色
+- title: 职位头衔
 - company: 所在公司（如有）
+- nationality: 国籍（如有）
 
 **Organization（机构）:**
 - organization_name: 机构名称
@@ -113,14 +116,16 @@ class EntityExtractionService {
 
 ### 3. Where（在哪里）- Location
 - location_name: 地点名称
+- type: 地点类型（如有）
 - country: 所属国家
 - region: 地区
+- coordinates: 坐标信息（如有）
 
 ### 4. When（什么时候）- Time
-- timestamp: 精确时间戳
-- date: 日期
-- hour: 小时（如有）
-- time_of_day: 时间段（上午/下午/晚上）
+- time_value: 精确时间值
+- type: 时间类型（DATETIME/DATE等）
+- precision: 精度（YEAR/MONTH/DAY/HOUR/MINUTE/SECOND）
+- timezone: 时区（如有）
 
 ### 5. How（如何发生）- 体现在事件描述中
 
@@ -154,69 +159,6 @@ class EntityExtractionService {
 
 请在每个事件的 event_level 字段中准确标注对应级别。
 
-## 输出格式：
-请严格按照以下JSON格式返回：
-
-\`\`\`json
-{
-  "events": [
-    {
-      "event_name": "事件名称",
-      "event_description": "事件详细描述",
-      "event_type": "事件类型",
-      "significance": 2,
-      "sentiment": "neutral",
-      "magnitude": 0.0,
-      "event_level": "Level 5"
-    }
-  ],
-  "companies": [
-    {
-      "company_name": "公司名称",
-      "ticker": "股票代码",
-      "industry": "行业"
-    }
-  ],
-  "persons": [
-    {
-      "person_name": "人物姓名",
-      "role": "职位",
-      "company": "所在公司"
-    }
-  ],
-  "organizations": [
-    {
-      "organization_name": "机构名称",
-      "type": "机构类型",
-      "country": "国家"
-    }
-  ],
-  "locations": [
-    {
-      "location_name": "地点名称",
-      "country": "国家",
-      "region": "地区"
-    }
-  ],
-  "times": [
-    {
-      "timestamp": "2025-01-19T10:00:00Z",
-      "date": "2025-01-19",
-      "hour": 10,
-      "time_of_day": "上午"
-    }
-  ],
-  "relationships": [
-    {
-      "type": "OCCURRED_IN",
-      "from": "事件名称",
-      "to": "公司名称",
-      "description": "关系描述"
-    }
-  ]
-}
-\`\`\`
-
 ## 重要提醒：
 - 只提取新闻中明确提到的信息，不要推测
 - 公司名称要标准化（如"苹果公司"统一为"Apple Inc."）
@@ -240,18 +182,16 @@ class EntityExtractionService {
     let lastError;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        // 将messages转换为单个prompt字符串
-        const prompt = messages.map(msg => {
-          if (msg.role === 'system') {
-            return `系统指令:\n${msg.content}`;
-          } else if (msg.role === 'user') {
-            return `用户请求:\n${msg.content}`;
-          }
-          return msg.content;
-        }).join('\n\n');
+        const extractionData = await callLLMWithJsonResponse(messages, {
+          schema: createEntityExtractionSchema(),
+          timeout: 5 * 60 * 1000 // 5分钟超时
+        });
         
-        const extractionData = await callLLMWithJsonResponse(prompt);
-        return extractionData;
+        if (extractionData.success) {
+          return extractionData.data;
+        } else {
+          throw new Error(extractionData.error || 'AI提取失败');
+        }
       } catch (error) {
         lastError = error;
         logger.warn(`AI六要素提取尝试 ${attempt} 失败:`, error.message);
@@ -275,7 +215,7 @@ class EntityExtractionService {
    */
   parseExtractionResult(extractionData, newsItem) {
     const result = new NewsExtractionResult({
-      news_id: newsItem.id,
+      newsId: newsItem.id,
     });
 
     // 解析事件
@@ -307,6 +247,8 @@ class EntityExtractionService {
             company_name: companyData.company_name || '',
             ticker: companyData.ticker || null,
             industry: companyData.industry || null,
+            market: companyData.market || null,
+            country: companyData.country || null,
           });
           result.addCompany(company);
         } catch (error) {
@@ -321,8 +263,9 @@ class EntityExtractionService {
         try {
           const person = new Person({
             person_name: personData.person_name || '',
-            role: personData.role || null,
+            title: personData.title || null,
             company: personData.company || null,
+            nationality: personData.nationality || null,
           });
           result.addPerson(person);
         } catch (error) {
@@ -353,8 +296,10 @@ class EntityExtractionService {
         try {
           const location = new Location({
             location_name: locationData.location_name || '',
+            type: locationData.type || null,
             country: locationData.country || null,
             region: locationData.region || null,
+            coordinates: locationData.coordinates || null,
           });
           result.addLocation(location);
         } catch (error) {
@@ -368,10 +313,10 @@ class EntityExtractionService {
       for (const timeData of extractionData.times) {
         try {
           const time = new Time({
-            timestamp: timeData.timestamp || new Date(newsItem.time * 1000).toISOString(),
-            date: timeData.date || this.parseDate(newsItem.time),
-            hour: timeData.hour || null,
-            time_of_day: timeData.time_of_day || null,
+            time_value: timeData.time_value || timeData.timestamp || new Date(newsItem.time * 1000).toISOString(),
+            type: timeData.type || 'DATETIME',
+            precision: timeData.precision || 'SECOND',
+            timezone: timeData.timezone,
           });
           result.addTime(time);
         } catch (error) {
@@ -568,7 +513,7 @@ class EntityExtractionService {
    * @returns {Array} - 提取结果数组
    */
   async callBatchAIExtraction(newsItems) {
-    const messages = [
+    const messages: LLMMessage[] = [
       {
         role: 'system',
         content: `
@@ -594,8 +539,9 @@ class EntityExtractionService {
 
 **Person（人物）:**
 - person_name: 人物姓名
-- role: 职位角色
+- title: 职位头衔
 - company: 所在公司（如有）
+- nationality: 国籍（如有）
 
 **Organization（机构）:**
 - organization_name: 机构名称
@@ -604,14 +550,16 @@ class EntityExtractionService {
 
 ### 3. Where（在哪里）- Location
 - location_name: 地点名称
+- type: 地点类型（如有）
 - country: 所属国家
 - region: 地区
+- coordinates: 坐标信息（如有）
 
 ### 4. When（什么时候）- Time
-- timestamp: 精确时间戳
-- date: 日期
-- hour: 小时（如有）
-- time_of_day: 时间段（上午/下午/晚上）
+- time_value: 精确时间值
+- type: 时间类型（DATETIME/DATE等）
+- precision: 精度（YEAR/MONTH/DAY/HOUR/MINUTE/SECOND）
+- timezone: 时区（如有）
 
 ### 5. How（如何发生）- 体现在事件描述中
 
@@ -703,17 +651,14 @@ ${newsItems.map((item, index) => `
     let lastError;
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
-        // 将messages转换为单个prompt字符串
-        const prompt = messages.map(msg => {
-          if (msg.role === 'system') {
-            return `系统指令:\n${msg.content}`;
-          } else if (msg.role === 'user') {
-            return `用户请求:\n${msg.content}`;
-          }
-          return msg.content;
-        }).join('\n\n');
+        const batchData = await callLLMWithJsonResponse(messages, {
+          schema: createBatchEntityExtractionSchema(),
+          timeout: 10 * 60 * 1000 // 10分钟超时
+        });
         
-        const batchData = await callLLMWithJsonResponse(prompt);
+        if (!batchData.success) {
+          throw new Error(batchData.error || 'AI批量提取失败');
+        }
         
         // 解析每条新闻的结果，确保按顺序对应
         const results = [];
@@ -721,9 +666,9 @@ ${newsItems.map((item, index) => `
           const newsItem = newsItems[i];
           
           // 先尝试按ID匹配，再按索引匹配
-          let extractionData = batchData.results?.find(r => r.news_id === newsItem.id);
-          if (!extractionData && batchData.results && batchData.results[i]) {
-            extractionData = batchData.results[i];
+          let extractionData = batchData.data?.results?.find(r => r.news_id === newsItem.id);
+          if (!extractionData && batchData.data?.results && batchData.data.results[i]) {
+            extractionData = batchData.data.results[i];
             // 确保news_id正确设置
             extractionData.news_id = newsItem.id;
           }
@@ -734,6 +679,7 @@ ${newsItems.map((item, index) => `
         
         return results;
       } catch (error) {
+        logger.info(JSON.stringify(error.message));
         lastError = error;
         logger.warn(`批量AI提取尝试 ${attempt} 失败:`, error.message);
 

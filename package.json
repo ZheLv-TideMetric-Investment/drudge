@@ -21,17 +21,14 @@
     "pm2:restart": "pm2 restart ecosystem.config.js",
     "pm2:logs": "pm2 logs drudge",
     "pm2:status": "pm2 status",
-    
     "news": "node dist/scripts/newsAcquisition.js",
     "graph": "node dist/scripts/knowledgeGraph.js",
     "level": "node dist/scripts/newsLevelCheck.js",
     "health": "node dist/scripts/systemHealth.js",
-    
     "news:dev": "tsx src/scripts/newsAcquisition.ts",
     "graph:dev": "tsx src/scripts/knowledgeGraph.ts",
     "level:dev": "tsx src/scripts/newsLevelCheck.ts",
     "health:dev": "tsx src/scripts/systemHealth.ts",
-    
     "schema:apply": "cypher-shell -f neo4j/schema.cypher",
     "clean:neo4j": "node scripts/cleanNeo4j.js"
   },
@@ -49,7 +46,8 @@
     "neo4j-driver": "^5.28.1",
     "node-cron": "^3.0.3",
     "pm2": "^5.3.1",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "zod": "^3.25.72"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.5",

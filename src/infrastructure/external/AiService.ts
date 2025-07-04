@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { callLLM, callLLMWithJsonResponse, LLMCallOptions, LLMResponse, LLMJsonResponse } from '../../shared/utils/llm';
+import { callLLM, callLLMWithJsonResponse, LLMCallOptions, LLMResponse, LLMJsonResponse, LLMMessage, createMessages, createNewsLevelSchema, createSummarySchema } from '../../shared/utils/llm';
 import logger from '../../shared/utils/logger';
 
 export interface NewsLevelResult {
@@ -63,7 +63,7 @@ class AiService {
    * 新闻级别评估
    */
   async evaluateNewsLevel(title: string, content: string): Promise<LLMJsonResponse<NewsLevelResult>> {
-    const prompt = `
+    const userPrompt = `
 作为专业的新闻分析师，请评估以下新闻的重要性级别（1-5级，1最重要，5最不重要）：
 
 标题：${title}
@@ -76,18 +76,20 @@ class AiService {
 - Level 4 (Low Priority): 对市场、行业或公司产生较小影响
 - Level 5 (Informational): 对当前事件的补充性说明或没有直接市场影响
 
-请以JSON格式返回：
-{
-  "level": 数字(1-5),
-  "reasoning": "评估理由",
-  "confidence": 置信度(0-1),
-  "urgency": "紧急程度(low/medium/high/critical)"
-}`;
+请返回包含以下字段的对象：
+- level: 数字(1-5)
+- reasoning: 评估理由
+- confidence: 置信度(0-1)
+- urgency: 紧急程度(low/medium/high/critical)`;
 
-    return await callLLMWithJsonResponse<NewsLevelResult>(prompt, {
+    const messages = createMessages(
+      '你是一个专业的新闻分析师，擅长评估新闻的重要性和市场影响。',
+      userPrompt
+    );
+
+    return await callLLMWithJsonResponse<NewsLevelResult>(messages, {
       temperature: 0.3,
-      maxTokens: 500,
-      system: '你是一个专业的新闻分析师，擅长评估新闻的重要性和市场影响。'
+      schema: createNewsLevelSchema(),
     });
   }
 
@@ -95,7 +97,7 @@ class AiService {
    * 实体提取
    */
   async extractEntities(request: EntityExtractionRequest): Promise<LLMJsonResponse<EntityExtractionResponse>> {
-    const prompt = `
+    const userPrompt = `
 请从以下新闻中提取实体信息：
 
 标题：${request.title}
@@ -110,24 +112,15 @@ class AiService {
 5. 地点 (Locations) - 地理位置
 6. 时间 (Times) - 特定的时间点或时间段
 
-请以JSON格式返回：
-{
-  "entities": {
-    "events": [{"event_name": "事件名", "description": "描述", "type": "事件类型"}],
-    "companies": [{"company_name": "公司名", "industry": "行业", "country": "国家"}],
-    "persons": [{"person_name": "姓名", "title": "职位", "company": "公司"}],
-    "organizations": [{"organization_name": "机构名", "type": "类型"}],
-    "locations": [{"location_name": "地点名", "type": "类型", "country": "国家"}],
-    "times": [{"time_value": "时间值", "type": "类型"}]
-  },
-  "relationships": [{"from": "实体1", "to": "实体2", "type": "关系类型"}],
-  "confidence": 置信度(0-1)
-}`;
+请返回包含entities对象（包含各类实体数组）、relationships数组和confidence数值的对象。`;
 
-    return await callLLMWithJsonResponse<EntityExtractionResponse>(prompt, {
+    const messages = createMessages(
+      '你是一个专业的信息提取专家，擅长从文本中识别和提取结构化信息。',
+      userPrompt
+    );
+
+    return await callLLMWithJsonResponse<EntityExtractionResponse>(messages, {
       temperature: 0.2,
-      maxTokens: 2000,
-      system: '你是一个专业的信息提取专家，擅长从文本中识别和提取结构化信息。'
     });
   }
 
@@ -144,7 +137,7 @@ class AiService {
     const style = request.style || 'brief';
     const maxLength = request.maxLength || 200;
 
-    const prompt = `
+    const userPrompt = `
 请为以下内容生成摘要：
 
 ${request.content}
@@ -154,17 +147,19 @@ ${request.content}
 - 最大长度：${maxLength}字
 - 突出关键信息和要点
 
-请以JSON格式返回：
-{
-  "summary": "摘要内容",
-  "key_points": ["要点1", "要点2", "要点3"],
-  "confidence": 置信度(0-1)
-}`;
+请返回包含以下字段的对象：
+- summary: 摘要内容
+- key_points: 要点数组
+- confidence: 置信度(0-1)`;
 
-    return await callLLMWithJsonResponse<SummaryResponse>(prompt, {
+    const messages = createMessages(
+      '你是一个专业的内容摘要专家，擅长提取关键信息并生成简洁准确的摘要。',
+      userPrompt
+    );
+
+    return await callLLMWithJsonResponse<SummaryResponse>(messages, {
       temperature: 0.4,
-      maxTokens: Math.max(maxLength * 2, 500),
-      system: '你是一个专业的内容摘要专家，擅长提取关键信息并生成简洁准确的摘要。'
+      schema: createSummarySchema(),
     });
   }
 
@@ -198,9 +193,13 @@ ${request.content}
    */
   async healthCheck(): Promise<{ status: string; timestamp: string; error?: string }> {
     try {
-      const testResponse = await callLLM('Hello, this is a health check.', {
-        temperature: 0.1,
-        maxTokens: 50
+      const messages = createMessages(
+        '你是一个AI助手，请简短回应。',
+        'Hello, this is a health check.'
+      );
+
+      const testResponse = await callLLM(messages, {
+        temperature: 0.1
       });
 
       return {

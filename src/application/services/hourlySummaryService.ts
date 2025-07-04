@@ -3,7 +3,7 @@ import logger from '../../shared/utils/logger';
 import knowledgeGraphService from './knowledgeGraphService';
 import aiService from '../../infrastructure/external/AiService';
 import webhookService from '../../infrastructure/external/WebhookService';
-import { callLLM } from '../../shared/utils/llm';
+import { callLLM, LLMMessage } from '../../shared/utils/llm';
 import { HourlySummary } from '../../domain/entities/index';
 import moment from 'moment-timezone';
 
@@ -80,7 +80,7 @@ class HourlySummaryService {
    */
   async generateSummaryText(summary) {
     try {
-      const messages = [
+      const messages: LLMMessage[] = [
         {
           role: 'system',
           content: `
@@ -123,7 +123,7 @@ ${summary.top_companies.map((company, index) =>
       ];
 
       const response = await callLLM(messages);
-      return response.trim();
+      return response.success ? response.data.trim() : this.generateFallbackSummary(summary);
     } catch (error) {
       logger.error('AI生成总结文本失败:', error);
       

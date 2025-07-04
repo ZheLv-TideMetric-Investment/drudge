@@ -246,7 +246,7 @@ class KnowledgeGraphService {
     `;
 
     await neo4jService.executeQuery(cypher, {
-      id: event.id,
+      id: event.event_id,
       eventName: event.event_name,
       eventDescription: event.event_description,
       eventDate: event.event_date,
@@ -268,6 +268,8 @@ class KnowledgeGraphService {
       MERGE (c:Company {company_name: $companyName})
       SET c.ticker = $ticker,
           c.industry = $industry,
+          c.market = $market,
+          c.country = $country,
           c.created_at = $createdAt,
           c.updated_at = $updatedAt
       RETURN c
@@ -277,6 +279,8 @@ class KnowledgeGraphService {
       companyName: company.company_name,
       ticker: company.ticker,
       industry: company.industry,
+      market: company.market,
+      country: company.country,
       createdAt: company.created_at,
       updatedAt: company.updated_at,
     });
@@ -288,8 +292,9 @@ class KnowledgeGraphService {
   async createPersonNode(person) {
     const cypher = `
       MERGE (p:Person {person_name: $personName})
-      SET p.role = $role,
+      SET p.title = $title,
           p.company = $company,
+          p.nationality = $nationality,
           p.created_at = $createdAt,
           p.updated_at = $updatedAt
       RETURN p
@@ -297,8 +302,9 @@ class KnowledgeGraphService {
 
     await neo4jService.executeQuery(cypher, {
       personName: person.person_name,
-      role: person.role,
+      title: person.title,
       company: person.company,
+      nationality: person.nationality,
       createdAt: person.created_at,
       updatedAt: person.updated_at,
     });
@@ -332,8 +338,10 @@ class KnowledgeGraphService {
   async createLocationNode(location) {
     const cypher = `
       MERGE (l:Location {location_name: $locationName})
-      SET l.country = $country,
+      SET l.type = $type,
+          l.country = $country,
           l.region = $region,
+          l.coordinates = $coordinates,
           l.created_at = $createdAt,
           l.updated_at = $updatedAt
       RETURN l
@@ -341,8 +349,10 @@ class KnowledgeGraphService {
 
     await neo4jService.executeQuery(cypher, {
       locationName: location.location_name,
+      type: location.type,
       country: location.country,
       region: location.region,
+      coordinates: location.coordinates,
       createdAt: location.created_at,
       updatedAt: location.updated_at,
     });
@@ -353,19 +363,19 @@ class KnowledgeGraphService {
    */
   async createTimeNode(time) {
     const cypher = `
-      MERGE (t:Time {timestamp: $timestamp})
-      SET t.date = $date,
-          t.hour = $hour,
-          t.time_of_day = $timeOfDay,
+      MERGE (t:Time {time_value: $timestamp})
+      SET t.type = $type,
+          t.precision = $precision,
+          t.timezone = $timezone,
           t.created_at = $createdAt
       RETURN t
     `;
 
     await neo4jService.executeQuery(cypher, {
-      timestamp: time.timestamp,
-      date: time.date,
-      hour: time.hour,
-      timeOfDay: time.time_of_day,
+      timestamp: time.time_value,
+      type: time.type,
+      precision: time.precision,
+      timezone: time.timezone,
       createdAt: time.created_at,
     });
   }
@@ -376,7 +386,7 @@ class KnowledgeGraphService {
   async createRelationships(extractionResult, newsId) {
     // 事件与新闻的关系
     for (const event of extractionResult.events) {
-      await this.createEventNewsRelation(event.id, newsId);
+      await this.createEventNewsRelation(event.event_id, newsId);
     }
 
     // 处理提取的关系
@@ -438,28 +448,28 @@ class KnowledgeGraphService {
     // 事件与公司的关系
     for (const event of extractionResult.events) {
       for (const company of extractionResult.companies) {
-        await this.createEventCompanyRelation(event.id, company.company_name);
+        await this.createEventCompanyRelation(event.event_id, company.company_name);
       }
     }
 
     // 事件与人物的关系
     for (const event of extractionResult.events) {
       for (const person of extractionResult.persons) {
-        await this.createEventPersonRelation(event.id, person.person_name, person.role);
+        await this.createEventPersonRelation(event.event_id, person.person_name, person.title);
       }
     }
 
     // 事件与地点的关系
     for (const event of extractionResult.events) {
       for (const location of extractionResult.locations) {
-        await this.createEventLocationRelation(event.id, location.location_name);
+        await this.createEventLocationRelation(event.event_id, location.location_name);
       }
     }
 
     // 事件与时间的关系
     for (const event of extractionResult.events) {
       for (const time of extractionResult.times) {
-        await this.createEventTimeRelation(event.id, time.timestamp);
+        await this.createEventTimeRelation(event.event_id, time.time_value);
       }
     }
   }
@@ -487,19 +497,19 @@ class KnowledgeGraphService {
   /**
    * 创建事件与人物的关系
    */
-  async createEventPersonRelation(eventId, personName, role) {
+  async createEventPersonRelation(eventId, personName, title) {
       const cypher = `
         MATCH (e:Event {id: $eventId})
       MATCH (p:Person {person_name: $personName})
       MERGE (e)-[r:INVOLVES]->(p)
-      SET r.role = $role,
+      SET r.title = $title,
           r.created_at = $createdAt
       `;
 
       await neo4jService.executeQuery(cypher, {
       eventId,
       personName,
-      role,
+      title,
         createdAt: new Date().toISOString(),
       });
   }
@@ -529,7 +539,7 @@ class KnowledgeGraphService {
   async createEventTimeRelation(eventId, timestamp) {
     const cypher = `
       MATCH (e:Event {id: $eventId})
-      MATCH (t:Time {timestamp: $timestamp})
+      MATCH (t:Time {time_value: $timestamp})
       MERGE (e)-[r:HAPPENED_AT]->(t)
       SET r.created_at = $createdAt
     `;
@@ -1172,7 +1182,7 @@ class KnowledgeGraphService {
       
       // 3. 构建返回结果
       for (const extractionResult of extractionResults) {
-        if (extractionResult && extractionResult.news_id) {
+        if (extractionResult && extractionResult.newsId) {
         const stats = {
             events: extractionResult.events?.length || 0,
             companies: extractionResult.companies?.length || 0,
@@ -1185,7 +1195,7 @@ class KnowledgeGraphService {
         };
         
         results.push({
-            newsId: extractionResult.news_id,
+            newsId: extractionResult.newsId,
           success: true,
           stats,
             extractionResult,
@@ -1193,7 +1203,7 @@ class KnowledgeGraphService {
           });
         } else {
           results.push({ 
-            newsId: extractionResult?.news_id || 'unknown',
+            newsId: extractionResult?.newsId || 'unknown',
             success: false, 
             error: '实体提取失败或缺少news_id',
             processed_at: new Date().toISOString()
@@ -1206,7 +1216,7 @@ class KnowledgeGraphService {
       logger.error('批量创建图数据失败:', error);
       // 返回错误结果
       return extractionResults.map(extractionResult => ({
-        newsId: extractionResult?.news_id || 'unknown',
+        newsId: extractionResult?.newsId || 'unknown',
         success: false,
         error: error.message,
         processed_at: new Date().toISOString()
@@ -1222,7 +1232,7 @@ class KnowledgeGraphService {
     const queries = [];
     
     for (const extractionResult of extractionResults) {
-      if (!extractionResult.news_id) continue;
+      if (!extractionResult.newsId) continue;
       
       const query = {
         cypher: `
@@ -1237,7 +1247,7 @@ class KnowledgeGraphService {
           RETURN n.id as newsId
         `,
         parameters: {
-          id: extractionResult.news_id,
+          id: extractionResult.newsId,
           newsLevel: extractionResult.news_level || 'Level 5',
           confidence: extractionResult.confidence || 0,
           processingTime: extractionResult.processing_time || 0,
@@ -1318,7 +1328,7 @@ class KnowledgeGraphService {
           RETURN e.id
         `,
                  parameters: {
-           id: event.id,
+           id: event.event_id,
            eventName: event.event_name,
            eventDescription: event.event_description,
            eventDate: event.event_date,
@@ -1340,6 +1350,8 @@ class KnowledgeGraphService {
           MERGE (c:Company {company_name: $companyName})
           SET c.ticker = $ticker,
               c.industry = $industry,
+              c.market = $market,
+              c.country = $country,
               c.created_at = $createdAt,
               c.updated_at = $updatedAt
           RETURN c.company_name
@@ -1348,6 +1360,8 @@ class KnowledgeGraphService {
           companyName: company.company_name,
           ticker: company.ticker,
           industry: company.industry,
+          market: company.market,
+          country: company.country,
           createdAt: company.created_at,
           updatedAt: company.updated_at,
         }
@@ -1359,16 +1373,18 @@ class KnowledgeGraphService {
       queries.push({
         cypher: `
           MERGE (p:Person {person_name: $personName})
-          SET p.role = $role,
+          SET p.title = $title,
               p.company = $company,
+              p.nationality = $nationality,
               p.created_at = $createdAt,
               p.updated_at = $updatedAt
           RETURN p.person_name
         `,
         parameters: {
           personName: person.person_name,
-          role: person.role,
+          title: person.title,
           company: person.company,
+          nationality: person.nationality,
           createdAt: person.created_at,
           updatedAt: person.updated_at,
         }
@@ -1401,16 +1417,20 @@ class KnowledgeGraphService {
       queries.push({
         cypher: `
           MERGE (l:Location {location_name: $locationName})
-          SET l.country = $country,
+          SET l.type = $type,
+              l.country = $country,
               l.region = $region,
+              l.coordinates = $coordinates,
               l.created_at = $createdAt,
               l.updated_at = $updatedAt
           RETURN l.location_name
         `,
         parameters: {
           locationName: location.location_name,
+          type: location.type,
           country: location.country,
           region: location.region,
+          coordinates: location.coordinates,
           createdAt: location.created_at,
           updatedAt: location.updated_at,
         }
@@ -1421,18 +1441,18 @@ class KnowledgeGraphService {
     for (const time of extractionResult.times || []) {
       queries.push({
         cypher: `
-          MERGE (t:Time {timestamp: $timestamp})
-          SET t.date = $date,
-              t.hour = $hour,
-              t.time_of_day = $timeOfDay,
+          MERGE (t:Time {time_value: $timestamp})
+          SET t.type = $type,
+              t.precision = $precision,
+              t.timezone = $timezone,
               t.created_at = $createdAt
-          RETURN t.timestamp
+          RETURN t.time_value
         `,
         parameters: {
-          timestamp: time.timestamp,
-          date: time.date,
-          hour: time.hour,
-          timeOfDay: time.time_of_day,
+          timestamp: time.time_value,
+          type: time.type,
+          precision: time.precision,
+          timezone: time.timezone,
           createdAt: time.created_at,
         }
       });
@@ -1460,8 +1480,8 @@ class KnowledgeGraphService {
           SET r.created_at = $createdAt
         `,
         parameters: {
-          eventId: event.id,
-          newsId: extractionResult.news_id,
+          eventId: event.event_id,
+          newsId: extractionResult.newsId,
           createdAt
         }
       });
@@ -1481,7 +1501,7 @@ class KnowledgeGraphService {
                 r.created_at = $createdAt
           `,
           parameters: {
-            eventId: event.id,
+            eventId: event.event_id,
             companyName: company.company_name,
             createdAt
           }
@@ -1495,13 +1515,13 @@ class KnowledgeGraphService {
             MATCH (e:Event {id: $eventId})
             MATCH (p:Person {person_name: $personName})
             MERGE (e)-[r:INVOLVES]->(p)
-            SET r.role = $role,
+            SET r.title = $title,
                 r.created_at = $createdAt
           `,
           parameters: {
-            eventId: event.id,
+            eventId: event.event_id,
             personName: person.person_name,
-            role: person.role,
+            title: person.title,
             createdAt
           }
         });
@@ -1518,7 +1538,7 @@ class KnowledgeGraphService {
                 r.created_at = $createdAt
           `,
           parameters: {
-            eventId: event.id,
+            eventId: event.event_id,
             locationName: location.location_name,
             createdAt
           }
@@ -1530,13 +1550,13 @@ class KnowledgeGraphService {
         queries.push({
           cypher: `
             MATCH (e:Event {id: $eventId})
-            MATCH (t:Time {timestamp: $timestamp})
+            MATCH (t:Time {time_value: $timestamp})
             MERGE (e)-[r:HAPPENED_AT]->(t)
             SET r.created_at = $createdAt
           `,
           parameters: {
-            eventId: event.id,
-            timestamp: time.timestamp,
+            eventId: event.event_id,
+            timestamp: time.time_value,
             createdAt
           }
         });

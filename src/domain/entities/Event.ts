@@ -5,10 +5,16 @@ import { BaseEntity } from '../../shared/types/common';
 export interface EventConstructorParams {
   event_id?: string;
   event_name: string;
+  event_date?: string;
+  event_description?: string;
+  event_type?: EventTypes;
   type?: EventTypes;
   description?: string;
   impact?: string;
   significance?: SignificanceLevel;
+  sentiment?: string;
+  magnitude?: number;
+  event_level?: string;
   keywords?: string[];
   properties?: Record<string, any>;
 }
@@ -19,10 +25,16 @@ export interface EventConstructorParams {
 export class Event implements BaseEntity {
   public event_id: string;
   public event_name: string;
+  public event_date: string;
+  public event_description: string;
+  public event_type: EventTypes;
   public type: EventTypes;
   public description: string;
   public impact: string;
   public significance: SignificanceLevel;
+  public sentiment: string;
+  public magnitude: number;
+  public event_level: string;
   public keywords: string[];
   public properties: Record<string, any>;
   public created_at: string;
@@ -31,19 +43,31 @@ export class Event implements BaseEntity {
   constructor({
     event_id,
     event_name,
+    event_date = '',
+    event_description = '',
+    event_type,
     type = EventTypes.OTHER,
     description = '',
     impact = '',
     significance = SignificanceLevel.LOW,
+    sentiment = 'neutral',
+    magnitude = 0,
+    event_level = 'Level 5',
     keywords = [],
     properties = {},
   }: EventConstructorParams) {
     this.event_id = event_id || this.generateId();
     this.event_name = event_name;
+    this.event_date = event_date;
+    this.event_description = event_description;
+    this.event_type = event_type || type;
     this.type = type;
     this.description = description;
     this.impact = impact;
     this.significance = significance;
+    this.sentiment = sentiment;
+    this.magnitude = magnitude;
+    this.event_level = event_level;
     this.keywords = keywords;
     this.properties = properties;
     this.created_at = new Date().toISOString();
@@ -74,10 +98,16 @@ export class Event implements BaseEntity {
     return {
       event_id: this.event_id,
       event_name: this.event_name,
+      event_date: this.event_date,
+      event_description: this.event_description,
+      event_type: this.event_type,
       type: this.type,
       description: this.description,
       impact: this.impact,
       significance: this.significance,
+      sentiment: this.sentiment,
+      magnitude: this.magnitude,
+      event_level: this.event_level,
       keywords: this.keywords,
       properties: this.properties,
       created_at: this.created_at,
