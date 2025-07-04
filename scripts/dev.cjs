@@ -36,7 +36,7 @@ function startApp() {
 
 function watchWorkerFiles() {
   const workerFiles = [
-    'src/workers/',
+          'src/infrastructure/workers/',
     'src/shared/',
     'src/infrastructure/',
     'src/application/services/',

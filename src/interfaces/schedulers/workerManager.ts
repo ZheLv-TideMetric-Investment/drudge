@@ -54,7 +54,7 @@ class WorkerManager {
   async createNewsProcessor() {
     return new Promise((resolve, reject) => {
       // Worker threads 需要运行编译后的JavaScript文件
-      const workerPath = path.join(process.cwd(), 'dist/workers/newsProcessorWorker.js');
+      const workerPath = path.join(process.cwd(), 'dist/infrastructure/workers/newsProcessorWorker.js');
       const worker = new Worker(workerPath);
       
       worker.lastActivity = Date.now();

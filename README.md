@@ -1,108 +1,48 @@
-# Drudge - 实时新闻处理与知识图谱系统
+# 新闻知识图谱系统
 
-![](https://img.shields.io/badge/Node.js-18+-green.svg)
-![](https://img.shields.io/badge/Neo4j-5.0+-blue.svg)
-![](https://img.shields.io/badge/License-ISC-yellow.svg)
+## 项目概述
 
-一个基于AI驱动的实时新闻处理与知识图谱构建系统，能够自动获取新闻、提取实体关系、构建知识图谱，并提供智能分析功能。
+这是一个基于AI的新闻处理和知识图谱系统，能够自动获取、处理、分析新闻数据，构建知识图谱，并提供智能总结和实时监控功能。系统采用前后端分离架构，后端负责数据处理和图谱构建，前端提供可视化查询界面。
 
-## 🌟 核心功能
+## 系统特性
 
-### 🤖 AI驱动的新闻处理
-- **智能实体提取**: 使用大语言模型提取新闻中的事件、公司、人物、地点、时间等实体
-- **新闻等级分类**: 自动将新闻分为1-5级重要性等级（Level 1为紧急新闻，Level 5为信息性新闻）
-- **批量处理优化**: 支持批量AI调用和数据库操作，显著提升处理效率
+### 🚀 核心功能
+- **新闻自动获取**: 从多个新闻源自动抓取最新新闻
+- **智能实体提取**: 使用AI模型提取新闻中的实体和关系
+- **新闻级别评估**: 自动评估新闻的重要性等级(1-5级)
+- **知识图谱构建**: 构建动态更新的知识图谱
+- **智能总结**: 生成小时级和每日新闻总结
+- **实时监控**: 高级别新闻预警和系统状态监控
 
-### 📊 知识图谱构建
-- **实体建模**: 基于新闻六要素（5W1H）设计的完整实体模型
-- **关系推理**: 自动识别和建立实体间的复杂关系
-- **图数据库存储**: 使用Neo4j存储和查询复杂的知识图谱
-- **增量更新**: 支持实体和关系的增量更新和合并
+### 🛠️ 技术栈
+- **后端**: Node.js + TypeScript + Neo4j
+- **前端**: Next.js + React + TypeScript + Tailwind CSS
+- **数据库**: Neo4j图数据库
+- **AI服务**: DeepSeek API + Google AI
+- **部署**: PM2进程管理
 
-### 🔍 三大核心服务
+### 📊 数据可视化
+- 交互式知识图谱展示
+- 实时数据统计图表
+- 新闻级别分布分析
+- 趋势分析和报告
 
-#### 1. Break News检测服务
-- 实时监控新闻流，自动识别突发重要新闻
-- 根据新闻级别和重要性进行实时推送
-- 支持钉钉机器人等多种通知方式
-
-#### 2. 按小时总结服务
-- 定时汇总每小时的重要新闻和事件
-- 生成结构化的小时总结报告
-- 识别当前时段的热点话题和趋势
-
-
-
-### 🔧 系统特性
-- **工作线程架构**: 主线程负责管理，工作线程处理具体任务
-- **定时调度**: 基于cron表达式的灵活定时任务调度
-- **错误恢复**: 完善的错误处理和自动恢复机制
-- **幂等设计**: 支持重复处理，确保数据一致性
-- **监控告警**: 实时系统状态监控和异常告警
-
-## 🏗️ 系统架构
-
-```
-drudge/
-├── src/
-│   ├── application/          # 应用层
-│   │   └── services/         # 核心业务服务
-│   │       ├── NewsProcessingService.js     # 新闻处理服务
-│   │       ├── hourlySummaryService.js      # 按小时总结服务
-
-│   │       ├── knowledgeGraphService.js     # 知识图谱服务
-│   │       └── newsLevelService.js          # 新闻等级服务
-│   ├── domain/               # 领域层
-│   │   ├── entities/         # 领域实体模型
-│   │   └── services/         # 领域服务
-│   │       └── entityExtractionService.js  # 实体提取服务
-│   ├── infrastructure/       # 基础设施层
-│   │   ├── database/         # 数据库访问
-│   │   │   ├── Neo4jRepository.js           # Neo4j操作
-│   │   │   └── GraphRepository.js           # 图数据库抽象
-│   │   ├── external/         # 外部服务集成
-│   │   │   ├── AiService.js                 # AI/LLM服务
-│   │   │   ├── NewsApiService.js            # 新闻API服务
-│   │   │   └── WebhookService.js            # 钉钉通知服务
-│   │   └── storage/          # 存储服务
-│   ├── interfaces/           # 接口层
-│   │   ├── controllers/      # 控制器
-│   │   └── schedulers/       # 定时任务调度
-│   ├── workers/              # 工作线程
-│   ├── scripts/              # 工具脚本
-│   └── shared/               # 共享组件
-├── neo4j/                    # Neo4j数据库配置
-│   └── schema.cypher         # 数据库模式定义
-├── scripts/                  # 外部工具脚本
-│   └── cleanNeo4j.js         # 数据库清理工具
-└── logs/                     # 日志文件
-```
-
-### 技术栈
-- **运行时**: Node.js 18+ (ES Module)
-- **数据库**: Neo4j 5.0+ (图数据库)
-- **AI/LLM**: DeepSeek API (支持多种LLM)
-- **定时任务**: node-cron
-- **进程管理**: PM2
-- **日志**: Winston
-- **通知**: 钉钉机器人
-
-## 🚀 快速开始
+## 快速开始
 
 ### 环境要求
 - Node.js 18+
 - Neo4j 5.0+
-- DeepSeek API Key (或其他LLM API)
+- npm 8.0+
 
 ### 安装步骤
 
 1. **克隆项目**
 ```bash
-git clone [repository-url]
+git clone <repository-url>
 cd drudge
 ```
 
-2. **安装依赖**
+2. **安装后端依赖**
 ```bash
 npm install
 ```
@@ -110,273 +50,229 @@ npm install
 3. **配置环境变量**
 ```bash
 cp .env.example .env
+# 编辑 .env 文件，配置数据库连接和API密钥
 ```
 
-编辑 `.env` 文件：
-```env
-# 钉钉机器人配置
-WEBHOOK_URL=your_dingtalk_webhook_url
+4. **启动Neo4j数据库**
+确保Neo4j服务运行在 `bolt://localhost:7687`
+
+5. **初始化数据库**
+```bash
+npm run schema:apply
+```
+
+6. **构建并启动后端**
+```bash
+npm run build
+npm start
+```
+
+7. **安装并启动前端**
+```bash
+cd web
+npm install
+npm run dev
+```
+
+8. **访问应用**
+- 前端界面: http://localhost:3000
+- API文档: http://localhost:3001
+
+## 使用指南
+
+### CLI工具
+
+#### 新闻获取
+```bash
+npm run news:dev fetch [数量]            # 获取最新新闻
+npm run news:dev stats [天数]            # 查看新闻统计
+```
+
+#### 知识图谱
+```bash
+npm run graph:dev process [限制数]        # 处理新闻构建图谱
+npm run graph:dev query <关键词> [限制数]  # 查询图谱
+npm run graph:dev stats                 # 显示图谱统计
+```
+
+#### 级别检查
+```bash
+npm run level:dev check [限制数]          # 检查新闻级别
+npm run level:dev notify [小时数]         # 发送高级别新闻通知
+```
+
+#### 系统监控
+```bash
+npm run health:dev check                 # 系统健康检查
+npm run health:dev report                # 生成健康报告
+```
+
+### Web界面功能
+
+1. **概览页面** (`/`) - 数据统计和最新动态
+2. **新闻页面** (`/news`) - 新闻列表、搜索和筛选
+3. **知识图谱** (`/graph`) - 交互式图谱可视化
+4. **总结报告** (`/summary`) - 智能总结和趋势分析
+5. **实时监控** (`/monitor`) - 系统状态和告警管理
+6. **统计分析** (`/analytics`) - 数据分析和报表
+
+## 项目结构
+
+```
+drudge/
+├── src/                    # 后端源代码
+│   ├── application/        # 应用层
+│   │   ├── services/       # 业务服务
+│   │   └── use-cases/      # 用例
+│   ├── domain/             # 领域层
+│   │   ├── entities/       # 实体定义
+│   │   └── repositories/   # 仓储接口
+│   ├── infrastructure/     # 基础设施层
+│   │   ├── database/       # 数据库
+│   │   ├── external/       # 外部服务
+│   │   └── workers/        # 工作线程
+│   ├── interfaces/         # 接口层
+│   │   ├── cli/            # CLI工具
+│   │   └── schedulers/     # 调度器
+│   └── shared/             # 共享模块
+├── web/                    # 前端应用
+│   └── src/
+│       ├── app/            # Next.js页面
+│       ├── components/     # React组件
+│       ├── lib/            # 工具库
+│       └── types/          # 类型定义
+├── data/                   # 数据存储
+├── logs/                   # 日志文件
+└── scripts/                # 构建脚本
+```
+
+## 开发脚本
+
+### 后端开发
+```bash
+npm run dev                 # 开发模式
+npm run build               # 构建项目
+npm run start               # 启动服务
+npm run pm2:start           # PM2启动
+npm run lint                # 代码检查
+npm run format              # 代码格式化
+```
+
+### 前端开发
+```bash
+cd web
+npm run dev                 # 开发模式
+npm run build               # 构建项目
+npm run start               # 启动服务
+npm run lint                # 代码检查
+```
+
+## 新闻级别分类
+
+| 级别 | 名称 | 标识 | 描述 |
+|------|------|------|------|
+| Level 1 | 紧急 | 🔴 | 重大突发事件、国际危机 |
+| Level 2 | 重要 | 🟠 | 重要新闻事件、政策变化 |
+| Level 3 | 中等 | 🟡 | 一般重要新闻、市场动态 |
+| Level 4 | 一般 | 🟢 | 普通新闻、日常报道 |
+| Level 5 | 低 | ⚪ | 日常资讯、轻松内容 |
+
+## 定时任务
+
+- **每分钟**: 自动获取新闻数据
+- **每5分钟**: 扫描高级别新闻并发送通知
+- **每小时** (11:00-22:00): 生成小时总结报告
+- **每日10:00**: 生成每日总结报告
+
+## 配置说明
+
+### 环境变量
+```bash
+# Neo4j配置
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=password
 
 # AI服务配置
-AI_API_KEY=your_deepseek_api_key
-AI_BASE_URL=https://api.deepseek.com
-AI_MODEL=deepseek-reasoner
+DEEPSEEK_API_KEY=your_api_key
+GOOGLE_API_KEY=your_api_key
 
-# Neo4j数据库配置
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USERNAME=neo4j
-NEO4J_PASSWORD=your_password
+# 新闻API配置
+NEWS_API_KEY=your_api_key
 
-# 其他配置
-STORAGE_PATH=./data
-LOG_LEVEL=info
+# 通知配置
+WEBHOOK_URL=your_webhook_url
 ```
 
-4. **初始化Neo4j数据库**
-```bash
-# 应用数据库模式
-npm run schema:apply
+## 部署指南
 
-# 或手动执行
-cypher-shell -f neo4j/schema.cypher
-```
-
-5. **启动系统**
+### 开发环境
 ```bash
-# 开发环境
+# 启动Neo4j
+docker run -d --name neo4j -p 7474:7474 -p 7687:7687 neo4j
+
+# 启动后端
 npm run dev
 
-# 生产环境
-npm start
-
-# 使用PM2管理（推荐）
-npm run pm2:start
+# 启动前端
+cd web && npm run dev
 ```
 
-## 📖 使用指南
-
-### 脚本使用指南
-
-本系统使用简化的脚本命令，通过基本命令加参数的方式执行功能：
-
-#### 📰 新闻管理
+### 生产环境
 ```bash
-npm run news                     # 显示帮助信息
-npm run news fetch               # 获取最新新闻
-npm run news fetch-batch 3       # 获取最近3天新闻
-npm run news list 20             # 列出最新20条新闻
-npm run news count               # 查看新闻统计
-npm run news status              # 查看模块状态
-```
+# 构建项目
+npm run build
+cd web && npm run build
 
-#### 🧠 知识图谱处理
-```bash
-npm run graph                    # 显示帮助信息
-npm run graph process            # 处理未处理的新闻
-npm run graph process-batch 30   # 批量处理30条新闻
-npm run graph process-recent 12  # 处理最近12小时新闻
-npm run graph query "苹果公司" 15 # 查询相关新闻
-npm run graph stats              # 查看图谱统计
-npm run graph status             # 查看模块状态
-```
-
-#### 📊 新闻等级检查
-```bash
-npm run level                    # 显示帮助信息
-npm run level check 100          # 检查新闻等级
-npm run level check-recent 24    # 检查最近24小时新闻
-npm run level break-news 3       # 查找Break News
-npm run level stats 7            # 获取等级统计
-```
-
-
-
-#### 🩺 系统健康检查
-```bash
-npm run health                   # 完整健康检查
-npm run health quick             # 快速检查
-npm run health services          # 检查服务状态
-npm run health database          # 检查数据库
-npm run health stats             # 系统统计
-```
-
-### 数据库管理
-
-```bash
-# 查看数据库统计
-npm run clean:neo4j stats
-
-# 清理孤立节点
-npm run clean:neo4j orphaned
-
-# 按时间清理数据
-npm run clean:neo4j before 2025-01-01
-
-# 完全清空数据库
-npm run clean:neo4j all
-```
-
-## 🔧 配置说明
-
-### 新闻等级分类
-- **Level 1**: 紧急新闻 - 全球性重大事件，立即推送
-- **Level 2**: 高优先级新闻 - 重要经济/政治事件
-- **Level 3**: 中等优先级新闻 - 行业重要事件
-- **Level 4**: 低优先级新闻 - 局部影响事件
-- **Level 5**: 信息性新闻 - 背景信息更新
-
-### 批量处理配置
-```env
-BATCH_ENABLED=true           # 启用批量处理
-BATCH_MIN_SIZE=3             # 最小批量大小
-BATCH_MAX_SIZE=5             # 最大批量大小
-BATCH_AI_RETRY=3             # AI调用重试次数
-BATCH_DB_SIZE=20             # 数据库批量大小
-BATCH_DELAY=500              # 批次间延迟(ms)
-```
-
-### 工作线程配置
-```env
-WORKERS_ENABLED=true         # 启用工作线程
-MAX_WORKERS=2                # 最大工作线程数
-WORKER_TIMEOUT=300000        # 工作线程超时时间(ms)
-```
-
-## 📊 API接口
-
-### 系统状态查询
-```javascript
-// 获取系统整体状态
-GET /api/system/status
-
-// 获取图数据库统计
-GET /api/graph/stats
-
-// 健康检查
-GET /api/health
-```
-
-### 新闻处理
-```javascript
-// 手动触发新闻处理
-POST /api/news/process
-
-// 获取新闻等级分布
-GET /api/news/levels
-
-// 查询特定等级新闻
-GET /api/news?level=1
-```
-
-### 知识图谱查询
-```javascript
-// 查询实体关系
-GET /api/graph/entity/{name}
-
-// 搜索相关事件
-GET /api/graph/events?query={keyword}
-
-// 获取公司关联事件
-GET /api/graph/company/{name}/events
-```
-
-## 🛠️ 开发指南
-
-### 代码规范
-```bash
-# 代码格式化
-npm run format
-
-# 代码检查
-npm run lint
-
-# 修复lint问题
-npm run lint:fix
-```
-
-### 测试
-```bash
-# 运行测试
-npm test
-
-# 运行健康检查
-npm run health-check
-```
-
-### 部署
-```bash
 # 使用PM2部署
 npm run pm2:start
 
-# 查看日志
-npm run pm2:logs
-
-# 重启服务
-npm run pm2:restart
-
-# 停止服务
-npm run pm2:stop
+# 启动前端
+cd web && npm start
 ```
 
-## 📝 日志和监控
+## 监控与维护
 
-### 日志文件
-- `logs/app.log` - 应用主日志
-- `logs/error.log` - 错误日志
-- `logs/out.log` - 标准输出日志
+### 系统监控
+```bash
+npm run health:dev check    # 健康检查
+npm run pm2:logs            # 查看日志
+npm run pm2:status          # 进程状态
+```
 
-### 监控指标
-- 新闻处理速度和成功率
-- AI调用延迟和成功率
-- 数据库连接状态
-- 内存和CPU使用情况
-- 定时任务执行状态
+### 数据备份
+```bash
+# 备份Neo4j数据
+cypher-shell "CALL apoc.export.cypher.all('backup.cypher', {})"
 
-## 🚨 故障排除
+# 备份数据文件
+tar -czf backup-$(date +%Y%m%d).tar.gz data/
+```
 
-### 常见问题
+## 技术文档
 
-1. **Neo4j连接失败**
-   - 检查Neo4j服务是否启动
-   - 验证连接配置和认证信息
+- 📖 [详细项目文档](./应用介绍文档.md) - 完整的项目介绍和使用说明
+- 🔧 [API文档](./docs/api.md) - 完整的API接口说明
+- 🏗️ [架构文档](./docs/architecture.md) - 系统架构和设计说明
 
-2. **AI调用失败**
-   - 检查API密钥是否正确
-   - 验证网络连接和API配额
+## 贡献指南
 
-3. **钉钉通知失败**
-   - 确认webhook URL正确
-   - 检查消息是否包含必需的关键字
+1. Fork本项目
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 创建Pull Request
 
-4. **内存使用过高**
-   - 调整批量处理大小
-   - 检查数据库连接池配置
+## 许可证
 
-### 性能优化
-- 调整批量处理参数
-- 使用数据库索引优化查询
-- 合理设置工作线程数量
-- 定期清理历史数据
+MIT License - 详见 [LICENSE](LICENSE) 文件
 
-## 🤝 贡献指南
+## 联系我们
 
-1. Fork 项目
-2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
-3. 提交更改 (`git commit -m 'Add amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 创建 Pull Request
-
-## 📄 许可证
-
-本项目采用 ISC 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
-
-## 📞 支持
-
-如有问题或建议，请：
-- 提交 [Issue](../../issues)
-- 发送邮件到 [micrott526@gmail.com]
-- 查看 [Wiki](../../wiki) 文档
+- 📧 邮箱: [your-email@example.com]
+- 🐛 问题反馈: [GitHub Issues](https://github.com/your-username/drudge/issues)
+- 📖 文档: [项目文档](./应用介绍文档.md)
 
 ---
 
-*Drudge - 让新闻数据变得更智能* 🚀
+**注意**: 这是一个实验性项目，请在生产环境使用前进行充分测试。

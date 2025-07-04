@@ -58,7 +58,7 @@ class SchedulerManager {
   async createSchedulerWorker() {
     return new Promise((resolve, reject) => {
       // Worker threads 需要运行编译后的JavaScript文件
-      const workerPath = path.join(process.cwd(), 'dist/workers/schedulerWorker.js');
+      const workerPath = path.join(process.cwd(), 'dist/infrastructure/workers/schedulerWorker.js');
       const worker = new Worker(workerPath);
       
       worker.on('message', (message) => {

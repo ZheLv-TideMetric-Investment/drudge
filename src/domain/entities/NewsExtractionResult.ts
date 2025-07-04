@@ -8,6 +8,12 @@ import { Time } from './Time';
 
 export interface NewsExtractionResultConstructorParams {
   newsId: string;
+  title?: string;
+  content?: string;
+  timestamp?: string;
+  source?: string;
+  url?: string;
+  level?: number;
   events?: Event[];
   companies?: Company[];
   persons?: Person[];
@@ -25,6 +31,12 @@ export interface NewsExtractionResultConstructorParams {
  */
 export class NewsExtractionResult implements BaseEntity, EntityExtractionResult {
   public newsId: string;
+  public title?: string;
+  public content?: string;
+  public timestamp?: string;
+  public source?: string;
+  public url?: string;
+  public level?: number;
   public events: Event[];
   public companies: Company[];
   public persons: Person[];
@@ -39,6 +51,12 @@ export class NewsExtractionResult implements BaseEntity, EntityExtractionResult 
 
   constructor({
     newsId,
+    title,
+    content,
+    timestamp,
+    source,
+    url,
+    level,
     events = [],
     companies = [],
     persons = [],
@@ -50,6 +68,12 @@ export class NewsExtractionResult implements BaseEntity, EntityExtractionResult 
     confidence = 0.0,
   }: NewsExtractionResultConstructorParams) {
     this.newsId = newsId;
+    this.title = title;
+    this.content = content;
+    this.timestamp = timestamp;
+    this.source = source;
+    this.url = url;
+    this.level = level;
     this.events = events;
     this.companies = companies;
     this.persons = persons;
@@ -117,6 +141,12 @@ export class NewsExtractionResult implements BaseEntity, EntityExtractionResult 
   public toPlainObject(): Record<string, any> {
     return {
       newsId: this.newsId,
+      title: this.title,
+      content: this.content,
+      timestamp: this.timestamp,
+      source: this.source,
+      url: this.url,
+      level: this.level,
       events: this.events.map(e => e.toPlainObject()),
       companies: this.companies.map(c => c.toPlainObject()),
       persons: this.persons.map(p => p.toPlainObject()),
@@ -127,6 +157,7 @@ export class NewsExtractionResult implements BaseEntity, EntityExtractionResult 
       summary: this.summary,
       confidence: this.confidence,
       created_at: this.created_at,
-      updated_at: this.updated_at,  }
+      updated_at: this.updated_at,
+    }
   }
 } 
