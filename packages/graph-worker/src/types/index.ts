@@ -1,78 +1,171 @@
+// 基础新闻接口
 export interface NewsItem {
   id: string;
   title: string;
   description?: string;
   content?: string;
-  url: string;
   source: string;
-  publishedAt: Date;
-  imageUrl?: string;
-  author?: string;
-  category: string;
-  language: string;
-  level: number;
-  processed: boolean;
+  url?: string;
+  timestamp: Date;
+  time?: number; // Unix timestamp in seconds
+  level?: number;
+  processed?: boolean;
 }
 
-export interface GraphNode {
-  id: string;
-  labels: string[];
-  properties: Record<string, any>;
+// 新闻提取结果
+export interface NewsExtractionResult {
+  id?: string;
+  newsId?: string;
+  title: string;
+  content?: string;
+  timestamp: Date | string;
+  source?: string;
+  url?: string;
+  news_level?: string;
+  processing_time?: number;
+  confidence?: number;
+  events: Event[];
+  companies: Company[];
+  persons?: Person[];
+  organizations: Organization[];
+  locations: Location[];
+  times: Time[];
+  relationships: Relationship[];
 }
 
-export interface GraphRelationship {
-  type: string;
-  fromId: string;
-  toId: string;
-  properties?: Record<string, any>;
+// 事件实体 - 完全重构
+export interface Event {
+  event_id: string;
+  event_name: string;
+  event_description: string;
+  event_type: 'macro' | 'policy' | 'market' | 'corporate' | 'industry' | 'tech' | 'geopolitics' | 'other';
+  significance: number; // 1-4
+  sentiment: 'positive' | 'negative' | 'neutral';
+  magnitude: number; // -1.0 to 1.0
+  event_level: 'Level 1' | 'Level 2' | 'Level 3' | 'Level 4' | 'Level 5';
+  event_date: string;
+  // 时间标准化字段
+  raw_event_date?: string;
+  parsed_event_date?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface GraphStats {
-  totalNodes: number;
-  totalRelationships: number;
-  nodeTypes: Array<{ label: string; count: number }>;
-  relationshipTypes: Array<{ type: string; count: number }>;
-  lastUpdated: Date;
+// 公司实体 - 优化结构
+export interface Company {
+  company_name: string;
+  ticker?: string;
+  industry?: string;
+  market?: string;
+  country?: string;
+  aliases: string[];
+  created_at?: string;
+  updated_at?: string;
 }
 
-export enum EntityType {
-  PERSON = 'PERSON',
-  COMPANY = 'COMPANY',
-  LOCATION = 'LOCATION',
-  EVENT = 'EVENT',
-  TIME = 'TIME'
+// 人物实体 - 简化结构
+export interface Person {
+  person_name: string;
+  title?: string;
+  company?: string;
+  nationality?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface ExtractedEntity {
-  type: EntityType;
-  name: string;
-  properties: Record<string, any>;
-  confidence: number;
+// 机构实体 - 使用标准枚举
+export interface Organization {
+  organization_name: string;
+  type?: 'government' | 'regulator' | 'intl_org' | 'fin_inst' | 'industry_assoc' | 'other';
+  country?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export enum SummaryType {
-  HOURLY = 'HOURLY',
-  DAILY = 'DAILY',
-  CUSTOM = 'CUSTOM'
+// 地点实体 - 使用标准枚举
+export interface Location {
+  location_name: string;
+  type?: 'country' | 'region' | 'city' | 'facility' | 'other';
+  country?: string;
+  region?: string;
+  coordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface SummaryResult {
-  type: SummaryType;
-  period: string;
-  summary: string;
-  highlights: string[];
-  trends?: string;
-  newsCount: number;
-  generatedAt: Date;
+// 时间实体 - 标准化时间处理
+export interface Time {
+  time_value: string;
+  type?: 'DATETIME' | 'DATE' | 'TIME' | 'PERIOD' | 'OTHER';
+  precision?: 'YEAR' | 'MONTH' | 'DAY' | 'HOUR' | 'MINUTE' | 'SECOND';
+  timezone?: string;
+  // 时间标准化字段
+  raw_value?: string;
+  parsed_iso?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface ProcessingJob {
-  id: string;
-  type: 'entity_extraction' | 'graph_building' | 'summary_generation';
-  status: 'pending' | 'running' | 'completed' | 'failed';
-  newsItems: string[];
-  progress: number;
-  createdAt: Date;
-  completedAt?: Date;
+// 关系实体 - 使用标准关系类型
+export interface Relationship {
+  type: 'LOCATED_IN' | 'WORKS_FOR' | 'OWNS' | 'PARTICIPATES_IN' | 'MERGES_WITH' | 'ACQUIRES' | 
+        'SUPPLIES' | 'PARTNERS_WITH' | 'SUED_BY' | 'REGULATED_BY' | 'INVESTS_IN' | 'OTHER';
+  from: string;
+  to: string;
+  description?: string;
+  confidence?: number;
+}
+
+// LLM 相关接口
+export interface LLMMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface LLMCallOptions {
+  temperature?: number;
+  timeout?: number;
+  schema?: any;
+}
+
+export interface LLMResponse<T = any> {
+  success: boolean;
+  data?: T;
   error?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
+// 处理结果接口
+export interface ProcessResult {
+  success: boolean;
+  newsId?: string;
+  message?: string;
+  error?: string;
+  processed_at?: string;
+  stats?: {
+    events: number;
+    companies: number;
+    persons: number;
+    organizations: number;
+    locations: number;
+    times: number;
+    relationships: number;
+  };
+  processingTime?: number;
+}
+
+// 批量处理摘要
+export interface BatchSummary {
+  total: number;
+  successful: number;
+  failed: number;
+  processingTime: number;
+  timestamp: string;
 } 

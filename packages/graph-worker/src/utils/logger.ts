@@ -1,37 +1,27 @@
 import winston from 'winston';
-import { existsSync, mkdirSync } from 'fs';
+import config from '../config/config';
 
-// 确保日志目录存在
-if (!existsSync('logs')) {
-  mkdirSync('logs', { recursive: true });
-}
-
-// 日志格式
-const logFormat = winston.format.combine(
-  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  winston.format.errors({ stack: true }),
-  winston.format.json()
-);
-
-// 创建logger实例
-export const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
-  format: logFormat,
+const logger = winston.createLogger({
+  level: config.logging.level,
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  defaultMeta: { service: 'graph-worker' },
   transports: [
-    // 控制台输出
+    // 写入到所有日志的文件
+    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'logs/combined.log' }),
+    
+    // 如果不是生产环境，也输出到控制台
     new winston.transports.Console({
       format: winston.format.combine(
         winston.format.colorize(),
         winston.format.simple()
       )
-    }),
-    // 文件输出
-    new winston.transports.File({ 
-      filename: 'logs/graph-worker-error.log', 
-      level: 'error' 
-    }),
-    new winston.transports.File({ 
-      filename: 'logs/graph-worker.log' 
     })
   ]
-}); 
+});
+
+export { logger }; 

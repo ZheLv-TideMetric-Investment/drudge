@@ -1,7 +1,6 @@
 import { logger } from '../../utils/logger';
 import { formatReadable } from '../../utils/time';
 import futuLiveService from '../../services/FutuLiveService';
-import axios from 'axios';
 
 /**
  * 获取最新新闻
@@ -21,9 +20,6 @@ export async function fetchLatestNews(): Promise<any> {
       };
     }
 
-    // 如果有新新闻，通知webhook
-    await notifyWebhook(newsItems.length, `成功获取 ${newsItems.length} 条新闻`);
-
     return {
       success: true,
       count: newsItems.length,
@@ -39,32 +35,5 @@ export async function fetchLatestNews(): Promise<any> {
       error: error.message,
       timestamp: formatReadable()
     };
-  }
-}
-
-/**
- * 通知webhook（如果配置了）
- */
-async function notifyWebhook(count: number, message: string): Promise<void> {
-  const webhookUrl = process.env.GRAPH_WORKER_URL;
-  if (!webhookUrl) return;
-
-  try {
-    const payload = {
-      type: 'NEW_NEWS',
-      source: 'futu_live',
-      count,
-      message,
-      timestamp: new Date().toISOString()
-    };
-
-    await axios.post(`${webhookUrl}/trigger/process-news`, payload, {
-      timeout: 5000,
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-    logger.info('✅ 成功通知graph-worker');
-  } catch (error: any) {
-    logger.warn('❌ 通知graph-worker失败:', error.message);
   }
 } 

@@ -1,83 +1,89 @@
-import dotenv from 'dotenv';
-import express from 'express';
-import { logger } from './utils/logger.js';
-import { KnowledgeGraphService } from './services/KnowledgeGraphService.js';
-import { EntityExtractionService } from './services/EntityExtractionService.js';
-import { SummaryService } from './services/SummaryService.js';
-import { triggerRoutes } from './routes/trigger.js';
+import { logger } from './utils/logger';
+import scheduler from './scheduler/index';
+import { startHttpServer } from './http/index';
+import aiService from './services/AiService';
+import knowledgeGraphService from './services/KnowledgeGraphService';
+import config from './config/config';
 
-// 加载环境变量
-dotenv.config();
-
-const PORT = process.env.PORT || 3004;
-
-async function startGraphWorker() {
+/**
+ * 初始化所有服务
+ */
+async function initialize(): Promise<void> {
   try {
-    logger.info('🚀 启动图谱处理工作器...');
+    logger.info('🚀 正在初始化graph-worker服务...');
     
-    // 初始化服务
-    const knowledgeGraphService = new KnowledgeGraphService();
-    const entityExtractionService = new EntityExtractionService();
-    const summaryService = new SummaryService();
-    
+    // 初始化各个服务
+    await aiService.initialize();
     await knowledgeGraphService.initialize();
-    await entityExtractionService.initialize();
-    await summaryService.initialize();
     
-    // 创建Express应用
-    const app = express();
-    app.use(express.json());
+    logger.info('✅ graph-worker服务初始化完成');
+  } catch (error: any) {
+    logger.error('❌ 服务初始化失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 启动主服务 (scheduler + http)
+ */
+async function startMainService(): Promise<void> {
+  try {
+    await initialize();
     
-    // 健康检查端点
-    app.get('/health', (req, res) => {
-      res.json({ 
-        status: 'ok', 
-        service: 'graph-worker',
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString()
-      });
-    });
+    // 初始化并启动调度器
+    await scheduler.initialize();
+    scheduler.start();
     
-    // 图谱统计端点
-    app.get('/stats', async (req, res) => {
-      try {
-        const stats = await knowledgeGraphService.getGraphStats();
-        res.json(stats);
-      } catch (error) {
-        logger.error('❌ 获取图谱统计失败:', error);
-        res.status(500).json({ error: '获取统计失败' });
-      }
-    });
+    // 启动HTTP服务器
+    await startHttpServer();
     
-    // 触发器路由
-    app.use('/api/trigger', triggerRoutes);
+    logger.info('🎉 graph-worker服务启动完成');
+    logger.info('📅 定时任务: 每1分钟扫描新闻文件进行图谱化');
+    logger.info(`🌐 HTTP API: 端口 ${config.server.port}`);
     
-    // 启动服务器
-    app.listen(PORT, () => {
-      logger.info(`📡 图谱处理工作器启动在端口: ${PORT}`);
-    });
-    
-    logger.info('✅ 图谱处理工作器启动成功');
-    
-  } catch (error) {
-    logger.error('❌ 图谱处理工作器启动失败:', error);
+  } catch (error: any) {
+    logger.error('❌ 启动主服务失败:', error);
     process.exit(1);
   }
 }
 
-// 优雅关闭处理
-process.on('SIGINT', async () => {
-  logger.info('🛑 正在关闭图谱处理工作器...');
-  process.exit(0);
-});
+/**
+ * 优雅关闭
+ */
+function setupGracefulShutdown(): void {
+  const shutdown = (signal: string) => {
+    logger.info(`收到${signal}信号，正在优雅关闭服务...`);
+    
+    // 停止和关闭调度器
+    scheduler.stop();
+    scheduler.close().catch((error: any) => {
+      logger.error('关闭调度器失败:', error);
+    });
+    
+    // 关闭知识图谱服务连接
+    knowledgeGraphService.close().then(() => {
+      logger.info('graph-worker服务已关闭');
+      process.exit(0);
+    }).catch(() => {
+      process.exit(1);
+    });
+  };
 
-process.on('SIGTERM', async () => {
-  logger.info('🛑 正在关闭图谱处理工作器...');
-  process.exit(0);
-});
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
 
-// 启动服务
-startGraphWorker().catch((error) => {
-  logger.error('💥 启动失败:', error);
+/**
+ * 主启动逻辑
+ */
+async function main(): Promise<void> {
+  // 启动服务模式
+  setupGracefulShutdown();
+  await startMainService();
+}
+
+// 启动应用
+main().catch((error) => {
+  logger.error('应用启动失败:', error);
   process.exit(1);
 }); 
