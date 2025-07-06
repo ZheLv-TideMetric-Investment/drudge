@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: drudge-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/password
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_memory_heap_initial_size: 512m
+      NEO4J_dbms_memory_heap_max_size: 1G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - ./shared/neo4j:/var/lib/neo4j/import
+    networks:
+      - drudge-network
+    restart: unless-stopped
+
+  web-app:
+    build:
+      context: ./packages/web-app
+      dockerfile: Dockerfile
+    container_name: drudge-web-app
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./packages/web-app/.env
+    depends_on:
+      - scheduler
+      - ingest-worker
+      - graph-worker
+    networks:
+      - drudge-network
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: ./packages/scheduler
+      dockerfile: Dockerfile
+    container_name: drudge-scheduler
+    ports:
+      - "3002:3002"
+    env_file:
+      - ./packages/scheduler/.env
+    depends_on:
+      - neo4j
+    networks:
+      - drudge-network
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+
+  ingest-worker:
+    build:
+      context: ./packages/ingest-worker
+      dockerfile: Dockerfile
+    container_name: drudge-ingest-worker
+    ports:
+      - "3003:3003"
+    env_file:
+      - ./packages/ingest-worker/.env
+    depends_on:
+      - neo4j
+    networks:
+      - drudge-network
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+
+  graph-worker:
+    build:
+      context: ./packages/graph-worker
+      dockerfile: Dockerfile
+    container_name: drudge-graph-worker
+    ports:
+      - "3004:3004"
+    env_file:
+      - ./packages/graph-worker/.env
+    depends_on:
+      - neo4j
+    networks:
+      - drudge-network
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+
+networks:
+  drudge-network:
+    driver: bridge
+
+volumes:
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local 

@@ -1,173 +1,244 @@
-# 新闻知识图谱系统
+# 新闻知识图谱系统 - pnpm Monorepo
 
-## 项目概述
+## 📋 项目概述
 
-这是一个基于AI的新闻处理和知识图谱系统，能够自动获取、处理、分析新闻数据，构建知识图谱，并提供智能总结和实时监控功能。系统采用前后端分离架构，后端负责数据处理和图谱构建，前端提供可视化查询界面。
+这是一个基于AI的新闻处理和知识图谱系统的 **pnpm Monorepo** 重构版本，采用微服务架构，将原有单体应用拆分为四个独立包：
 
-## 系统特性
+- 🌐 **web-app**: 前端应用 (Next.js)
+- ⏰ **scheduler**: 调度服务 (定时任务管理)
+- 📥 **ingest-worker**: 数据摄取工作器 (新闻获取、级别评估)
+- 🔗 **graph-worker**: 图谱处理工作器 (实体提取、图谱构建、总结生成)
 
-### 🚀 核心功能
-- **新闻自动获取**: 从多个新闻源自动抓取最新新闻
-- **智能实体提取**: 使用AI模型提取新闻中的实体和关系
-- **新闻级别评估**: 自动评估新闻的重要性等级(1-5级)
-- **知识图谱构建**: 构建动态更新的知识图谱
-- **智能总结**: 生成小时级和每日新闻总结
-- **实时监控**: 高级别新闻预警和系统状态监控
+## 🏗️ 架构图
 
-### 🛠️ 技术栈
-- **后端**: Node.js + TypeScript + Neo4j
-- **前端**: Next.js + React + TypeScript + Tailwind CSS
-- **数据库**: Neo4j图数据库
-- **AI服务**: DeepSeek API + Google AI
-- **部署**: PM2进程管理
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     pnpm Monorepo 根目录                        │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
+│  │  web-app    │ │ scheduler   │ │ingest-worker│ │graph-worker │ │
+│  │   :3000     │ │   :3002     │ │   :3003     │ │   :3004     │ │
+│  │             │ │             │ │             │ │             │ │
+│  │ Next.js前端 │ │ 定时任务     │ │ 新闻获取    │ │ 图谱构建    │ │
+│  │ React UI    │ │ Cron调度    │ │ 级别评估    │ │ 实体提取    │ │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
+│         │               │               │               │       │
+└─────────┼───────────────┼───────────────┼───────────────┼───────┘
+          │               │               │               │
+          └───────────────┼───────────────┼───────────────┼───────┐
+                          │               │               │       │
+                    ┌─────▼─────┐   ┌─────▼─────┐   ┌─────▼─────┐ │
+                    │  Neo4j    │   │ 外部APIs  │   │ 文件存储  │ │
+                    │图数据库   │   │新闻、AI   │   │数据缓存   │ │
+                    └───────────┘   └───────────┘   └───────────┘ │
+```
 
-### 📊 数据可视化
-- 交互式知识图谱展示
-- 实时数据统计图表
-- 新闻级别分布分析
-- 趋势分析和报告
-
-## 快速开始
+## 🚀 快速开始
 
 ### 环境要求
-- Node.js 18+
-- Neo4j 5.0+
-- npm 8.0+
+- **Node.js**: 18.0.0+
+- **pnpm**: 8.0.0+
+- **Neo4j**: 5.0.0+
 
-### 安装步骤
+### 安装依赖
 
-1. **克隆项目**
 ```bash
-git clone <repository-url>
-cd drudge
+# 安装所有包的依赖
+pnpm install
+
+# 安装单个包的依赖
+pnpm --filter @drudge/web-app install
 ```
 
-2. **安装后端依赖**
+### 环境配置
+
+1. **复制环境变量模板**
 ```bash
-npm install
+# 为每个包配置环境变量
+cp packages/web-app/.env.example packages/web-app/.env
+cp packages/scheduler/.env.example packages/scheduler/.env
+cp packages/ingest-worker/.env.example packages/ingest-worker/.env
+cp packages/graph-worker/.env.example packages/graph-worker/.env
 ```
 
-3. **配置环境变量**
+2. **配置必要的环境变量**
 ```bash
-cp .env.example .env
-# 编辑 .env 文件，配置数据库连接和API密钥
+# 每个包的 .env 文件中配置：
+# - Neo4j数据库连接
+# - AI服务API密钥 (DeepSeek, Google)
+# - 新闻API密钥
+# - Webhook通知地址
 ```
 
-4. **启动Neo4j数据库**
-确保Neo4j服务运行在 `bolt://localhost:7687`
+### 启动开发环境
 
-5. **初始化数据库**
 ```bash
-npm run schema:apply
+# 启动Neo4j数据库 (使用Docker)
+docker run -d --name neo4j \
+  -p 7474:7474 -p 7687:7687 \
+  -e NEO4J_AUTH=neo4j/password \
+  neo4j:5.15-community
+
+# 应用数据库schema
+pnpm run schema:apply
+
+# 启动所有服务 (开发模式)
+pnpm run dev
+
+# 或分别启动各个服务
+pnpm --filter @drudge/web-app run dev      # 前端 :3000
+pnpm --filter @drudge/scheduler run dev    # 调度器 :3002
+pnpm --filter @drudge/ingest-worker run dev # 摄取器 :3003
+pnpm --filter @drudge/graph-worker run dev  # 图谱器 :3004
 ```
 
-6. **构建并启动后端**
+### 生产部署
+
 ```bash
-npm run build
-npm start
+# 构建所有包
+pnpm run build
+
+# 使用Docker Compose部署
+pnpm run docker:build
+pnpm run docker:up
+
+# 查看服务状态
+pnpm run docker:logs
 ```
 
-7. **安装并启动前端**
+## 📦 包结构
+
+### 🌐 web-app (前端应用)
+```
+packages/web-app/
+├── src/
+│   ├── app/           # Next.js App Router
+│   ├── components/    # React组件
+│   ├── lib/          # 工具库
+│   └── types/        # 类型定义
+├── public/           # 静态资源
+└── package.json
+```
+
+**访问**: http://localhost:3000
+
+### ⏰ scheduler (调度服务)
+```
+packages/scheduler/
+├── src/
+│   ├── services/     # 调度服务
+│   ├── utils/        # 工具函数
+│   └── types/        # 类型定义
+└── package.json
+```
+
+**功能**: 
+- 每分钟触发新闻获取
+- 每5分钟扫描高级别新闻
+- 每小时生成总结报告
+- 每日生成综合报告
+
+### 📥 ingest-worker (数据摄取)
+```
+packages/ingest-worker/
+├── src/
+│   ├── services/     # 新闻获取、级别评估
+│   ├── routes/       # API路由
+│   ├── utils/        # 工具函数
+│   └── types/        # 类型定义
+└── package.json
+```
+
+**功能**:
+- 新闻API集成
+- 新闻级别AI评估
+- 数据预处理
+
+### 🔗 graph-worker (图谱处理)
+```
+packages/graph-worker/
+├── src/
+│   ├── services/     # 图谱构建、实体提取、总结生成
+│   ├── routes/       # API路由
+│   ├── utils/        # 工具函数
+│   └── types/        # 类型定义
+└── package.json
+```
+
+**功能**:
+- AI实体提取
+- Neo4j图谱构建
+- 智能总结生成
+- 图谱维护
+
+## 🔧 开发命令
+
+### 根目录命令
 ```bash
-cd web
-npm install
-npm run dev
+# 开发模式 (所有服务)
+pnpm run dev
+
+# 构建所有包
+pnpm run build
+
+# 启动所有包 (生产模式)
+pnpm run start
+
+# 代码检查和格式化
+pnpm run lint
+pnpm run format
+
+# 清理所有构建文件
+pnpm run clean
+
+# Docker操作
+pnpm run docker:build    # 构建镜像
+pnpm run docker:up       # 启动容器
+pnpm run docker:down     # 停止容器
+pnpm run docker:logs     # 查看日志
+
+# 数据库操作
+pnpm run schema:apply    # 应用Neo4j schema
+pnpm run clean:neo4j     # 清理Neo4j数据
 ```
 
-8. **访问应用**
-- 前端界面: http://localhost:3000
-- API文档: http://localhost:3001
-
-## 使用指南
-
-### CLI工具
-
-#### 新闻获取
+### 单包命令
 ```bash
-npm run news:dev fetch [数量]            # 获取最新新闻
-npm run news:dev stats [天数]            # 查看新闻统计
+# 在特定包中运行命令
+pnpm --filter @drudge/web-app run <command>
+pnpm --filter @drudge/scheduler run <command>
+pnpm --filter @drudge/ingest-worker run <command>
+pnpm --filter @drudge/graph-worker run <command>
+
+# 示例
+pnpm --filter @drudge/web-app run build
+pnpm --filter @drudge/scheduler run dev
 ```
 
-#### 知识图谱
-```bash
-npm run graph:dev process [限制数]        # 处理新闻构建图谱
-npm run graph:dev query <关键词> [限制数]  # 查询图谱
-npm run graph:dev stats                 # 显示图谱统计
-```
+## 🌟 新功能特性
 
-#### 级别检查
-```bash
-npm run level:dev check [限制数]          # 检查新闻级别
-npm run level:dev notify [小时数]         # 发送高级别新闻通知
-```
+### ✅ 完全分离的微服务
+- 每个包都有独立的依赖管理
+- 独立部署和扩展
+- 服务间通过HTTP API通信
 
-#### 系统监控
-```bash
-npm run health:dev check                 # 系统健康检查
-npm run health:dev report                # 生成健康报告
-```
+### ✅ 环境变量分离
+- 每个包有自己的 `.env` 配置
+- 机密信息完全隔离
+- 便于不同环境配置
 
-### Web界面功能
+### ✅ Docker化部署
+- 每个包有独立的Dockerfile
+- Docker Compose编排
+- 生产环境开箱即用
 
-1. **概览页面** (`/`) - 数据统计和最新动态
-2. **新闻页面** (`/news`) - 新闻列表、搜索和筛选
-3. **知识图谱** (`/graph`) - 交互式图谱可视化
-4. **总结报告** (`/summary`) - 智能总结和趋势分析
-5. **实时监控** (`/monitor`) - 系统状态和告警管理
-6. **统计分析** (`/analytics`) - 数据分析和报表
+### ✅ 开发体验优化
+- 热重载开发模式
+- 并行启动所有服务
+- 统一的代码检查和格式化
 
-## 项目结构
-
-```
-drudge/
-├── src/                    # 后端源代码
-│   ├── application/        # 应用层
-│   │   ├── services/       # 业务服务
-│   │   └── use-cases/      # 用例
-│   ├── domain/             # 领域层
-│   │   ├── entities/       # 实体定义
-│   │   └── repositories/   # 仓储接口
-│   ├── infrastructure/     # 基础设施层
-│   │   ├── database/       # 数据库
-│   │   ├── external/       # 外部服务
-│   │   └── workers/        # 工作线程
-│   ├── interfaces/         # 接口层
-│   │   ├── cli/            # CLI工具
-│   │   └── schedulers/     # 调度器
-│   └── shared/             # 共享模块
-├── web/                    # 前端应用
-│   └── src/
-│       ├── app/            # Next.js页面
-│       ├── components/     # React组件
-│       ├── lib/            # 工具库
-│       └── types/          # 类型定义
-├── data/                   # 数据存储
-├── logs/                   # 日志文件
-└── scripts/                # 构建脚本
-```
-
-## 开发脚本
-
-### 后端开发
-```bash
-npm run dev                 # 开发模式
-npm run build               # 构建项目
-npm run start               # 启动服务
-npm run pm2:start           # PM2启动
-npm run lint                # 代码检查
-npm run format              # 代码格式化
-```
-
-### 前端开发
-```bash
-cd web
-npm run dev                 # 开发模式
-npm run build               # 构建项目
-npm run start               # 启动服务
-npm run lint                # 代码检查
-```
-
-## 新闻级别分类
+## 📊 新闻级别分类
 
 | 级别 | 名称 | 标识 | 描述 |
 |------|------|------|------|
@@ -177,102 +248,47 @@ npm run lint                # 代码检查
 | Level 4 | 一般 | 🟢 | 普通新闻、日常报道 |
 | Level 5 | 低 | ⚪ | 日常资讯、轻松内容 |
 
-## 定时任务
+## 🔗 服务端点
 
-- **每分钟**: 自动获取新闻数据
-- **每5分钟**: 扫描高级别新闻并发送通知
-- **每小时** (11:00-22:00): 生成小时总结报告
-- **每日10:00**: 生成每日总结报告
+| 服务 | 端口 | 健康检查 | 描述 |
+|------|------|----------|------|
+| web-app | 3000 | - | 前端应用 |
+| scheduler | 3002 | `/health` | 调度服务 |
+| ingest-worker | 3003 | `/health` | 数据摄取 |
+| graph-worker | 3004 | `/health` | 图谱处理 |
+| Neo4j | 7474/7687 | - | 图数据库 |
 
-## 配置说明
+## 🐛 故障排除
 
-### 环境变量
-```bash
-# Neo4j配置
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=password
+### 常见问题
 
-# AI服务配置
-DEEPSEEK_API_KEY=your_api_key
-GOOGLE_API_KEY=your_api_key
+1. **端口冲突**
+   ```bash
+   # 检查端口占用
+   lsof -i :3000,3002,3003,3004,7474,7687
+   ```
 
-# 新闻API配置
-NEWS_API_KEY=your_api_key
+2. **Neo4j连接失败**
+   ```bash
+   # 检查Neo4j状态
+   docker ps | grep neo4j
+   # 重启Neo4j
+   docker restart neo4j
+   ```
 
-# 通知配置
-WEBHOOK_URL=your_webhook_url
-```
+3. **依赖安装失败**
+   ```bash
+   # 清理并重新安装
+   pnpm run clean
+   pnpm install
+   ```
 
-## 部署指南
+## 📖 更多文档
 
-### 开发环境
-```bash
-# 启动Neo4j
-docker run -d --name neo4j -p 7474:7474 -p 7687:7687 neo4j
-
-# 启动后端
-npm run dev
-
-# 启动前端
-cd web && npm run dev
-```
-
-### 生产环境
-```bash
-# 构建项目
-npm run build
-cd web && npm run build
-
-# 使用PM2部署
-npm run pm2:start
-
-# 启动前端
-cd web && npm start
-```
-
-## 监控与维护
-
-### 系统监控
-```bash
-npm run health:dev check    # 健康检查
-npm run pm2:logs            # 查看日志
-npm run pm2:status          # 进程状态
-```
-
-### 数据备份
-```bash
-# 备份Neo4j数据
-cypher-shell "CALL apoc.export.cypher.all('backup.cypher', {})"
-
-# 备份数据文件
-tar -czf backup-$(date +%Y%m%d).tar.gz data/
-```
-
-## 技术文档
-
-- 📖 [详细项目文档](./应用介绍文档.md) - 完整的项目介绍和使用说明
-- 🔧 [API文档](./docs/api.md) - 完整的API接口说明
-- 🏗️ [架构文档](./docs/architecture.md) - 系统架构和设计说明
-
-## 贡献指南
-
-1. Fork本项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建Pull Request
-
-## 许可证
-
-MIT License - 详见 [LICENSE](LICENSE) 文件
-
-## 联系我们
-
-- 📧 邮箱: [your-email@example.com]
-- 🐛 问题反馈: [GitHub Issues](https://github.com/your-username/drudge/issues)
-- 📖 文档: [项目文档](./应用介绍文档.md)
+- [详细技术文档](./应用介绍文档.md)
+- [API接口文档](./docs/api.md)
+- [部署指南](./docs/deployment.md)
 
 ---
 
-**注意**: 这是一个实验性项目，请在生产环境使用前进行充分测试。
+🎉 **重构完成！** 现在你拥有了一个现代化的微服务架构新闻知识图谱系统。

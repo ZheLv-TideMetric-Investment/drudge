@@ -1,0 +1,261 @@
+import fs from 'fs';
+import path from 'path';
+import { logger } from '../utils/logger';
+import { formatForFilename, parseTime, startOfToday, daysAgo } from '../utils/time';
+import config from '../config/config';
+
+/**
+ * 新闻数据接口
+ */
+export interface NewsItem {
+  id: string;
+  title: string;
+  content?: string;
+  source: string;
+  time: number;
+  url?: string;
+  author?: string;
+  category?: string;
+  summary?: string;
+  [key: string]: any;
+}
+
+/**
+ * 文件存储服务
+ * 负责新闻数据的本地文件存储和管理
+ */
+export class FileStorage {
+  private dataPath: string;
+  private source: string = 'futu_live';
+
+  constructor() {
+    const storagePath = config.storage.path || '../../data';
+    this.dataPath = path.join(storagePath, 'news');
+    this.ensureDataPath();
+  }
+
+  /**
+   * 确保数据目录存在
+   */
+  private async ensureDataPath(): Promise<void> {
+    try {
+      await fs.promises.mkdir(this.dataPath, { recursive: true });
+    } catch (error: any) {
+      logger.error('创建数据目录失败:', error);
+    }
+  }
+
+  /**
+   * 保存新闻到文件
+   */
+  async saveNews(news: NewsItem[]): Promise<string> {
+    const timestamp = formatForFilename();
+    const filename = `${this.source}_${timestamp}.json`;
+    const filePath = path.join(this.dataPath, filename);
+    
+    await fs.promises.writeFile(filePath, JSON.stringify(news, null, 2));
+    logger.info(`✅ 保存新闻到文件: ${filename} (${news.length}条)`);
+    
+    return filename;
+  }
+
+  /**
+   * 获取最新新闻的ID
+   */
+  async getLatestNewsId(): Promise<string | null> {
+    try {
+      const files = await this.getNewsFiles();
+      if (files.length === 0) return null;
+
+      const latestFile = files[0];
+      const filePath = path.join(this.dataPath, latestFile);
+      const content = await fs.promises.readFile(filePath, 'utf-8');
+      const news: NewsItem[] = JSON.parse(content);
+      
+      return news.length > 0 ? news[0].id : null;
+    } catch (error: any) {
+      logger.warn('获取最新新闻ID失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 获取所有新闻文件列表（按时间排序）
+   */
+  private async getNewsFiles(): Promise<string[]> {
+    const files = await fs.promises.readdir(this.dataPath);
+    return files
+      .filter(file => file.startsWith(`${this.source}_`) && file.endsWith('.json'))
+      .sort((a, b) => {
+        const statsA = fs.statSync(path.join(this.dataPath, a));
+        const statsB = fs.statSync(path.join(this.dataPath, b));
+        return statsB.mtime.getTime() - statsA.mtime.getTime();
+      });
+  }
+
+  /**
+   * 获取所有新闻
+   */
+  async getAllNews(): Promise<NewsItem[]> {
+    try {
+      const files = await this.getNewsFiles();
+      const allNews: NewsItem[] = [];
+      
+      for (const file of files) {
+        try {
+          const filePath = path.join(this.dataPath, file);
+          const content = await fs.promises.readFile(filePath, 'utf-8');
+          const news: NewsItem[] = JSON.parse(content);
+          allNews.push(...news);
+        } catch (error: any) {
+          logger.warn(`读取文件失败: ${file}`, error.message);
+        }
+      }
+      
+      return allNews.sort((a, b) => b.time - a.time);
+    } catch (error: any) {
+      logger.error('获取所有新闻失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 按数量获取新闻
+   */
+  async getNewsByLimit(limit: number): Promise<NewsItem[]> {
+    const allNews = await this.getAllNews();
+    return allNews.slice(0, limit);
+  }
+
+  /**
+   * 按时间范围获取新闻
+   */
+  async getNewsByTimeRange(startTime: any, endTime: any): Promise<NewsItem[]> {
+    try {
+      const files = await this.getNewsFiles();
+      const allNews: NewsItem[] = [];
+      
+      for (const file of files) {
+        try {
+          const filePath = path.join(this.dataPath, file);
+          const content = await fs.promises.readFile(filePath, 'utf-8');
+          const news: NewsItem[] = JSON.parse(content);
+          
+          const filteredNews = news.filter(item => {
+            const newsTime = parseTime(item.time * 1000);
+            return newsTime.isAfter(startTime) && newsTime.isBefore(endTime);
+          });
+          
+          allNews.push(...filteredNews);
+        } catch (error: any) {
+          logger.warn(`读取文件失败: ${file}`, error.message);
+        }
+      }
+      
+      return allNews.sort((a, b) => b.time - a.time);
+    } catch (error: any) {
+      logger.error('按时间范围获取新闻失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 获取新闻统计信息
+   */
+  async getNewsStats(): Promise<any> {
+    try {
+      const files = await this.getNewsFiles();
+      let totalCount = 0;
+      let todayCount = 0;
+      let recentCount = 0;
+      
+      const today = startOfToday();
+      const threeDaysAgo = daysAgo(3);
+      
+      for (const file of files) {
+        try {
+          const filePath = path.join(this.dataPath, file);
+          const content = await fs.promises.readFile(filePath, 'utf-8');
+          const news: NewsItem[] = JSON.parse(content);
+          
+          totalCount += news.length;
+          
+          // 统计今天的新闻
+          const todayNews = news.filter(item => {
+            const newsTime = parseTime(item.time * 1000);
+            return newsTime.isAfter(today);
+          });
+          todayCount += todayNews.length;
+          
+          // 统计最近3天的新闻
+          const recentNews = news.filter(item => {
+            const newsTime = parseTime(item.time * 1000);
+            return newsTime.isAfter(threeDaysAgo);
+          });
+          recentCount += recentNews.length;
+          
+        } catch (error: any) {
+          logger.warn(`读取文件失败: ${file}`, error.message);
+        }
+      }
+      
+      return {
+        totalCount,
+        todayCount,
+        recentCount,
+        fileCount: files.length,
+        source: this.source
+      };
+    } catch (error: any) {
+      logger.error('获取新闻统计失败:', error);
+      return {
+        totalCount: 0,
+        todayCount: 0,
+        recentCount: 0,
+        fileCount: 0,
+        source: this.source
+      };
+    }
+  }
+
+  /**
+   * 清理旧文件
+   */
+  async cleanOldFiles(days: number = 7): Promise<any> {
+    try {
+      const files = await this.getNewsFiles();
+      const cutoffTime = daysAgo(days);
+      let deletedCount = 0;
+      let remainingCount = 0;
+      
+      for (const file of files) {
+        try {
+          const filePath = path.join(this.dataPath, file);
+          const stats = await fs.promises.stat(filePath);
+          
+          const fileTime = parseTime(stats.mtime);
+          if (fileTime.isBefore(cutoffTime)) {
+            await fs.promises.unlink(filePath);
+            deletedCount++;
+            logger.info(`🗑️ 删除旧文件: ${file}`);
+          } else {
+            remainingCount++;
+          }
+        } catch (error: any) {
+          logger.warn(`处理文件失败: ${file}`, error.message);
+        }
+      }
+      
+      return {
+        deletedCount,
+        remainingCount,
+        message: `清理完成: 删除 ${deletedCount} 个文件，保留 ${remainingCount} 个文件`
+      };
+    } catch (error: any) {
+      logger.error('清理旧文件失败:', error);
+      throw error;
+    }
+  }
+}
+
+export default new FileStorage(); 
