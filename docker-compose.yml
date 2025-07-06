@@ -31,30 +31,12 @@ services:
     env_file:
       - ./packages/web-app/.env
     depends_on:
-      - scheduler
+      - neo4j
       - ingest-worker
       - graph-worker
     networks:
       - drudge-network
     restart: unless-stopped
-
-  scheduler:
-    build:
-      context: ./packages/scheduler
-      dockerfile: Dockerfile
-    container_name: drudge-scheduler
-    ports:
-      - "3002:3002"
-    env_file:
-      - ./packages/scheduler/.env
-    depends_on:
-      - neo4j
-    networks:
-      - drudge-network
-    restart: unless-stopped
-    volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
 
   ingest-worker:
     build:

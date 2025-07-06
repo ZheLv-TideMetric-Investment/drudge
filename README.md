@@ -2,10 +2,9 @@
 
 ## 📋 项目概述
 
-这是一个基于AI的新闻处理和知识图谱系统的 **pnpm Monorepo** 重构版本，采用微服务架构，将原有单体应用拆分为四个独立包：
+这是一个基于AI的新闻处理和知识图谱系统的 **pnpm Monorepo** 重构版本，采用微服务架构，将原有单体应用拆分为三个独立包：
 
-- 🌐 **web-app**: 前端应用 (Next.js)
-- ⏰ **scheduler**: 调度服务 (定时任务管理)
+- 🌐 **web-app**: 前端应用 (Next.js，集成定时任务调度功能)
 - 📥 **ingest-worker**: 数据摄取工作器 (新闻获取、级别评估)
 - 🔗 **graph-worker**: 图谱处理工作器 (实体提取、图谱构建、总结生成)
 
@@ -16,18 +15,18 @@
 │                     pnpm Monorepo 根目录                        │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ │
-│  │  web-app    │ │ scheduler   │ │ingest-worker│ │graph-worker │ │
-│  │   :3000     │ │   :3002     │ │   :3003     │ │   :3004     │ │
-│  │             │ │             │ │             │ │             │ │
-│  │ Next.js前端 │ │ 定时任务     │ │ 新闻获取    │ │ 图谱构建    │ │
-│  │ React UI    │ │ Cron调度    │ │ 级别评估    │ │ 实体提取    │ │
-│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ │
-│         │               │               │               │       │
-└─────────┼───────────────┼───────────────┼───────────────┼───────┘
-          │               │               │               │
-          └───────────────┼───────────────┼───────────────┼───────┐
-                          │               │               │       │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐               │
+│  │  web-app    │ │ingest-worker│ │graph-worker │               │
+│  │   :3000     │ │   :3003     │ │   :3004     │               │
+│  │             │ │             │ │             │               │
+│  │ Next.js前端 │ │ 新闻获取    │ │ 图谱构建    │               │
+│  │+定时任务调度│ │ 级别评估    │ │ 实体提取    │               │
+│  └─────────────┘ └─────────────┘ └─────────────┘               │
+│         │               │               │                     │
+└─────────┼───────────────┼───────────────┼─────────────────────┘
+          │               │               │
+          └───────────────┼───────────────┼───────────────────────┐
+                          │               │                       │
                     ┌─────▼─────┐   ┌─────▼─────┐   ┌─────▼─────┐ │
                     │  Neo4j    │   │ 外部APIs  │   │ 文件存储  │ │
                     │图数据库   │   │新闻、AI   │   │数据缓存   │ │
@@ -57,7 +56,6 @@ pnpm --filter @drudge/web-app install
 ```bash
 # 为每个包配置环境变量
 cp packages/web-app/.env.example packages/web-app/.env
-cp packages/scheduler/.env.example packages/scheduler/.env
 cp packages/ingest-worker/.env.example packages/ingest-worker/.env
 cp packages/graph-worker/.env.example packages/graph-worker/.env
 ```
@@ -88,7 +86,6 @@ pnpm run dev
 
 # 或分别启动各个服务
 pnpm --filter @drudge/web-app run dev      # 前端 :3000
-pnpm --filter @drudge/scheduler run dev    # 调度器 :3002
 pnpm --filter @drudge/ingest-worker run dev # 摄取器 :3003
 pnpm --filter @drudge/graph-worker run dev  # 图谱器 :3004
 ```
@@ -123,18 +120,7 @@ packages/web-app/
 
 **访问**: http://localhost:3000
 
-### ⏰ scheduler (调度服务)
-```
-packages/scheduler/
-├── src/
-│   ├── services/     # 调度服务
-│   ├── utils/        # 工具函数
-│   └── types/        # 类型定义
-└── package.json
-```
-
-**功能**: 
-- 每分钟触发新闻获取
+**调度功能**: 
 - 每5分钟扫描高级别新闻
 - 每小时生成总结报告
 - 每日生成综合报告
@@ -207,13 +193,12 @@ pnpm run clean:neo4j     # 清理Neo4j数据
 ```bash
 # 在特定包中运行命令
 pnpm --filter @drudge/web-app run <command>
-pnpm --filter @drudge/scheduler run <command>
 pnpm --filter @drudge/ingest-worker run <command>
 pnpm --filter @drudge/graph-worker run <command>
 
 # 示例
 pnpm --filter @drudge/web-app run build
-pnpm --filter @drudge/scheduler run dev
+pnpm --filter @drudge/ingest-worker run dev
 ```
 
 ## 🌟 新功能特性
@@ -252,8 +237,7 @@ pnpm --filter @drudge/scheduler run dev
 
 | 服务 | 端口 | 健康检查 | 描述 |
 |------|------|----------|------|
-| web-app | 3000 | - | 前端应用 |
-| scheduler | 3002 | `/health` | 调度服务 |
+| web-app | 3000 | - | 前端应用(含调度功能) |
 | ingest-worker | 3003 | `/health` | 数据摄取 |
 | graph-worker | 3004 | `/health` | 图谱处理 |
 | Neo4j | 7474/7687 | - | 图数据库 |

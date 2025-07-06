@@ -1,7 +1,14 @@
 import { clsx, type ClassValue } from 'clsx';
 import { format, formatDistanceToNow, parseISO, isValid } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import { config } from './config';
+// 新闻级别配置
+const newsLevels = {
+  'Level 1': { color: '#ef4444', label: '紧急', priority: 1 },
+  'Level 2': { color: '#f97316', label: '重要', priority: 2 },
+  'Level 3': { color: '#eab308', label: '中等', priority: 3 },
+  'Level 4': { color: '#22c55e', label: '一般', priority: 4 },
+  'Level 5': { color: '#6b7280', label: '低', priority: 5 }
+};
 
 // 样式类合并工具
 export function cn(...inputs: ClassValue[]) {
@@ -31,7 +38,7 @@ export function formatRelativeTime(date: string | Date): string {
 
 // 新闻级别工具
 export function getNewsLevelInfo(level: string) {
-  return (config.newsLevels as Record<string, { color: string; label: string; priority: number }>)[level] || {
+  return newsLevels[level as keyof typeof newsLevels] || {
     color: '#6b7280',
     label: '未知',
     priority: 6

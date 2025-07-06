@@ -21,7 +21,12 @@
     "react-dom": "^19.0.0",
     "recharts": "^3.0.2",
     "vis-data": "^7.1.9",
-    "vis-network": "^9.1.13"
+    "vis-network": "^9.1.13",
+    "node-cron": "^3.0.3",
+    "moment-timezone": "^0.5.48",
+    "winston": "^3.11.0",
+    "zod": "^3.22.4",
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

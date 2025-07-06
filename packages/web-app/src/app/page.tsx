@@ -1,253 +1,256 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Card } from '@/components/ui/Card';
-import { Loading } from '@/components/ui/Loading';
-import { 
-  NewspaperIcon, 
-  ShareIcon, 
-  ChartBarIcon,
-  ExclamationTriangleIcon
-} from '@heroicons/react/24/outline';
-import { formatNumber, formatDate, getNewsLevelColor } from '@/lib/utils';
-import type { NewsStats, GraphStats, NewsItem } from '@/types';
+import { useState, useEffect } from 'react';
+import { Layout } from '../components/Layout';
+import { Card } from '../components/ui/Card';
+import { Loading } from '../components/ui/Loading';
 
-export default function Dashboard() {
+interface SchedulerStatus {
+  running: boolean;
+  jobs: Array<{
+    name: string;
+    schedule: string;
+    description: string;
+    enabled: boolean;
+    running: boolean;
+    lastRun?: string;
+    nextRun?: string;
+  }>;
+  timestamp: string;
+}
+
+export default function Home() {
+  const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null);
   const [loading, setLoading] = useState(true);
-  const [newsStats, setNewsStats] = useState<NewsStats | null>(null);
-  const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
-  const [recentNews, setRecentNews] = useState<NewsItem[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadDashboardData();
+    fetchSchedulerStatus();
+    const interval = setInterval(fetchSchedulerStatus, 30000); // 每30秒更新一次
+    return () => clearInterval(interval);
   }, []);
 
-  const loadDashboardData = async () => {
+  const fetchSchedulerStatus = async () => {
     try {
-      setLoading(true);
-      setError(null);
-
-      // 模拟API调用 - 实际使用时替换为真实API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('/api/scheduler/status');
+      const data = await response.json();
       
-      // 模拟数据
-      setNewsStats({
-        total: 1248,
-        highLevel: 89,
-        breakNews: 12,
-        levelDistribution: {
-          'Level 1': 12,
-          'Level 2': 77,
-          'Level 3': 234,
-          'Level 4': 567,
-          'Level 5': 358
-        },
-        timeDistribution: {}
-      });
-
-      setGraphStats({
-        nodes: 5432,
-        relationships: 8765,
-        news: 1248,
-        companies: 345,
-        persons: 567,
-        events: 890,
-        locations: 234,
-        times: 1148
-      });
-
-      setRecentNews([
-        {
-          newsId: '1',
-          title: '科技公司发布重大产品更新',
-          content: '某知名科技公司今日发布了其旗舰产品的重大更新...',
-          timestamp: new Date().toISOString(),
-          source: '科技日报',
-          news_level: 'Level 2',
-          processed: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        },
-        {
-          newsId: '2',
-          title: '经济指标显示积极趋势',
-          content: '最新发布的经济数据显示...',
-          timestamp: new Date(Date.now() - 1800000).toISOString(),
-          source: '财经周刊',
-          news_level: 'Level 3',
-          processed: true,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }
-      ]);
-
+      if (data.success) {
+        setSchedulerStatus(data.data);
+        setError(null);
+      } else {
+        setError(data.error || '获取调度器状态失败');
+      }
     } catch (err) {
-      setError('加载数据失败');
-      console.error('Dashboard loading error:', err);
+      setError('网络请求失败');
     } finally {
       setLoading(false);
     }
   };
 
+  const triggerJob = async (jobName: string) => {
+    try {
+      const response = await fetch(`/api/scheduler/trigger/${jobName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        alert(`任务 ${jobName} 执行成功`);
+      } else {
+        alert(`任务 ${jobName} 执行失败: ${data.error}`);
+      }
+    } catch (err) {
+      alert('网络请求失败');
+    }
+  };
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loading size="lg" text="加载数据中..." />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <ExclamationTriangleIcon className="mx-auto h-12 w-12 text-red-400" />
-        <h3 className="mt-2 text-sm font-medium text-gray-900">加载失败</h3>
-        <p className="mt-1 text-sm text-gray-500">{error}</p>
-        <div className="mt-6">
-          <button
-            type="button"
-            onClick={loadDashboardData}
-            className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            重新加载
-          </button>
-        </div>
-      </div>
+      <Layout>
+        <Loading />
+      </Layout>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* 页面标题 */}
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">数据概览</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          实时监控新闻处理和知识图谱构建状态
-        </p>
-      </div>
-
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        {/* 新闻总数 */}
-        <Card>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <NewspaperIcon className="h-8 w-8 text-gray-400" />
-            </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  新闻总数
-                </dt>
-                <dd className="text-2xl font-semibold text-gray-900">
-                  {formatNumber(newsStats?.total || 0)}
-                </dd>
-              </dl>
-            </div>
-          </div>
-        </Card>
-
-        {/* 高级别新闻 */}
-        <Card>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <ExclamationTriangleIcon className="h-8 w-8 text-orange-400" />
-            </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  高级别新闻
-                </dt>
-                <dd className="text-2xl font-semibold text-gray-900">
-                  {formatNumber(newsStats?.highLevel || 0)}
-                </dd>
-              </dl>
-            </div>
-          </div>
-        </Card>
-
-        {/* 图谱节点 */}
-        <Card>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <ShareIcon className="h-8 w-8 text-blue-400" />
-            </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  图谱节点
-                </dt>
-                <dd className="text-2xl font-semibold text-gray-900">
-                  {formatNumber(graphStats?.nodes || 0)}
-                </dd>
-              </dl>
-            </div>
-          </div>
-        </Card>
-
-        {/* 图谱关系 */}
-        <Card>
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <ChartBarIcon className="h-8 w-8 text-green-400" />
-            </div>
-            <div className="ml-5 w-0 flex-1">
-              <dl>
-                <dt className="text-sm font-medium text-gray-500 truncate">
-                  图谱关系
-                </dt>
-                <dd className="text-2xl font-semibold text-gray-900">
-                  {formatNumber(graphStats?.relationships || 0)}
-                </dd>
-              </dl>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      {/* 内容区域 */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* 新闻级别分布 */}
-        <Card title="新闻级别分布" subtitle="过去7天的新闻级别统计">
-          {newsStats?.levelDistribution && (
-            <div className="space-y-3">
-              {Object.entries(newsStats.levelDistribution).map(([level, count]) => (
-                <div key={level} className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <div 
-                      className="w-3 h-3 rounded-full mr-2"
-                      style={{ backgroundColor: getNewsLevelColor(level) }}
-                    />
-                    <span className="text-sm font-medium text-gray-900">{level}</span>
-                  </div>
-                  <span className="text-sm text-gray-500">{count}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </Card>
-
-        {/* 最新新闻 */}
-        <Card title="最新新闻" subtitle="最近处理的新闻">
-          <div className="space-y-3">
-            {recentNews.map((news) => (
-              <div key={news.newsId} className="border-l-4 pl-3" style={{
-                borderLeftColor: getNewsLevelColor(news.news_level)
-              }}>
-                <h4 className="text-sm font-medium text-gray-900 truncate">
-                  {news.title}
-                </h4>
-                <div className="mt-1 flex items-center text-xs text-gray-500">
-                  <span>{news.source}</span>
-                  <span className="mx-2">•</span>
-                  <span>{formatDate(news.timestamp, 'HH:mm')}</span>
+    <Layout>
+      <div className="space-y-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            新闻图谱应用
+          </h1>
+          <p className="text-gray-600 mb-4">
+            基于 Next.js 构建的新闻图谱可视化应用，集成了定时任务调度功能
+          </p>
+          
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
+              <div className="flex">
+                <div className="text-red-800">
+                  <strong>错误:</strong> {error}
                 </div>
               </div>
-            ))}
+            </div>
+          )}
+        </div>
+
+        <Card
+          title="定时任务调度器"
+          subtitle="实时监控和管理定时任务"
+        >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">
+                  调度器状态
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {schedulerStatus?.timestamp ? 
+                    `最后更新: ${new Date(schedulerStatus.timestamp).toLocaleString()}` : 
+                    '状态未知'
+                  }
+                </p>
+              </div>
+              <div className="flex items-center">
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  schedulerStatus?.running 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  {schedulerStatus?.running ? '运行中' : '已停止'}
+                </span>
+              </div>
+            </div>
+
+            {schedulerStatus?.jobs && schedulerStatus.jobs.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        任务名称
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        描述
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        调度配置
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        状态
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        操作
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {schedulerStatus.jobs.map((job) => (
+                      <tr key={job.name}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900">
+                            {job.name}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {job.description}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">
+                            {job.schedule}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            job.running 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {job.running ? '运行中' : '已停止'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <button
+                            onClick={() => triggerJob(job.name)}
+                            className="text-indigo-600 hover:text-indigo-900"
+                          >
+                            手动触发
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <Card
+            title="高级别新闻扫描"
+            subtitle="实时监控Level 1和Level 2新闻"
+          >
+            <div className="space-y-3">
+              <div className="text-sm text-gray-600">
+                • 每5分钟执行一次<br/>
+                • 发现新的高级别新闻时发送通知<br/>
+                • 支持手动触发扫描
+              </div>
+              <button
+                onClick={() => triggerJob('high-level-scan')}
+                className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                立即扫描
+              </button>
+            </div>
+          </Card>
+
+          <Card
+            title="小时总结"
+            subtitle="生成每小时新闻总结"
+          >
+            <div className="space-y-3">
+              <div className="text-sm text-gray-600">
+                • 工作时间(11:00-22:00)每小时执行<br/>
+                • 使用AI生成总结报告<br/>
+                • 有高级别新闻时发送通知
+              </div>
+              <button
+                onClick={() => triggerJob('hourly-summary')}
+                className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+              >
+                生成总结
+              </button>
+            </div>
+          </Card>
+
+          <Card
+            title="每日总结"
+            subtitle="生成每日新闻总结"
+          >
+            <div className="space-y-3">
+              <div className="text-sm text-gray-600">
+                • 每天10:00执行<br/>
+                • 总结前一天22:00到当天10:00的新闻<br/>
+                • 发送每日总结通知
+              </div>
+              <button
+                onClick={() => triggerJob('daily-summary')}
+                className="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
+              >
+                生成总结
+              </button>
+            </div>
+          </Card>
+        </div>
       </div>
-    </div>
+    </Layout>
   );
 }

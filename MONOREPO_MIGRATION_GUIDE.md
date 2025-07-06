@@ -12,7 +12,7 @@
 
 2. **四个独立包**
    - ✅ **web-app** (`packages/web-app/`): Next.js前端应用
-   - ✅ **scheduler** (`packages/scheduler/`): 定时任务调度服务
+   - ✅ **scheduler**: 已迁移到 web-app 中
    - ✅ **ingest-worker** (`packages/ingest-worker/`): 数据摄取工作器
    - ✅ **graph-worker** (`packages/graph-worker/`): 图谱处理工作器
 
