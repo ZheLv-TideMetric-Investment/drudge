@@ -1,40 +1,51 @@
-FROM node:18-alpine AS base
+# Ingest Worker - News Data Ingestion Service
+FROM node:lts-alpine3.21 AS builder
 
-# Install dependencies
-FROM base AS deps
-RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci --only=production
+# Copy package files and install all dependencies
+COPY package.json package-lock.json ./
+COPY tsconfig.json ./
+RUN npm ci
 
-# Build the source code
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+# Copy source code
+COPY src/ ./src/
 
+# Build the application
 RUN npm run build
 
-# Production image
-FROM base AS runner
+# Production stage
+FROM node:lts-alpine3.21 AS production
+
 WORKDIR /app
 
-ENV NODE_ENV production
+# Install curl for health check
+RUN apk add --no-cache curl
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nodejs
+# Copy package files and install production dependencies
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy built application
-COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
-COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
 
-# Create data and logs directories
-RUN mkdir -p data logs && chown -R nodejs:nodejs data logs
+# Create necessary directories
+RUN mkdir -p logs data/news storage
 
-USER nodejs
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S ingestworker -u 1001 -G nodejs
 
-EXPOSE 3003
+# Change ownership
+RUN chown -R ingestworker:nodejs /app
+USER ingestworker
 
-CMD ["node", "dist/index.js"] 
+# Expose port
+EXPOSE 39110
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:39110/health || exit 1
+
+# Start
+CMD ["npm", "start"] 
