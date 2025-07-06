@@ -20,6 +20,12 @@ export default {
     requestInterval: parseInt(process.env.NEWS_API_REQUEST_INTERVAL || '1000')
   },
   
+  // 通知配置
+  notification: {
+    enableWebhookNotification: process.env.ENABLE_WEBHOOK_NOTIFICATION === 'true' || false,
+    webhookUrl: process.env.WEBHOOK_URL || ''
+  },
+  
   // 日志配置
   log: {
     level: process.env.LOG_LEVEL || 'info',

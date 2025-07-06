@@ -4,6 +4,7 @@ import { google } from '@ai-sdk/google';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
 import config from '../config/config';
+import notificationService from './NotificationService';
 import { LLMMessage, LLMCallOptions, LLMResponse } from '../types/index';
 
 /**
@@ -46,8 +47,20 @@ export class AiService {
 
       this.initialized = true;
       logger.info('✅ AI服务初始化完成');
-    } catch (error) {
+    } catch (error: any) {
       logger.error('❌ AI服务初始化失败:', error);
+      
+      // 发送AI服务初始化失败通知
+      try {
+        await notificationService.sendAiServiceFailureNotification(
+          config?.ai?.provider || 'unknown',
+          config?.ai?.deepseek?.model || config?.ai?.google?.model || 'unknown',
+          error.message || 'AI服务初始化失败'
+        );
+      } catch (notifyError) {
+        logger.error('发送AI服务失败通知失败:', notifyError);
+      }
+      
       this.initialized = false;
       throw error;
     }
@@ -142,6 +155,17 @@ export class AiService {
 
     } catch (error: any) {
       logger.error('LLM JSON调用失败:', error);
+      
+      // 发送AI服务调用失败通知
+      try {
+        await notificationService.sendAiServiceFailureNotification(
+          config?.ai?.provider || 'unknown',
+          config?.ai?.deepseek?.model || config?.ai?.google?.model || 'unknown',
+          error.message || 'LLM调用失败'
+        );
+      } catch (notifyError) {
+        logger.error('发送AI服务调用失败通知失败:', notifyError);
+      }
       
       // 如果是初始化相关错误，重置状态
       if (error.message?.includes('provider') || error.message?.includes('模型') || error.message?.includes('配置')) {

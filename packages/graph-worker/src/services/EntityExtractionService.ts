@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger';
 import aiService from './AiService';
+import notificationService from './NotificationService';
 import { z } from 'zod';
 import * as chrono from 'chrono-node';
 import { 
@@ -147,6 +148,16 @@ export class EntityExtractionService {
       
     } catch (error: any) {
       logger.error(`❌ 新闻 ${newsItem.id} 六要素提取异常:`, error);
+      
+      // 发送实体提取失败通知
+      try {
+        await notificationService.sendEntityExtractionFailureNotification(
+          newsItem.id,
+          error.message || '实体提取失败'
+        );
+      } catch (notifyError) {
+        logger.error('发送实体提取失败通知失败:', notifyError);
+      }
       
       // 返回带新闻信息的兜底结果
       const fallbackResult = this.createFallbackResultWithNewsInfo(newsItem);

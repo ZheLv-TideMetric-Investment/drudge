@@ -2,6 +2,7 @@ import axios from 'axios';
 import { logger } from '../utils/logger';
 import config from '../config/config';
 import fileStorage, { NewsItem } from '../storage/FileStorage';
+import notificationService from './NotificationService';
 
 /**
  * 随机生成 User-Agent
@@ -120,6 +121,14 @@ export class FutuLiveService {
       return response;
     } catch (error: any) {
       logger.error('请求富途新闻API失败:', error.message);
+      
+      // 发送API失败通知
+      try {
+        await notificationService.sendNewsApiFailureNotification(error.message);
+      } catch (notifyError) {
+        logger.error('发送API失败通知失败:', notifyError);
+      }
+      
       // 如果是网络错误，等待更长时间后重试
       if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
         await new Promise(resolve => setTimeout(resolve, 5000));
@@ -139,7 +148,16 @@ export class FutuLiveService {
         const response = await this.makeRequest();
 
         if (!response || !response.data || !response.data.data || !response.data.data.data) {
-          logger.error('❌ 获取富途新闻失败: 响应格式错误');
+          const errorMsg = '获取富途新闻失败: 响应格式错误';
+          logger.error(`❌ ${errorMsg}`);
+          
+          // 发送API响应格式错误通知
+          try {
+            await notificationService.sendNewsApiFailureNotification(errorMsg);
+          } catch (notifyError) {
+            logger.error('发送API响应格式错误通知失败:', notifyError);
+          }
+          
           return [];
         }
 
@@ -199,6 +217,21 @@ export class FutuLiveService {
       return allNews;
     } catch (error: any) {
       logger.error('❌ 富途新闻获取失败:', error);
+      
+      // 发送服务异常通知
+      try {
+        await notificationService.sendServiceErrorNotification(
+          'FutuLiveService', 
+          error.message || '富途新闻获取失败',
+          {
+            isFirstRun: this.isFirstRun,
+            lastRequestTime: this.lastRequestTime
+          }
+        );
+      } catch (notifyError) {
+        logger.error('发送服务异常通知失败:', notifyError);
+      }
+      
       return [];
     }
   }

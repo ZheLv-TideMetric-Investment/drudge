@@ -1,6 +1,7 @@
 import neo4j, { Driver, Session } from 'neo4j-driver';
 import { logger } from '../utils/logger';
 import config from '../config/config';
+import notificationService from './NotificationService';
 
 /**
  * Neo4j 数据库服务
@@ -35,8 +36,18 @@ export class Neo4jService {
         await session.close();
       }
 
-    } catch (error) {
+    } catch (error: any) {
       logger.error('❌ Neo4j数据库连接失败:', error);
+      
+      // 发送数据库连接失败通知
+      try {
+        await notificationService.sendNeo4jConnectionFailureNotification(
+          error.message || 'Neo4j数据库连接失败'
+        );
+      } catch (notifyError) {
+        logger.error('发送Neo4j连接失败通知失败:', notifyError);
+      }
+      
       throw error;
     }
   }

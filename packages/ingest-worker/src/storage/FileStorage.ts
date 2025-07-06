@@ -3,6 +3,7 @@ import path from 'path';
 import { logger } from '../utils/logger';
 import { formatForFilename, parseTime, startOfToday, daysAgo } from '../utils/time';
 import config from '../config/config';
+import notificationService from '../services/NotificationService';
 
 /**
  * 新闻数据接口
@@ -53,10 +54,26 @@ export class FileStorage {
     const filename = `${this.source}_${timestamp}.json`;
     const filePath = path.join(this.dataPath, filename);
     
-    await fs.promises.writeFile(filePath, JSON.stringify(news, null, 2));
-    logger.info(`✅ 保存新闻到文件: ${filename} (${news.length}条)`);
-    
-    return filename;
+    try {
+      await fs.promises.writeFile(filePath, JSON.stringify(news, null, 2));
+      logger.info(`✅ 保存新闻到文件: ${filename} (${news.length}条)`);
+      return filename;
+    } catch (error: any) {
+      logger.error(`❌ 保存新闻文件失败: ${filename}`, error);
+      
+      // 发送文件保存失败通知
+      try {
+        await notificationService.sendFileSaveFailureNotification(
+          filename,
+          news.length,
+          error.message || '文件写入失败'
+        );
+      } catch (notifyError) {
+        logger.error('发送文件保存失败通知失败:', notifyError);
+      }
+      
+      throw error; // 重新抛出错误，让调用方知道保存失败
+    }
   }
 
   /**

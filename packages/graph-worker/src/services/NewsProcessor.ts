@@ -2,6 +2,7 @@ import fs from 'fs';
 import { logger } from '../utils/logger';
 import config from '../config/config';
 import knowledgeGraphService from './KnowledgeGraphService';
+import notificationService from './NotificationService';
 import { FileInfo, markFileAsProcessed } from './FileScanner';
 import { NewsItem, ProcessResult } from '../types/index';
 
@@ -139,6 +140,18 @@ async function processSingleNewsFile(fileInfo: FileInfo): Promise<FileProcessRes
 
   } catch (error: any) {
     logger.error(`❌ 处理文件失败: ${fileInfo.fileName}`, error);
+    
+    // 发送新闻处理失败通知
+    try {
+      await notificationService.sendNewsProcessingFailureNotification(
+        fileInfo.fileName,
+        0, // 无法确定新闻数量
+        0, // 处理成功数量为0
+        error.message || '文件处理失败'
+      );
+    } catch (notifyError) {
+      logger.error('发送新闻处理失败通知失败:', notifyError);
+    }
     
     return {
       success: false,

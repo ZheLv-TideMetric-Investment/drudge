@@ -45,6 +45,12 @@ const config = {
     retryDelay: parseInt(process.env.RETRY_DELAY || '1000', 10)
   },
   
+  // 通知配置
+  notification: {
+    enableWebhookNotification: process.env.ENABLE_WEBHOOK_NOTIFICATION === 'true' || false,
+    webhookUrl: process.env.WEBHOOK_URL || ''
+  },
+  
   // 日志配置
   logging: {
     level: process.env.LOG_LEVEL || 'info',
