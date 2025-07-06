@@ -6,13 +6,20 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
+# Enable corepack for pnpm
+RUN corepack enable
+
 # Install dependencies based on the preferred package manager
-COPY package*.json ./
-RUN npm ci --only=production
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
+
+# Enable corepack for pnpm
+RUN corepack enable
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
@@ -21,7 +28,7 @@ COPY . .
 # Uncomment the following line in case you want to disable telemetry during the build.
 # ENV NEXT_TELEMETRY_DISABLED 1
 
-RUN npm run build
+RUN pnpm run build
 
 # Production image, copy all the files and run next
 FROM base AS runner
@@ -43,8 +50,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
-EXPOSE 3000
+EXPOSE 39112
 
-ENV PORT 3000
+ENV PORT 39112
 
 CMD ["node", "server.js"] 

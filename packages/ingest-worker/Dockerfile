@@ -3,28 +3,34 @@ FROM node:lts-alpine3.21 AS builder
 
 WORKDIR /app
 
+# Enable corepack for pnpm
+RUN corepack enable
+
 # Copy package files and install all dependencies
-COPY package.json package-lock.json ./
+COPY package.json pnpm-lock.yaml ./
 COPY tsconfig.json ./
-RUN npm ci
+RUN pnpm install --frozen-lockfile
 
 # Copy source code
 COPY src/ ./src/
 
 # Build the application
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
 FROM node:lts-alpine3.21 AS production
 
 WORKDIR /app
 
+# Enable corepack for pnpm
+RUN corepack enable
+
 # Install curl for health check
 RUN apk add --no-cache curl
 
 # Copy package files and install production dependencies
-COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod && pnpm store prune
 
 # Copy built application
 COPY --from=builder /app/dist ./dist
@@ -48,4 +54,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:39110/health || exit 1
 
 # Start
-CMD ["npm", "start"] 
+CMD ["pnpm", "start"] 
