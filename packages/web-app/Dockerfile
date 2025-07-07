@@ -10,8 +10,8 @@ WORKDIR /app
 RUN corepack enable
 
 # Install dependencies based on the preferred package manager
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod
+COPY package.json ./
+RUN pnpm install --prod
 
 # Rebuild the source code only when needed
 FROM base AS builder

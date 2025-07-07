@@ -7,9 +7,9 @@ WORKDIR /app
 RUN corepack enable
 
 # Copy package files and install all dependencies
-COPY package.json pnpm-lock.yaml ./
+COPY package.json ./
 COPY tsconfig.json ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 # Copy source code
 COPY src/ ./src/
@@ -29,8 +29,8 @@ RUN corepack enable
 RUN apk add --no-cache curl
 
 # Copy package files and install production dependencies
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod && pnpm store prune
+COPY package.json ./
+RUN pnpm install --prod && pnpm store prune
 
 # Copy built application
 COPY --from=builder /app/dist ./dist

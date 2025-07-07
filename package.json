@@ -23,7 +23,15 @@
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f",
     "schema:apply": "cypher-shell -f shared/neo4j/schema.cypher || echo 'Neo4j schema applied'",
-    "clean:neo4j": "node shared/scripts/cleanNeo4j.js"
+    "clean:neo4j": "node shared/scripts/cleanNeo4j.js",
+    "pm2": "node pm2-manager.cjs",
+    "pm2:start": "node pm2-manager.cjs start",
+    "pm2:stop": "node pm2-manager.cjs stop",
+    "pm2:restart": "node pm2-manager.cjs restart",
+    "pm2:delete": "node pm2-manager.cjs delete",
+    "pm2:status": "node pm2-manager.cjs status",
+    "pm2:logs": "node pm2-manager.cjs logs",
+    "pm2:dev": "node pm2-manager.cjs dev"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
