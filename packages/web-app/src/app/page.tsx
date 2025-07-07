@@ -78,7 +78,7 @@ export default function Home() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+    <div className="space-y-6">
         <div className="bg-white rounded-lg shadow p-6">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             新闻图谱应用
@@ -92,11 +92,11 @@ export default function Home() {
               <div className="flex">
                 <div className="text-red-800">
                   <strong>错误:</strong> {error}
-                </div>
-              </div>
+      </div>
+            </div>
             </div>
           )}
-        </div>
+          </div>
 
         <Card
           title="定时任务调度器"
@@ -115,7 +115,7 @@ export default function Home() {
                   }
                 </p>
               </div>
-              <div className="flex items-center">
+          <div className="flex items-center">
                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                   schedulerStatus?.running 
                     ? 'bg-green-100 text-green-800' 
@@ -154,17 +154,17 @@ export default function Home() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900">
                             {job.name}
-                          </div>
+            </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900">
                             {job.description}
-                          </div>
+          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">
                             {job.schedule}
-                          </div>
+            </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -187,7 +187,7 @@ export default function Home() {
                     ))}
                   </tbody>
                 </table>
-              </div>
+            </div>
             )}
           </div>
         </Card>
@@ -202,15 +202,15 @@ export default function Home() {
                 • 每5分钟执行一次<br/>
                 • 发现新的高级别新闻时发送通知<br/>
                 • 支持手动触发扫描
-              </div>
+            </div>
               <button
                 onClick={() => triggerJob('high-level-scan')}
                 className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
               >
                 立即扫描
               </button>
-            </div>
-          </Card>
+          </div>
+        </Card>
 
           <Card
             title="小时总结"
@@ -221,7 +221,7 @@ export default function Home() {
                 • 工作时间(11:00-22:00)每小时执行<br/>
                 • 使用AI生成总结报告<br/>
                 • 有高级别新闻时发送通知
-              </div>
+                  </div>
               <button
                 onClick={() => triggerJob('hourly-summary')}
                 className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
@@ -229,13 +229,13 @@ export default function Home() {
                 生成总结
               </button>
             </div>
-          </Card>
+        </Card>
 
           <Card
             title="每日总结"
             subtitle="生成每日新闻总结"
           >
-            <div className="space-y-3">
+          <div className="space-y-3">
               <div className="text-sm text-gray-600">
                 • 每天10:00执行<br/>
                 • 总结前一天22:00到当天10:00的新闻<br/>
@@ -247,10 +247,10 @@ export default function Home() {
               >
                 生成总结
               </button>
-            </div>
-          </Card>
-        </div>
+          </div>
+        </Card>
       </div>
+    </div>
     </Layout>
   );
 }

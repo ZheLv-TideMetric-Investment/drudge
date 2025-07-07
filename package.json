@@ -30,8 +30,7 @@
     "pm2:restart": "node pm2-manager.cjs restart",
     "pm2:delete": "node pm2-manager.cjs delete",
     "pm2:status": "node pm2-manager.cjs status",
-    "pm2:logs": "node pm2-manager.cjs logs",
-    "pm2:dev": "node pm2-manager.cjs dev"
+    "pm2:logs": "node pm2-manager.cjs logs"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",

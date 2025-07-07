@@ -113,31 +113,13 @@ const commands = {
       console.log('📜 查看所有应用日志...');
       execSync('pm2 logs', { stdio: 'inherit' });
     }
-  },
-
-  dev: (appName) => {
-    if (appName && apps[appName]) {
-      console.log(`🛠️  开发模式启动 ${appName}...`);
-      // 启动开发版本
-      execSync(`cd ${apps[appName].path} && pm2 start ecosystem.config.js --only ${appName}-dev`, { stdio: 'inherit' });
-    } else {
-      console.log('🛠️  开发模式启动所有应用...');
-      Object.keys(apps).forEach(app => {
-        try {
-          execSync(`cd ${apps[app].path} && pm2 start ecosystem.config.js --only ${app}-dev`, { stdio: 'inherit' });
-          console.log(`✅ ${app} 开发模式启动成功`);
-        } catch (error) {
-          console.error(`❌ ${app} 开发模式启动失败:`, error.message);
-        }
-      });
-    }
   }
 };
 
 // 帮助信息
 function showHelp() {
   console.log(`
-🚀 PM2 管理脚本 - Drudge项目
+ 🚀 PM2 管理脚本 - Drudge项目
 
  用法:
    node pm2-manager.cjs <command> [app-name]
@@ -149,7 +131,6 @@ function showHelp() {
   delete [app-name]    删除应用 (不指定则删除所有)
   status               查看所有应用状态
   logs [app-name]      查看应用日志 (不指定则查看所有)
-  dev [app-name]       开发模式启动 (不指定则启动所有)
 
 应用名称:
   web-app              Web应用
@@ -158,7 +139,7 @@ function showHelp() {
 
  示例:
    node pm2-manager.cjs start web-app        # 启动Web应用
-   node pm2-manager.cjs dev ingest-worker    # 开发模式启动数据获取服务
+   node pm2-manager.cjs restart ingest-worker # 重启数据获取服务
    node pm2-manager.cjs status               # 查看所有应用状态
    node pm2-manager.cjs logs graph-worker    # 查看知识图谱服务日志
 `);
