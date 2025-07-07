@@ -1,4 +1,4 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, Express } from 'express';
 import { logger } from '../utils/logger';
 import config from '../config/config';
 
@@ -11,7 +11,7 @@ import { getSystemStatus, healthCheck } from '../apis/system/status';
 import { getSchedulerStatus, triggerNewsTask } from '../apis/system/scheduler';
 import { daysAgo, parseTime } from '../utils/time';
 
-const app = express();
+const app: Express = express();
 
 // 中间件
 app.use(express.json());
