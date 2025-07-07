@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Neo4j 数据库服务 (Graph Worker 依赖)
   neo4j:
-    image: neo4j:5.28.1
+    image: neo4j:latest
     container_name: drudge-neo4j
     restart: unless-stopped
     ports:
