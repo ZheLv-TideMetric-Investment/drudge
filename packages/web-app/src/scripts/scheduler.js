@@ -1,25 +1,38 @@
 #!/usr/bin/env node
-import cron from 'node-cron';
-import axios from 'axios';
-import moment from 'moment-timezone';
-import { config } from '../lib/config';
-import { 
-  SchedulerTrigger, 
-  SCHEDULER_CRON_CONFIG, 
-  SchedulerApiRequest,
-  SchedulerApiResponse 
-} from '../types/scheduler';
+const cron = require('node-cron');
+const axios = require('axios');
+const moment = require('moment-timezone');
+
+/**
+ * 定时器触发器类型枚举
+ */
+const SchedulerTrigger = {
+  EVERY_MINUTE: 'every_minute',
+  EVERY_5_MINUTES: 'every_5_minutes',
+  EVERY_30_MINUTES: 'every_30_minutes',
+  EVERY_HOUR: 'every_hour',
+  OVERNIGHT: 'overnight'
+};
+
+/**
+ * 定时器配置映射
+ */
+const SCHEDULER_CRON_CONFIG = {
+  [SchedulerTrigger.EVERY_MINUTE]: '* * * * *',           // 每分钟
+  [SchedulerTrigger.EVERY_5_MINUTES]: '*/5 * * * *',      // 每5分钟
+  [SchedulerTrigger.EVERY_30_MINUTES]: '*/30 * * * *',    // 每半小时
+  [SchedulerTrigger.EVERY_HOUR]: '0 11-22 * * *',         // 每小时（11-22点）
+  [SchedulerTrigger.OVERNIGHT]: '0 22 * * *'              // 隔夜（22点）
+};
 
 /**
  * 轻量级定时器调度器
- * 使用node-cron设置触发器，调用Next.js API接口执行实际业务逻辑
  */
 class CronScheduler {
-  private tasks: Map<SchedulerTrigger, cron.ScheduledTask> = new Map();
-  private taskStatus: Map<SchedulerTrigger, boolean> = new Map();
-  private apiBaseUrl: string;
-  
   constructor() {
+    this.tasks = new Map();
+    this.taskStatus = new Map();
+    
     // 构建API基础URL
     const port = process.env.PORT || 39112;
     this.apiBaseUrl = `http://localhost:${port}/api`;
@@ -30,7 +43,7 @@ class CronScheduler {
   /**
    * 启动所有定时器
    */
-  start(): void {
+  start() {
     console.log('[CronScheduler] 启动定时器调度器...');
     
     // 设置每分钟触发器
@@ -60,7 +73,7 @@ class CronScheduler {
   /**
    * 设置单个触发器
    */
-  private setupTrigger(trigger: SchedulerTrigger, description: string): void {
+  setupTrigger(trigger, description) {
     const cronExpression = SCHEDULER_CRON_CONFIG[trigger];
     
     const task = cron.schedule(cronExpression, async () => {
@@ -71,19 +84,20 @@ class CronScheduler {
     });
     
     this.tasks.set(trigger, task);
+    this.taskStatus.set(trigger, false);
     console.log(`[CronScheduler] 设置触发器: ${trigger} (${description}) - ${cronExpression}`);
   }
 
   /**
    * 执行触发器 - 调用API接口
    */
-  private async executeTrigger(trigger: SchedulerTrigger, description: string): Promise<void> {
+  async executeTrigger(trigger, description) {
     const timestamp = moment().toISOString();
     
     console.log(`[CronScheduler] 触发器执行: ${trigger} (${description}) at ${timestamp}`);
     
     try {
-      const requestData: SchedulerApiRequest = {
+      const requestData = {
         trigger,
         timestamp,
         metadata: {
@@ -105,7 +119,7 @@ class CronScheduler {
         }
       );
       
-      const result: SchedulerApiResponse = response.data;
+      const result = response.data;
       
       if (result.success) {
         console.log(`[CronScheduler] ✅ ${trigger} 执行成功: ${result.message}`);
@@ -117,12 +131,12 @@ class CronScheduler {
       }
       
     } catch (error) {
-      if (axios.isAxiosError(error)) {
-        const status = error.response?.status || 'UNKNOWN';
-        const message = error.response?.data?.message || error.message;
+      if (error.response) {
+        const status = error.response.status || 'UNKNOWN';
+        const message = error.response.data?.message || error.message;
         console.error(`[CronScheduler] ❌ ${trigger} API调用失败 (${status}): ${message}`);
       } else {
-        console.error(`[CronScheduler] ❌ ${trigger} 执行出错:`, error);
+        console.error(`[CronScheduler] ❌ ${trigger} 执行出错:`, error.message);
       }
     }
   }
@@ -130,7 +144,7 @@ class CronScheduler {
   /**
    * 启动所有任务
    */
-  private startAllTasks(): void {
+  startAllTasks() {
     for (const [trigger, task] of this.tasks) {
       task.start();
       this.taskStatus.set(trigger, true);
@@ -141,7 +155,7 @@ class CronScheduler {
   /**
    * 停止所有任务
    */
-  stop(): void {
+  stop() {
     console.log('[CronScheduler] 停止所有定时器...');
     
     for (const [trigger, task] of this.tasks) {
@@ -158,7 +172,7 @@ class CronScheduler {
   /**
    * 打印定时器状态
    */
-  private printStatus(): void {
+  printStatus() {
     console.log('\n[CronScheduler] 定时器状态:');
     console.log('================================');
     
@@ -175,7 +189,7 @@ class CronScheduler {
   /**
    * 设置优雅关闭
    */
-  private setupGracefulShutdown(): void {
+  setupGracefulShutdown() {
     const gracefulShutdown = () => {
       console.log('\n[CronScheduler] 收到关闭信号，优雅关闭中...');
       this.stop();
@@ -185,27 +199,6 @@ class CronScheduler {
     process.on('SIGTERM', gracefulShutdown);
     process.on('SIGINT', gracefulShutdown);
     process.on('SIGHUP', gracefulShutdown);
-  }
-
-  /**
-   * 获取运行状态
-   */
-  getStatus(): Record<string, unknown> {
-    const status: Record<string, unknown> = {};
-    
-    for (const [trigger] of this.tasks) {
-      status[trigger] = {
-        running: this.taskStatus.get(trigger) || false,
-        cronExpression: SCHEDULER_CRON_CONFIG[trigger]
-      };
-    }
-    
-    return {
-      totalTasks: this.tasks.size,
-      apiBaseUrl: this.apiBaseUrl,
-      tasks: status,
-      startedAt: new Date().toISOString()
-    };
   }
 }
 
@@ -225,7 +218,7 @@ async function main() {
     
     // 启动定时器
     scheduler.start();
-    scheduler['startAllTasks'](); // 调用私有方法启动所有任务
+    scheduler.startAllTasks();
     
     console.log('[CronScheduler] 定时器调度器启动完成，按 Ctrl+C 退出');
     
@@ -252,4 +245,4 @@ if (require.main === module) {
   });
 }
 
-export default CronScheduler; 
+module.exports = CronScheduler; 

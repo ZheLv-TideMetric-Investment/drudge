@@ -2,8 +2,8 @@ module.exports = {
   apps: [
     {
       name: 'web-app',
-      script: 'next',
-      args: 'start -p 39112',
+      script: 'npm',
+      args: 'start',
       cwd: './',
       instances: 1,
       exec_mode: 'fork',
@@ -25,8 +25,7 @@ module.exports = {
     },
     {
       name: 'web-scheduler',
-      script: 'tsx',
-      args: 'src/scripts/scheduler.ts',
+      script: 'src/scripts/scheduler.js',
       cwd: './',
       instances: 1,
       exec_mode: 'fork',

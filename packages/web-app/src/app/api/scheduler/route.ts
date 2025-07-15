@@ -8,6 +8,7 @@ import {
 } from '../../../types/scheduler';
 import { highLevelNewsScanner } from '../../../lib/services/high-level-scanner';
 import { summaryService } from '../../../lib/services/summary';
+import { initializeServices } from '../../../lib/services/init';
 
 // 请求验证模式
 const schedulerRequestSchema = z.object({
@@ -24,6 +25,9 @@ export async function POST(request: NextRequest) {
   const startTime = Date.now();
   
   try {
+    // 确保服务已初始化
+    await initializeServices();
+    
     // 解析请求体
     const body = await request.json();
     const validatedBody = schedulerRequestSchema.parse(body) as SchedulerApiRequest;
@@ -206,6 +210,9 @@ async function handleOvernight(timestamp: string, metadata?: Record<string, unkn
  */
 export async function GET() {
   try {
+    // 确保服务已初始化
+    await initializeServices();
+    
     const status = {
       available_triggers: Object.values(SchedulerTrigger),
       server_time: new Date().toISOString(),
