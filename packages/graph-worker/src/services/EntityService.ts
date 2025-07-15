@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
+import { parseTimeToBeijing } from '../utils/timeUtils';
 import { 
   NewsExtractionResult, 
   Event, 
@@ -61,7 +62,7 @@ export class EntityService {
       id: newsItem.id,
       title: newsItem.title,
       content: newsItem.content,
-      timestamp: newsItem.time && newsItem.time > 0 ? new Date(newsItem.time * 1000).toISOString() : new Date().toISOString(),
+      timestamp: parseTimeToBeijing(newsItem.time),
       source: newsItem.source || '',
       url: newsItem.url || '',
       level: newsItem.level || 0,

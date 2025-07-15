@@ -3,6 +3,7 @@ import aiService from './AiService';
 import notificationService from './NotificationService';
 import { z } from 'zod';
 import * as chrono from 'chrono-node';
+import { parseTimeToBeijing } from '../utils/timeUtils';
 import { 
   NewsItem, 
   NewsExtractionResult, 
@@ -211,7 +212,7 @@ export class EntityExtractionService {
 
 标题：${newsItem.title}
 内容：${newsItem.content}
-发布时间：${new Date((newsItem.time || 0) * 1000).toISOString()}
+        发布时间：${parseTimeToBeijing(newsItem.time)}
 来源：${newsItem.source}
         `,
       },
@@ -608,7 +609,7 @@ export class EntityExtractionService {
       newsId: newsItem.id,
       title: newsItem.title,
       content: newsItem.content,
-      timestamp: new Date((newsItem.time || 0) * 1000).toISOString(),
+      timestamp: parseTimeToBeijing(newsItem.time),
       source: newsItem.source,
       url: newsItem.url,
       news_level: 'Level 5', // 默认最低级别
@@ -632,7 +633,7 @@ export class EntityExtractionService {
       newsId: newsItem.id,
       title: newsItem.title,
       content: newsItem.content,
-      timestamp: new Date((newsItem.time || 0) * 1000).toISOString(),
+      timestamp: parseTimeToBeijing(newsItem.time),
       source: newsItem.source,
       url: newsItem.url,
       news_level: 'Level 5', // 默认最低级别
@@ -664,7 +665,7 @@ export class EntityExtractionService {
           sentiment: event.sentiment || 'neutral',
           magnitude: event.magnitude || 0,
           event_level: event.event_level || 'Level 5',
-          event_date: event.event_date || new Date().toISOString(), // 使用当前时间而不是1970
+          event_date: event.event_date || parseTimeToBeijing(newsItem.time),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }));
@@ -823,7 +824,7 @@ export class EntityExtractionService {
       newsId: newsItem.id,
       title: newsItem.title,
       content: newsItem.content,
-      timestamp: new Date((newsItem.time || 0) * 1000).toISOString(),
+      timestamp: parseTimeToBeijing(newsItem.time),
       source: newsItem.source,
       url: newsItem.url,
       news_level: 'Level 5', // 默认最低级别
