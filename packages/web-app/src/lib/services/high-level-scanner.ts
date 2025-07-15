@@ -4,6 +4,18 @@ import { notificationService } from './notification';
 import { HighLevelScanResult, CallSource } from '../../types/scheduler';
 
 /**
+ * 扫描选项接口
+ */
+export interface ScanOptions {
+  /** 是否发送通知 */
+  sendNotifications?: boolean;
+  /** 是否跳过已处理的新闻 */
+  skipProcessed?: boolean;
+  /** 扫描来源 */
+  source?: CallSource;
+}
+
+/**
  * 高级别新闻扫描服务
  * 基于Neo4j数据，扫描高等级新闻并发送通知
  */
@@ -17,89 +29,104 @@ class HighLevelNewsScanner {
 
   /**
    * 扫描高级别新闻
-   * @param source 调用来源
+   * @param startTime 开始时间（ISO字符串或moment对象），如果不提供则使用上次扫描时间或5分钟前
+   * @param endTime 结束时间（ISO字符串或moment对象），如果不提供则使用当前时间
+   * @param options 扫描选项
    */
-  async scanHighLevelNews(source: CallSource = CallSource.API): Promise<HighLevelScanResult> {
+  async scanHighLevelNews(
+    startTime?: string | moment.Moment,
+    endTime?: string | moment.Moment,
+    options: ScanOptions = {}
+  ): Promise<HighLevelScanResult> {
     try {
+      // 设置默认选项
+      const {
+        sendNotifications = true,
+        skipProcessed = true,
+        source = CallSource.API
+      } = options;
+
       console.log('开始扫描高级别新闻...');
       
       // 计算扫描时间范围
-      const endTime = moment();
-      const startTime = this.lastScanTime ? 
-        moment(this.lastScanTime) : 
-        moment().subtract(5, 'minutes'); // 首次运行扫描最近5分钟
+      const end = endTime ? moment(endTime) : moment();
+      const start = startTime ? 
+        moment(startTime) : 
+        (this.lastScanTime ? moment(this.lastScanTime) : moment().subtract(5, 'minutes'));
+
+      if (!start.isValid() || !end.isValid()) {
+        throw new Error('无效的时间格式');
+      }
+
+      if (start.isAfter(end)) {
+        throw new Error('开始时间不能晚于结束时间');
+      }
+
+      console.log(`扫描时间范围: ${start.format('YYYY-MM-DD HH:mm')} - ${end.format('YYYY-MM-DD HH:mm')}`);
 
       // 从Neo4j获取高级别新闻
       const highLevelNews = await queryService.getHighLevelNews(
-        startTime.toISOString(),
-        endTime.toISOString()
+        start.toISOString(),
+        end.toISOString()
       );
 
       if (highLevelNews.length === 0) {
-        this.lastScanTime = endTime.toISOString();
+        this.updateLastScanTime(end);
         return {
           success: true,
           found: 0,
           sent: 0,
-          message: `${startTime.format('HH:mm')}-${endTime.format('HH:mm')} 时段没有发现高级别新闻`,
-          period: `${startTime.format('HH:mm')}-${endTime.format('HH:mm')}`,
+          message: `${start.format('HH:mm')}-${end.format('HH:mm')} 时段没有发现高级别新闻`,
+          period: this.formatPeriod(start, end),
           timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
         };
       }
 
-      // 过滤出未处理的新闻
-      const newHighLevelNews = highLevelNews.filter(news => 
-        !this.processedNewsIds.has(news.newsId)
-      );
+      // 过滤新闻（根据skipProcessed选项）
+      const newsToProcess = skipProcessed ? 
+        highLevelNews.filter(news => !this.processedNewsIds.has(news.newsId)) :
+        highLevelNews;
 
-      if (newHighLevelNews.length === 0) {
-        this.lastScanTime = endTime.toISOString();
+      if (newsToProcess.length === 0 && skipProcessed) {
+        this.updateLastScanTime(end);
         return {
           success: true,
           found: highLevelNews.length,
           sent: 0,
           message: `发现 ${highLevelNews.length} 条高级别新闻，但都已处理过`,
-          period: `${startTime.format('HH:mm')}-${endTime.format('HH:mm')}`,
+          period: this.formatPeriod(start, end),
           timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
         };
       }
 
       // 发送通知
       let sentCount = 0;
-      for (const news of newHighLevelNews) {
-        try {
-          const notificationSent = await notificationService.sendHighLevelNewsNotification(news, source);
-          if (notificationSent) {
-            sentCount++;
+      if (sendNotifications) {
+        sentCount = await this.sendNotifications(newsToProcess, source);
+        
+        // 标记为已处理（仅在skipProcessed为true时）
+        if (skipProcessed) {
+          newsToProcess.forEach(news => {
             this.processedNewsIds.add(news.newsId);
-          }
-        } catch (notificationError: any) {
-          console.error(`发送高级别新闻通知失败 (ID: ${news.newsId}):`, notificationError.message);
+          });
         }
       }
 
       // 清理过期的已处理新闻ID
       this.cleanupProcessedNewsIds();
 
-      this.lastScanTime = endTime.toISOString();
+      this.updateLastScanTime(end);
 
+      const scanType = startTime || endTime ? '自定义' : '定时';
+      const processType = skipProcessed ? '新发现' : '全部';
+      
       return {
         success: true,
-        found: newHighLevelNews.length,
+        found: newsToProcess.length,
         sent: sentCount,
-        message: `扫描完成：发现 ${newHighLevelNews.length} 条新的高级别新闻，成功发送 ${sentCount} 条通知`,
-        period: `${startTime.format('HH:mm')}-${endTime.format('HH:mm')}`,
-        high_level_news: newHighLevelNews.map(news => ({
-          newsId: news.newsId,
-          title: news.title,
-          level: news.level,
-          urgency: news.urgency,
-          companies: news.companies,
-          persons: news.persons,
-          organizations: news.organizations || [], // 新增：包含organizations数据
-          events: news.events,
-          timestamp: news.timestamp
-        })),
+        message: `${scanType}扫描完成：发现 ${newsToProcess.length} 条${processType}高级别新闻${sendNotifications ? `，成功发送 ${sentCount} 条通知` : ''}`,
+        period: this.formatPeriod(start, end),
+        high_level_news: newsToProcess.map(news => this.formatNewsItem(news)),
         timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
       };
 
@@ -118,79 +145,119 @@ class HighLevelNewsScanner {
   }
 
   /**
-   * 手动扫描高级别新闻
+   * 定时扫描高级别新闻（向后兼容方法）
+   * @param source 调用来源
+   */
+  async scanHighLevelNewsScheduled(source: CallSource = CallSource.SCHEDULER): Promise<HighLevelScanResult> {
+    return this.scanHighLevelNews(undefined, undefined, {
+      sendNotifications: true,
+      skipProcessed: true,
+      source
+    });
+  }
+
+  /**
+   * 手动扫描高级别新闻（向后兼容方法）
    * @param minutes 扫描最近几分钟的新闻
    * @param source 调用来源
    */
   async manualScan(minutes: number = 30, source: CallSource = CallSource.API): Promise<HighLevelScanResult> {
-    try {
-      console.log(`开始手动扫描最近 ${minutes} 分钟的高级别新闻...`);
-      
-      // 计算扫描时间范围
-      const endTime = moment();
-      const startTime = moment().subtract(minutes, 'minutes');
+    const endTime = moment();
+    const startTime = moment().subtract(minutes, 'minutes');
+    
+    return this.scanHighLevelNews(startTime, endTime, {
+      sendNotifications: true,
+      skipProcessed: false, // 手动扫描时不跳过已处理的新闻
+      source
+    });
+  }
 
-      // 从Neo4j获取高级别新闻
-      const highLevelNews = await queryService.getHighLevelNews(
-        startTime.toISOString(),
-        endTime.toISOString()
-      );
+  /**
+   * 扫描指定时间范围的高级别新闻
+   * @param startTime 开始时间
+   * @param endTime 结束时间
+   * @param source 调用来源
+   */
+  async scanTimeRange(
+    startTime: string | moment.Moment,
+    endTime: string | moment.Moment,
+    source: CallSource = CallSource.API
+  ): Promise<HighLevelScanResult> {
+    return this.scanHighLevelNews(startTime, endTime, {
+      sendNotifications: true,
+      skipProcessed: false,
+      source
+    });
+  }
 
-      if (highLevelNews.length === 0) {
-        return {
-          success: true,
-          found: 0,
-          sent: 0,
-          message: `最近 ${minutes} 分钟内没有发现高级别新闻`,
-          period: `${startTime.format('HH:mm')}-${endTime.format('HH:mm')}`,
-          timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
-        };
-      }
+  /**
+   * 仅查询高级别新闻（不发送通知）
+   * @param startTime 开始时间
+   * @param endTime 结束时间
+   */
+  async queryHighLevelNews(
+    startTime: string | moment.Moment,
+    endTime: string | moment.Moment
+  ): Promise<HighLevelScanResult> {
+    return this.scanHighLevelNews(startTime, endTime, {
+      sendNotifications: false,
+      skipProcessed: false,
+      source: CallSource.API
+    });
+  }
 
-      // 手动扫描时，不过滤已处理的新闻ID，重新发送所有找到的新闻
-      let sentCount = 0;
-      for (const news of highLevelNews) {
-        try {
-          const notificationSent = await notificationService.sendHighLevelNewsNotification(news, source);
-          if (notificationSent) {
-            sentCount++;
-          }
-        } catch (notificationError: any) {
-          console.error(`发送高级别新闻通知失败 (ID: ${news.newsId}):`, notificationError.message);
+  /**
+   * 发送通知
+   */
+  private async sendNotifications(newsItems: any[], source: CallSource): Promise<number> {
+    let sentCount = 0;
+    
+    for (const news of newsItems) {
+      try {
+        const notificationSent = await notificationService.sendHighLevelNewsNotification(news, source);
+        if (notificationSent) {
+          sentCount++;
         }
+      } catch (notificationError: any) {
+        console.error(`发送高级别新闻通知失败 (ID: ${news.newsId}):`, notificationError.message);
       }
+    }
+    
+    return sentCount;
+  }
 
-      return {
-        success: true,
-        found: highLevelNews.length,
-        sent: sentCount,
-        message: `手动扫描完成：发现 ${highLevelNews.length} 条高级别新闻，发送 ${sentCount} 条通知`,
-        period: `${startTime.format('HH:mm')}-${endTime.format('HH:mm')}`,
-        high_level_news: highLevelNews.map(news => ({
-          newsId: news.newsId,
-          title: news.title,
-          level: news.level,
-          urgency: news.urgency,
-          companies: news.companies,
-          persons: news.persons,
-          organizations: news.organizations || [], // 新增：包含organizations数据
-          events: news.events,
-          timestamp: news.timestamp
-        })),
-        timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
-      };
+  /**
+   * 格式化新闻项
+   */
+  private formatNewsItem(news: any): any {
+    return {
+      newsId: news.newsId,
+      title: news.title,
+      level: news.level,
+      urgency: news.urgency,
+      companies: news.companies,
+      persons: news.persons,
+      organizations: news.organizations || [],
+      events: news.events,
+      timestamp: news.timestamp
+    };
+  }
 
-    } catch (error: any) {
-      console.error('手动扫描高级别新闻失败:', error);
-      return {
-        success: false,
-        found: 0,
-        sent: 0,
-        message: '手动扫描失败',
-        error: error.message,
-        period: '',
-        timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
-      };
+  /**
+   * 更新最后扫描时间
+   */
+  private updateLastScanTime(time: moment.Moment): void {
+    this.lastScanTime = time.toISOString();
+  }
+
+  /**
+   * 格式化时间段
+   */
+  private formatPeriod(start: moment.Moment, end: moment.Moment): string {
+    if (start.isSame(end, 'day')) {
+      return `${start.format('MM-DD HH:mm')}-${end.format('HH:mm')}`;
+    } else {
+      return `${start.format('MM-DD HH:mm')}-${end.format('MM-DD HH:mm')}`;
     }
   }
 

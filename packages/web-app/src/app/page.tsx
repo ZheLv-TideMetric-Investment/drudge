@@ -1,256 +1,589 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { 
+  Button, 
+  Card, 
+  Spin, 
+  Badge, 
+  message, 
+  Row, 
+  Col, 
+  Divider, 
+  Space, 
+  Typography, 
+  Alert,
+  Descriptions,
+  Tag,
+  Progress,
+  notification
+} from 'antd';
+import { 
+  PlayCircleOutlined, 
+  ScanOutlined, 
+  FileTextOutlined, 
+  ClockCircleOutlined,
+  CheckCircleOutlined,
+  ExclamationCircleOutlined,
+  ReloadOutlined,
+  RobotOutlined,
+  DatabaseOutlined,
+  ScheduleOutlined
+} from '@ant-design/icons';
 import { Layout } from '../components/Layout';
-import { Card } from '../components/ui/Card';
-import { Loading } from '../components/ui/Loading';
 
-interface SchedulerStatus {
-  running: boolean;
-  jobs: Array<{
-    name: string;
-    schedule: string;
-    description: string;
-    enabled: boolean;
-    running: boolean;
-    lastRun?: string;
-    nextRun?: string;
-  }>;
-  timestamp: string;
+const { Title, Paragraph, Text } = Typography;
+
+interface SystemStatus {
+  scheduler: {
+    available_triggers: string[];
+    server_time: string;
+    status: string;
+  };
+  scanner: {
+    lastScanTime: string | null;
+    processedNewsCount: number;
+    isRunning: boolean;
+    timestamp: string;
+  };
+  summary: {
+    available_types: string[];
+    server_time: string;
+  };
 }
 
 export default function Home() {
-  const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [triggerLoading, setTriggerLoading] = useState<Record<string, boolean>>({});
+  const [messageApi, contextHolder] = message.useMessage();
+  const [notificationApi, notificationContextHolder] = notification.useNotification();
 
   useEffect(() => {
-    fetchSchedulerStatus();
-    const interval = setInterval(fetchSchedulerStatus, 30000); // 每30秒更新一次
+    fetchSystemStatus();
+    const interval = setInterval(fetchSystemStatus, 30000); // 每30秒更新一次
     return () => clearInterval(interval);
   }, []);
 
-  const fetchSchedulerStatus = async () => {
+  const fetchSystemStatus = async () => {
     try {
-      const response = await fetch('/api/scheduler/status');
-      const data = await response.json();
-      
-      if (data.success) {
-        setSchedulerStatus(data.data);
-        setError(null);
-      } else {
-        setError(data.error || '获取调度器状态失败');
-      }
+      const [schedulerRes, scanRes, summaryRes] = await Promise.all([
+        fetch('/api/scheduler'),
+        fetch('/api/scan'),
+        fetch('/api/summary')
+      ]);
+
+      const [schedulerData, scanData, summaryData] = await Promise.all([
+        schedulerRes.json(),
+        scanRes.json(),
+        summaryRes.json()
+      ]);
+
+      setSystemStatus({
+        scheduler: schedulerData,
+        scanner: scanData.scanner_status,
+        summary: summaryData
+      });
+      setError(null);
     } catch (err) {
-      setError('网络请求失败');
+      setError('获取系统状态失败');
+      messageApi.error('获取系统状态失败');
     } finally {
       setLoading(false);
     }
   };
 
-  const triggerJob = async (jobName: string) => {
+  const triggerSummary = async (type: 'hourly' | 'daily' | 'custom') => {
+    const key = `summary-${type}`;
+    setTriggerLoading(prev => ({ ...prev, [key]: true }));
+    
     try {
-      const response = await fetch(`/api/scheduler/trigger/${jobName}`, {
+      let body: any = {};
+      const endTime = new Date();
+      let startTime: Date;
+      
+      if (type === 'hourly') {
+        // 当前小时的开始时间到现在
+        startTime = new Date(endTime.getFullYear(), endTime.getMonth(), endTime.getDate(), endTime.getHours(), 0, 0, 0);
+        body = {
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          summaryType: 'hourly',
+          source: 'api'
+        };
+      } else if (type === 'daily') {
+        // 当天的开始时间到现在
+        startTime = new Date(endTime.getFullYear(), endTime.getMonth(), endTime.getDate(), 0, 0, 0, 0);
+        body = {
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          summaryType: 'daily',
+          source: 'api'
+        };
+      } else {
+        // custom: 最近1小时的总结
+        startTime = new Date(endTime.getTime() - 60 * 60 * 1000);
+        body = {
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          summaryType: 'custom',
+          source: 'api'
+        };
+      }
+
+      const response = await fetch('/api/summary', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
       });
+      
       const data = await response.json();
       
       if (data.success) {
-        alert(`任务 ${jobName} 执行成功`);
+        const typeName = type === 'hourly' ? '小时' : type === 'daily' ? '每日' : '自定义';
+        notificationApi.success({
+          message: '总结生成成功',
+          description: `${typeName}总结已生成完成`,
+          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+        });
       } else {
-        alert(`任务 ${jobName} 执行失败: ${data.error}`);
+        messageApi.error(`总结生成失败: ${data.message || data.error}`);
       }
     } catch (err) {
-      alert('网络请求失败');
+      messageApi.error('网络请求失败');
+    } finally {
+      setTriggerLoading(prev => ({ ...prev, [key]: false }));
     }
+  };
+
+  const triggerScan = async (type: 'auto' | 'manual') => {
+    const key = `scan-${type}`;
+    setTriggerLoading(prev => ({ ...prev, [key]: true }));
+    
+    try {
+      let body: any = {};
+      
+      if (type === 'auto') {
+        body = {}; // 自动扫描使用默认参数
+      } else {
+        body = {
+          sendNotifications: true,
+          skipProcessed: false
+        };
+      }
+
+      const response = await fetch('/api/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const typeName = type === 'auto' ? '自动' : '手动';
+        notificationApi.success({
+          message: '扫描完成',
+          description: `${typeName}扫描已完成`,
+          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+        });
+        fetchSystemStatus(); // 刷新状态
+      } else {
+        messageApi.error(`扫描失败: ${data.message || data.error}`);
+      }
+    } catch (err) {
+      messageApi.error('网络请求失败');
+    } finally {
+      setTriggerLoading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const triggerScheduler = async (trigger: string) => {
+    const key = `scheduler-${trigger}`;
+    setTriggerLoading(prev => ({ ...prev, [key]: true }));
+    
+    try {
+      const response = await fetch('/api/scheduler', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trigger,
+          timestamp: new Date().toISOString()
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        notificationApi.success({
+          message: '调度器触发成功',
+          description: data.message,
+          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+        });
+      } else {
+        messageApi.error(`调度器触发失败: ${data.message || data.error}`);
+      }
+    } catch (err) {
+      messageApi.error('网络请求失败');
+    } finally {
+      setTriggerLoading(prev => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const getTriggerDescription = (trigger: string) => {
+    const descriptions = {
+      'every_minute': '每分钟执行任务，用于轻量级监控',
+      'every_5_minutes': '每5分钟执行任务，高频扫描新闻',
+      'every_30_minutes': '每30分钟执行任务，中频处理',
+      'every_hour': '每小时执行任务，生成小时总结',
+      'overnight': '夜间执行任务，处理大批量数据'
+    };
+    return descriptions[trigger as keyof typeof descriptions] || '未知任务';
+  };
+
+  const getTriggerColor = (trigger: string) => {
+    const colors = {
+      'every_minute': 'green',
+      'every_5_minutes': 'blue',
+      'every_30_minutes': 'orange',
+      'every_hour': 'purple',
+      'overnight': 'red'
+    };
+    return colors[trigger as keyof typeof colors] || 'default';
   };
 
   if (loading) {
     return (
       <Layout>
-        <Loading />
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '50vh' 
+        }}>
+          <Spin size="large" tip="加载系统状态中..." />
+        </div>
       </Layout>
     );
   }
 
   return (
     <Layout>
-    <div className="space-y-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            新闻图谱应用
-          </h1>
-          <p className="text-gray-600 mb-4">
-            基于 Next.js 构建的新闻图谱可视化应用，集成了定时任务调度功能
-          </p>
+      {contextHolder}
+      {notificationContextHolder}
+      <div style={{ padding: '24px' }}>
+        {/* 页面标题和描述 */}
+        <div style={{ marginBottom: '24px' }}>
+          <Title level={1}>
+            <RobotOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
+            新闻知识图谱系统
+          </Title>
+          <Paragraph style={{ fontSize: '16px', color: '#666' }}>
+            基于AI的新闻知识图谱分析和可视化平台，集成定时任务调度、新闻扫描和AI总结功能
+          </Paragraph>
           
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-4">
-              <div className="flex">
-                <div className="text-red-800">
-                  <strong>错误:</strong> {error}
-      </div>
-            </div>
-            </div>
+            <Alert
+              message="系统错误"
+              description={error}
+              type="error"
+              showIcon
+              closable
+              style={{ marginBottom: '16px' }}
+            />
           )}
-          </div>
+        </div>
 
-        <Card
-          title="定时任务调度器"
-          subtitle="实时监控和管理定时任务"
-        >
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">
+        {/* 系统状态概览 */}
+        <Title level={2}>
+          <DatabaseOutlined style={{ marginRight: '8px' }} />
+          系统状态概览
+        </Title>
+        <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
+          <Col xs={24} sm={8}>
+            <Card 
+              title={
+                <Space>
+                  <ScheduleOutlined />
                   调度器状态
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {schedulerStatus?.timestamp ? 
-                    `最后更新: ${new Date(schedulerStatus.timestamp).toLocaleString()}` : 
-                    '状态未知'
-                  }
-                </p>
-              </div>
-          <div className="flex items-center">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  schedulerStatus?.running 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {schedulerStatus?.running ? '运行中' : '已停止'}
-                </span>
-              </div>
-            </div>
+                </Space>
+              }
+              size="small"
+            >
+              <Descriptions column={1} size="small">
+                <Descriptions.Item label="运行状态">
+                  <Badge 
+                    status={systemStatus?.scheduler?.status === 'active' ? 'processing' : 'error'} 
+                    text={systemStatus?.scheduler?.status === 'active' ? '运行中' : '已停止'} 
+                  />
+                </Descriptions.Item>
+                <Descriptions.Item label="可用触发器">
+                  <Text strong>{systemStatus?.scheduler?.available_triggers?.length || 0} 个</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="最后更新">
+                  <Text type="secondary">
+                    {systemStatus?.scheduler?.server_time ? 
+                      new Date(systemStatus.scheduler.server_time).toLocaleString() : 
+                      '未知'
+                    }
+                  </Text>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+          </Col>
 
-            {schedulerStatus?.jobs && schedulerStatus.jobs.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        任务名称
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        描述
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        调度配置
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        状态
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        操作
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {schedulerStatus.jobs.map((job) => (
-                      <tr key={job.name}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {job.name}
-            </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">
-                            {job.description}
-          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">
-                            {job.schedule}
-            </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            job.running 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {job.running ? '运行中' : '已停止'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <button
-                            onClick={() => triggerJob(job.name)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                          >
-                            手动触发
-                          </button>
-                        </td>
-                      </tr>
+          <Col xs={24} sm={8}>
+            <Card 
+              title={
+                <Space>
+                  <ScanOutlined />
+                  扫描器状态
+                </Space>
+              }
+              size="small"
+            >
+              <Descriptions column={1} size="small">
+                <Descriptions.Item label="运行状态">
+                  <Badge 
+                    status={systemStatus?.scanner?.isRunning ? 'processing' : 'default'} 
+                    text={systemStatus?.scanner?.isRunning ? '扫描中' : '空闲'} 
+                  />
+                </Descriptions.Item>
+                <Descriptions.Item label="已处理新闻">
+                  <Text strong>{systemStatus?.scanner?.processedNewsCount || 0} 条</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="上次扫描">
+                  <Text type="secondary">
+                    {systemStatus?.scanner?.lastScanTime || '从未扫描'}
+                  </Text>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+          </Col>
+
+          <Col xs={24} sm={8}>
+            <Card 
+              title={
+                <Space>
+                  <RobotOutlined />
+                  AI总结服务
+                </Space>
+              }
+              size="small"
+            >
+              <Descriptions column={1} size="small">
+                <Descriptions.Item label="可用类型">
+                  <Text strong>{systemStatus?.summary?.available_types?.length || 0} 种</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label="支持格式">
+                  <Space wrap>
+                    {systemStatus?.summary?.available_types?.map(type => (
+                      <Tag key={type} color="blue">{type}</Tag>
                     ))}
-                  </tbody>
-                </table>
-            </div>
-            )}
-          </div>
-        </Card>
+                  </Space>
+                </Descriptions.Item>
+                <Descriptions.Item label="最后更新">
+                  <Text type="secondary">
+                    {systemStatus?.summary?.server_time ? 
+                      new Date(systemStatus.summary.server_time).toLocaleString() : 
+                      '未知'
+                    }
+                  </Text>
+                </Descriptions.Item>
+              </Descriptions>
+            </Card>
+          </Col>
+        </Row>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card
-            title="高级别新闻扫描"
-            subtitle="实时监控Level 1和Level 2新闻"
-          >
-            <div className="space-y-3">
-              <div className="text-sm text-gray-600">
-                • 每5分钟执行一次<br/>
-                • 发现新的高级别新闻时发送通知<br/>
-                • 支持手动触发扫描
-            </div>
-              <button
-                onClick={() => triggerJob('high-level-scan')}
-                className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-              >
-                立即扫描
-              </button>
-          </div>
-        </Card>
+        <Divider />
 
-          <Card
-            title="小时总结"
-            subtitle="生成每小时新闻总结"
-          >
-            <div className="space-y-3">
-              <div className="text-sm text-gray-600">
-                • 工作时间(11:00-22:00)每小时执行<br/>
-                • 使用AI生成总结报告<br/>
-                • 有高级别新闻时发送通知
-                  </div>
-              <button
-                onClick={() => triggerJob('hourly-summary')}
-                className="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+        {/* 调度器触发器 */}
+        <Title level={2}>
+          <ScheduleOutlined style={{ marginRight: '8px' }} />
+          调度器触发器
+        </Title>
+        <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
+          {systemStatus?.scheduler?.available_triggers?.map((trigger) => (
+            <Col xs={24} sm={12} lg={8} key={trigger}>
+              <Card 
+                size="small"
+                title={
+                  <Space>
+                    <Tag color={getTriggerColor(trigger)}>
+                      {trigger.replace(/_/g, ' ').toUpperCase()}
+                    </Tag>
+                  </Space>
+                }
+                actions={[
+                  <Button
+                    key="trigger"
+                    type="primary"
+                    icon={<PlayCircleOutlined />}
+                    loading={triggerLoading[`scheduler-${trigger}`]}
+                    onClick={() => triggerScheduler(trigger)}
+                    block
+                  >
+                    {triggerLoading[`scheduler-${trigger}`] ? '触发中...' : '立即触发'}
+                  </Button>
+                ]}
               >
-                生成总结
-              </button>
-            </div>
-        </Card>
+                <Paragraph style={{ minHeight: '60px', margin: 0 }}>
+                  {getTriggerDescription(trigger)}
+                </Paragraph>
+              </Card>
+            </Col>
+          ))}
+        </Row>
 
-          <Card
-            title="每日总结"
-            subtitle="生成每日新闻总结"
-          >
-          <div className="space-y-3">
-              <div className="text-sm text-gray-600">
-                • 每天10:00执行<br/>
-                • 总结前一天22:00到当天10:00的新闻<br/>
-                • 发送每日总结通知
-              </div>
-              <button
-                onClick={() => triggerJob('daily-summary')}
-                className="w-full bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition-colors"
-              >
-                生成总结
-              </button>
-          </div>
-        </Card>
+        <Divider />
+
+        {/* 新闻扫描 */}
+        <Title level={2}>
+          <ScanOutlined style={{ marginRight: '8px' }} />
+          新闻扫描
+        </Title>
+        <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
+          <Col xs={24} sm={12}>
+            <Card 
+              title="自动扫描"
+              size="small"
+              actions={[
+                <Button
+                  key="auto-scan"
+                  type="primary"
+                  icon={<ScanOutlined />}
+                  loading={triggerLoading['scan-auto']}
+                  onClick={() => triggerScan('auto')}
+                  block
+                >
+                  {triggerLoading['scan-auto'] ? '扫描中...' : '开始自动扫描'}
+                </Button>
+              ]}
+            >
+              <Paragraph>
+                使用上次扫描时间到现在的时间范围自动扫描新闻，智能处理增量数据
+              </Paragraph>
+            </Card>
+          </Col>
+
+          <Col xs={24} sm={12}>
+            <Card 
+              title="手动扫描"
+              size="small"
+              actions={[
+                <Button
+                  key="manual-scan"
+                  type="primary"
+                  icon={<ReloadOutlined />}
+                  loading={triggerLoading['scan-manual']}
+                  onClick={() => triggerScan('manual')}
+                  block
+                >
+                  {triggerLoading['scan-manual'] ? '扫描中...' : '开始手动扫描'}
+                </Button>
+              ]}
+            >
+              <Paragraph>
+                手动扫描最近30分钟的新闻，发送通知且不跳过已处理的内容
+              </Paragraph>
+            </Card>
+          </Col>
+        </Row>
+
+        <Divider />
+
+        {/* AI总结生成 */}
+        <Title level={2}>
+          <FileTextOutlined style={{ marginRight: '8px' }} />
+          AI总结生成
+        </Title>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={8}>
+            <Card 
+              title={
+                <Space>
+                  <ClockCircleOutlined />
+                  小时总结
+                </Space>
+              }
+              size="small"
+              actions={[
+                <Button
+                  key="hourly-summary"
+                  type="primary"
+                  icon={<FileTextOutlined />}
+                  loading={triggerLoading['summary-hourly']}
+                  onClick={() => triggerSummary('hourly')}
+                  block
+                >
+                  {triggerLoading['summary-hourly'] ? '生成中...' : '生成小时总结'}
+                </Button>
+              ]}
+            >
+              <Paragraph>
+                生成当前小时的新闻总结报告，快速了解最新动态
+              </Paragraph>
+            </Card>
+          </Col>
+
+          <Col xs={24} sm={8}>
+            <Card 
+              title={
+                <Space>
+                  <DatabaseOutlined />
+                  每日总结
+                </Space>
+              }
+              size="small"
+              actions={[
+                <Button
+                  key="daily-summary"
+                  type="primary"
+                  icon={<FileTextOutlined />}
+                  loading={triggerLoading['summary-daily']}
+                  onClick={() => triggerSummary('daily')}
+                  block
+                >
+                  {triggerLoading['summary-daily'] ? '生成中...' : '生成每日总结'}
+                </Button>
+              ]}
+            >
+              <Paragraph>
+                生成当日的新闻总结报告，全面回顾一天的重要新闻
+              </Paragraph>
+            </Card>
+          </Col>
+
+          <Col xs={24} sm={8}>
+            <Card 
+              title={
+                <Space>
+                  <RobotOutlined />
+                  自定义总结
+                </Space>
+              }
+              size="small"
+              actions={[
+                <Button
+                  key="custom-summary"
+                  type="primary"
+                  icon={<FileTextOutlined />}
+                  loading={triggerLoading['summary-custom']}
+                  onClick={() => triggerSummary('custom')}
+                  block
+                >
+                  {triggerLoading['summary-custom'] ? '生成中...' : '生成自定义总结'}
+                </Button>
+              ]}
+            >
+              <Paragraph>
+                生成最近1小时的自定义新闻总结，灵活控制时间范围
+              </Paragraph>
+            </Card>
+          </Col>
+        </Row>
       </div>
-    </div>
     </Layout>
   );
 }

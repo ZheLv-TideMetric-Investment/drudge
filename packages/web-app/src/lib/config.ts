@@ -14,6 +14,23 @@ export const config = {
     database: process.env.NEO4J_DATABASE || 'neo4j'
   },
   
+  // AI配置
+  ai: {
+    provider: process.env.AI_PROVIDER || 'deepseek',
+    deepseek: {
+      model: process.env.DEEPSEEK_MODEL || 'deepseek-reasoner',
+      apiKey: process.env.DEEPSEEK_API_KEY || ''
+    },
+    google: {
+      model: process.env.GOOGLE_MODEL || 'gemini-1.5-flash',
+      apiKey: process.env.GOOGLE_API_KEY || ''
+    },
+    qwen: {
+      model: process.env.QWEN_MODEL || 'qwen-max',
+      apiKey: process.env.QWEN_API_KEY || ''
+    }
+  },
+  
   // 通知配置
   notification: {
     enableWebhookNotification: process.env.ENABLE_WEBHOOK_NOTIFICATION === 'true',

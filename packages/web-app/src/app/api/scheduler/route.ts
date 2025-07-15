@@ -121,7 +121,8 @@ async function handleEvery5Minutes(timestamp: string, metadata?: Record<string, 
   console.log(`[每5分钟触发器] 执行高级别新闻扫描: ${timestamp}`);
   
   try {
-    const scanResult = await highLevelNewsScanner.scanHighLevelNews(CallSource.SCHEDULER);
+    // 使用定时扫描方法，会自动使用上次扫描时间作为起始时间
+    const scanResult = await highLevelNewsScanner.scanHighLevelNewsScheduled(CallSource.SCHEDULER);
     
     return {
       message: `高级别新闻扫描完成，发现 ${scanResult.found} 条，发送 ${scanResult.sent} 条通知`,
@@ -165,6 +166,7 @@ async function handleEveryHour(timestamp: string, metadata?: Record<string, unkn
   console.log(`[每小时触发器] 执行小时总结: ${timestamp}`);
   
   try {
+    // 使用便捷方法生成小时总结，会自动检查时间范围
     const summaryResult = await summaryService.generateHourlySummary(undefined, CallSource.SCHEDULER);
     
     return {
@@ -189,6 +191,7 @@ async function handleOvernight(timestamp: string, metadata?: Record<string, unkn
   console.log(`[隔夜触发器] 执行每日总结: ${timestamp}`);
   
   try {
+    // 使用便捷方法生成每日总结，会自动检查时间范围
     const summaryResult = await summaryService.generateDailySummary(CallSource.SCHEDULER);
     
     return {
