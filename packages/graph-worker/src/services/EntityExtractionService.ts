@@ -664,7 +664,7 @@ export class EntityExtractionService {
           sentiment: event.sentiment || 'neutral',
           magnitude: event.magnitude || 0,
           event_level: event.event_level || 'Level 5',
-          event_date: event.event_date || new Date((newsItem.time || 0) * 1000).toISOString(),
+          event_date: event.event_date || new Date().toISOString(), // 使用当前时间而不是1970
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }));

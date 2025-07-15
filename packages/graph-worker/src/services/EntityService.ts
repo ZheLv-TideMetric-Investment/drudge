@@ -61,7 +61,7 @@ export class EntityService {
       id: newsItem.id,
       title: newsItem.title,
       content: newsItem.content,
-      timestamp: new Date((newsItem.time || 0) * 1000).toISOString(),
+      timestamp: newsItem.time && newsItem.time > 0 ? new Date(newsItem.time * 1000).toISOString() : new Date().toISOString(),
       source: newsItem.source || '',
       url: newsItem.url || '',
       level: newsItem.level || 0,
