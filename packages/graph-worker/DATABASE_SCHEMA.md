@@ -10,6 +10,11 @@
 - **版本**: Neo4j 5.x+
 - **编码**: UTF-8
 
+### 系统特性
+- **时间处理**: 所有时间数据统一使用北京时间 (Asia/Shanghai 时区)
+- **数据质量**: 严格的数据验证，不允许兜底数据，确保数据准确性
+- **失败处理**: 处理失败的新闻数据会保存到 `data/news/failed` 目录便于后续分析
+
 ---
 
 ## 节点类型 (Node Types)
@@ -160,7 +165,6 @@
 | `type` | String | ✗ | 地点类型 (见枚举值) |
 | `country` | String | ✗ | 国家代码 |
 | `region` | String | ✗ | 地区 |
-| `coordinates` | Object | ✗ | 坐标信息 |
 | `created_at` | DateTime | ✓ | 创建时间 |
 | `updated_at` | DateTime | ✓ | 更新时间 |
 
@@ -171,15 +175,7 @@
 - `facility`: 设施
 - `other`: 其他
 
-**坐标格式**:
-```json
-{
-  "coordinates": {
-    "latitude": 35.6762,
-    "longitude": 139.6503
-  }
-}
-```
+> **注意**: 坐标信息(coordinates)字段已移除，后续将通过专门的地理定位服务来处理坐标数据。
 
 ### 7. Time (时间节点)
 表示时间实体。
@@ -189,14 +185,16 @@
 **属性**:
 | 属性名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| `time_value` | String | ✓ | 时间值 (ISO 8601格式) |
+| `time_value` | String | ✓ | 时间值 (ISO 8601格式，北京时间) |
 | `type` | String | ✗ | 时间类型 (见枚举值) |
 | `precision` | String | ✗ | 时间精度 (见枚举值) |
-| `timezone` | String | ✗ | 时区 |
+| `timezone` | String | ✗ | 时区 (统一为 Asia/Shanghai) |
 | `raw_value` | String | ✗ | 原始时间字符串 |
 | `parsed_iso` | String | ✗ | 解析后的ISO时间 |
 | `created_at` | DateTime | ✓ | 创建时间 |
 | `updated_at` | DateTime | ✓ | 更新时间 |
+
+> **时间处理说明**: 系统使用智能时间解析器，支持多种时间格式输入（秒级/毫秒级时间戳、ISO字符串、自然语言时间等），统一转换为北京时间存储。
 
 **时间类型枚举**:
 - `DATETIME`: 日期时间
@@ -255,6 +253,102 @@
 | `source_news` | String | 源新闻ID (推断关系) |
 | `created_at` | DateTime | 创建时间 |
 | `updated_at` | DateTime | 更新时间 |
+
+---
+
+## 数据处理机制
+
+### 智能时间处理
+
+系统内置智能时间解析器 (`TimeParser`)，具备以下特性：
+
+- **多格式支持**: 自动识别并处理秒级时间戳、毫秒级时间戳、ISO字符串、自然语言时间等
+- **时区统一**: 所有时间数据统一转换为北京时间 (Asia/Shanghai)
+- **兜底机制**: 无效时间输入自动使用当前北京时间
+- **智能识别**: 自动判断时间戳的精度级别
+
+**支持的时间格式示例**:
+```javascript
+// 秒级时间戳
+1703175600 → "2023-12-22T00:20:00.000+08:00"
+
+// 毫秒级时间戳  
+1703175600000 → "2023-12-22T00:20:00.000+08:00"
+
+// ISO字符串
+"2023-12-21T13:00:00Z" → "2023-12-21T21:00:00.000+08:00"
+
+// 自然语言
+"今天下午3点" → 当前日期下午15:00北京时间
+```
+
+### 严格数据验证
+
+系统采用严格的数据验证策略：
+
+- **无兜底数据**: 不允许创建空白或默认的兜底数据
+- **必须成功**: 每条新闻数据必须成功解析所有实体和关系
+- **5次重试**: AI提取失败时最多重试5次
+- **智能修复**: 内置JSON格式错误修复机制
+
+### 失败新闻处理机制
+
+对于无法成功处理的新闻数据，系统采用以下策略：
+
+#### 失败数据存储位置
+```
+data/news/failed/failed_{newsId}_{timestamp}.json
+```
+
+#### 失败数据结构
+```json
+{
+  "newsItem": {
+    "id": "news_123",
+    "title": "新闻标题",
+    "content": "新闻内容",
+    "source": "数据源",
+    "url": "新闻链接",
+    "time": 1721030018
+  },
+  "error": {
+    "message": "具体错误信息",
+    "stack": "错误堆栈信息",
+    "timestamp": "2025-07-15T09:33:38.456Z",
+    "service": "EntityExtractionService"
+  },
+  "metadata": {
+    "failedAt": "2025-07-15T09:33:38.456Z",
+    "originalId": "news_123",
+    "source": "数据源",
+    "title": "新闻标题"
+  }
+}
+```
+
+#### 失败处理流程
+
+1. **检测失败**: AI提取或数据解析过程中发生异常
+2. **保存数据**: 将完整的新闻数据和错误信息保存到失败目录
+3. **发送通知**: 通过Webhook发送失败通知
+4. **继续处理**: 不中断批处理，继续处理其他新闻
+5. **统计报告**: 提供详细的成功/失败统计信息
+
+#### 批处理统计示例
+```
+✅ 批量六要素提取完成: 成功 8 条，失败 2 条，总计 10 条新闻
+⚠️ 2 条新闻处理失败，已保存到 data/news/failed 目录
+```
+
+### JSON修复机制
+
+系统内置智能JSON修复功能，能够处理AI返回的常见格式错误：
+
+- **空键修复**: 处理 `{"company_name":"测试","","industry":""}` 类型错误
+- **分号修复**: 修复错误的分号分隔符
+- **逗号修复**: 处理缺失或多余的逗号
+- **引号修复**: 修复不匹配的引号
+- **尾随逗号**: 清理JSON尾部的多余逗号
 
 ---
 
@@ -433,12 +527,26 @@ RETURN e.event_date as date,
 ORDER BY e.event_date;
 ```
 
-#### 新闻发布频率
+#### 新闻发布频率（北京时间）
 ```cypher
+MATCH (n:News)
+RETURN date(datetime({epochMillis: apoc.date.parse(n.timestamp, 'ms'), timezone: 'Asia/Shanghai'})) as beijingDate,
+       count(n) as newsCount
+ORDER BY beijingDate;
+
+// 简化版本
 MATCH (n:News)
 RETURN date(n.timestamp) as date,
        count(n) as newsCount
 ORDER BY date;
+
+// 按小时统计（北京时间）
+MATCH (n:News)
+WITH datetime({epochMillis: apoc.date.parse(n.timestamp, 'ms'), timezone: 'Asia/Shanghai'}) as beijingTime
+RETURN date(beijingTime) as date,
+       beijingTime.hour as hour,
+       count(*) as newsCount
+ORDER BY date, hour;
 ```
 
 ---
@@ -622,10 +730,16 @@ RETURN c, r, related;
 
 #### 时间范围查询
 ```cypher
-// 查找指定时间范围内的新闻和事件
+// 查找指定时间范围内的新闻和事件（北京时间）
 MATCH (n:News)-[:DESCRIBES]->(e:Event)
-WHERE n.timestamp >= '2024-01-01' AND n.timestamp <= '2024-12-31'
+WHERE n.timestamp >= '2024-01-01T00:00:00+08:00' AND n.timestamp <= '2024-12-31T23:59:59+08:00'
 RETURN n.title, e.event_name, e.sentiment, n.timestamp
+ORDER BY n.timestamp DESC;
+
+// 查找今天的新闻（北京时间）
+MATCH (n:News)
+WHERE date(n.timestamp) = date(datetime({timezone: 'Asia/Shanghai'}))
+RETURN n.title, n.timestamp
 ORDER BY n.timestamp DESC;
 ```
 
@@ -736,6 +850,25 @@ npm run cli query "关键词" 10
 # 数据库维护
 npm run cli db-clean-duplicates  # 清理重复数据
 npm run cli db-clean-orphaned    # 清理孤立节点
+
+# 失败新闻处理
+ls -la ../../data/news/failed/   # 查看失败新闻文件
+cat ../../data/news/failed/failed_*.json | jq '.error.message'  # 查看失败原因
+```
+
+### 失败新闻分析
+```bash
+# 统计失败新闻数量
+find ../../data/news/failed/ -name "*.json" | wc -l
+
+# 查看最近的失败新闻
+ls -lt ../../data/news/failed/ | head -5
+
+# 分析失败原因分布
+grep -h '"message"' ../../data/news/failed/*.json | sort | uniq -c | sort -nr
+
+# 清理旧的失败记录（谨慎操作）
+find ../../data/news/failed/ -name "*.json" -mtime +30 -delete
 ```
 
 ---
@@ -770,10 +903,38 @@ A:
 2. 删除不必要的关系和节点
 3. 使用 `CALL db.cleanup.compactStore()` 压缩存储
 
+### Q: 新闻处理失败怎么办？
+A: 
+1. 检查 `data/news/failed/` 目录中的失败记录
+2. 分析错误信息，常见原因包括：AI服务异常、网络超时、数据格式错误
+3. 修复问题后可以重新处理失败的新闻数据
+4. 系统会自动重试5次，大部分临时问题会自动恢复
+
+### Q: 如何监控系统处理质量？
+A: 
+1. 查看批处理日志中的成功/失败统计
+2. 定期检查失败新闻目录的文件数量
+3. 分析失败原因的分布情况
+4. 设置监控告警，当失败率超过阈值时通知
+
+### Q: 时间数据显示不正确怎么办？
+A: 
+1. 确认所有时间数据都已转换为北京时间
+2. 检查原始数据的时间格式是否正确
+3. 系统支持多种时间格式，通常能自动识别和转换
+4. 如有问题，查看 TimeParser 的处理日志
+
 ---
 
 ## 更新日志
 
+- **v3.0.0**: 重大系统升级
+  - 新增智能时间解析器，统一北京时区处理
+  - 移除兜底数据机制，实施严格数据验证
+  - 新增失败新闻处理机制，完善错误跟踪
+  - 移除Location节点的coordinates字段
+  - 增强JSON修复能力，提高数据解析成功率
+  - AI重试次数增加到5次
 - **v2.0.0**: 完整重构，优化数据结构，增加约束和索引
 - **v1.0.0**: 初始版本，基础数据结构
 
