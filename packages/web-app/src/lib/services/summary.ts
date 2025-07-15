@@ -204,6 +204,7 @@ class SummaryService {
 
 涉及公司：${hourlyData.companies.slice(0, 10).join(', ')}
 涉及人物：${hourlyData.persons.slice(0, 10).join(', ')}
+涉及机构：${hourlyData.organizations?.slice(0, 10).join(', ') || '无'}
 涉及地点：${hourlyData.locations.slice(0, 5).join(', ')}
 
 主要新闻：
@@ -254,6 +255,7 @@ ${hourlyData.news_items.map((item: any, index: number) =>
 
 涉及主要公司：${dailyData.companies.slice(0, 15).join(', ')}
 涉及重要人物：${dailyData.persons.slice(0, 10).join(', ')}
+涉及关键机构：${dailyData.organizations?.slice(0, 10).join(', ') || '无'}
 
 重要新闻列表：
 ${dailyData.news_items

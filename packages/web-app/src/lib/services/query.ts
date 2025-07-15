@@ -17,15 +17,17 @@ class QueryService {
         MATCH (n:News)
         WHERE n.timestamp >= $startTime AND n.timestamp <= $endTime
         OPTIONAL MATCH (n)-[:DESCRIBES]->(e:Event)
-        OPTIONAL MATCH (e)-[:INVOLVES]->(c:Company)
-        OPTIONAL MATCH (e)-[:INVOLVES]->(p:Person)
-        OPTIONAL MATCH (e)-[:INVOLVES]->(l:Location)
+        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(c:Company)
+        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(p:Person)
+        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(o:Organization)
+        OPTIONAL MATCH (e)-[:LOCATED_AT]->(l:Location)
         
         RETURN 
           count(DISTINCT n) as news_count,
           count(DISTINCT e) as event_count,
           collect(DISTINCT c.company_name) as companies,
           collect(DISTINCT p.person_name) as persons,
+          collect(DISTINCT o.organization_name) as organizations,
           collect(DISTINCT l.location_name) as locations,
           collect({
             newsId: n.id,
@@ -46,6 +48,7 @@ class QueryService {
           event_count: 0,
           companies: [],
           persons: [],
+          organizations: [],
           locations: [],
           news_items: []
         };
@@ -57,6 +60,7 @@ class QueryService {
         event_count: record.get('event_count').toNumber(),
         companies: record.get('companies').filter(Boolean),
         persons: record.get('persons').filter(Boolean),
+        organizations: record.get('organizations').filter(Boolean),
         locations: record.get('locations').filter(Boolean),
         news_items: record.get('news_items').filter((item: any) => item.title)
       };
@@ -77,8 +81,9 @@ class QueryService {
           AND n.timestamp <= $endTime
           AND n.news_level IN ['Level 1', 'Level 2']
         OPTIONAL MATCH (n)-[:DESCRIBES]->(e:Event)
-        OPTIONAL MATCH (e)-[:INVOLVES]->(c:Company)
-        OPTIONAL MATCH (e)-[:INVOLVES]->(p:Person)
+        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(c:Company)
+        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(p:Person)
+        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(o:Organization)
         RETURN 
           n.id as newsId,
           n.title as title,
@@ -89,6 +94,7 @@ class QueryService {
           n.url as url,
           collect(DISTINCT c.company_name) as companies,
           collect(DISTINCT p.person_name) as persons,
+          collect(DISTINCT o.organization_name) as organizations,
           collect(DISTINCT e.event_name) as events,
           collect(DISTINCT e.event_level) as event_levels
         ORDER BY n.timestamp DESC
@@ -113,6 +119,7 @@ class QueryService {
           url: record.get('url'),
           companies: record.get('companies').filter(Boolean),
           persons: record.get('persons').filter(Boolean),
+          organizations: record.get('organizations').filter(Boolean),
           events: record.get('events').filter(Boolean),
           event_levels: eventLevels,
           urgency: hasUrgentEvent ? 'critical' : record.get('level') === 'Level 1' ? 'high' : 'medium'
@@ -133,8 +140,9 @@ class QueryService {
         MATCH (n:News)
         WHERE n.timestamp >= $startTime AND n.timestamp <= $endTime
         OPTIONAL MATCH (n)-[:DESCRIBES]->(e:Event)
-        OPTIONAL MATCH (e)-[:INVOLVES]->(c:Company)
-        OPTIONAL MATCH (e)-[:INVOLVES]->(p:Person)
+        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(c:Company)
+        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(p:Person)
+        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(o:Organization)
         
         RETURN 
           count(DISTINCT n) as news_count,
@@ -143,6 +151,7 @@ class QueryService {
           sum(CASE WHEN n.news_level = 'Level 1' THEN 1 ELSE 0 END) as critical_count,
           collect(DISTINCT c.company_name) as companies,
           collect(DISTINCT p.person_name) as persons,
+          collect(DISTINCT o.organization_name) as organizations,
           collect({
             newsId: n.id,
             title: n.title,
@@ -164,6 +173,7 @@ class QueryService {
           critical_count: 0,
           companies: [],
           persons: [],
+          organizations: [],
           news_items: []
         };
       }
@@ -176,12 +186,248 @@ class QueryService {
         critical_count: record.get('critical_count').toNumber(),
         companies: record.get('companies').filter(Boolean),
         persons: record.get('persons').filter(Boolean),
+        organizations: record.get('organizations').filter(Boolean),
         news_items: record.get('news_items').filter((item: any) => item.title)
       };
     } catch (error: any) {
       console.error('获取每日新闻数据失败:', error);
       throw error;
     }
+  }
+
+  /**
+   * 搜索实体
+   */
+  async searchEntities(searchTerm: string, nodeType?: string, limit: number = 20): Promise<any[]> {
+    try {
+      let cypher: string;
+      
+      if (nodeType) {
+        // 搜索特定类型的节点
+        switch (nodeType.toLowerCase()) {
+          case 'company':
+            cypher = `
+              MATCH (c:Company)
+              WHERE c.company_name CONTAINS $searchTerm
+              OPTIONAL MATCH (c)-[r]-()
+              RETURN c as entity, 
+                     'Company' as type,
+                     c.company_name as name,
+                     count(r) as connections
+              ORDER BY connections DESC, c.company_name
+              LIMIT $limit
+            `;
+            break;
+          case 'person':
+            cypher = `
+              MATCH (p:Person)
+              WHERE p.person_name CONTAINS $searchTerm
+              OPTIONAL MATCH (p)-[r]-()
+              RETURN p as entity,
+                     'Person' as type,
+                     p.person_name as name,
+                     count(r) as connections
+              ORDER BY connections DESC, p.person_name
+              LIMIT $limit
+            `;
+            break;
+          case 'organization':
+            cypher = `
+              MATCH (o:Organization)
+              WHERE o.organization_name CONTAINS $searchTerm
+              OPTIONAL MATCH (o)-[r]-()
+              RETURN o as entity,
+                     'Organization' as type,
+                     o.organization_name as name,
+                     count(r) as connections
+              ORDER BY connections DESC, o.organization_name
+              LIMIT $limit
+            `;
+            break;
+          case 'location':
+            cypher = `
+              MATCH (l:Location)
+              WHERE l.location_name CONTAINS $searchTerm
+              OPTIONAL MATCH (l)-[r]-()
+              RETURN l as entity,
+                     'Location' as type,
+                     l.location_name as name,
+                     count(r) as connections
+              ORDER BY connections DESC, l.location_name
+              LIMIT $limit
+            `;
+            break;
+          case 'event':
+            cypher = `
+              MATCH (e:Event)
+              WHERE e.event_name CONTAINS $searchTerm OR e.event_description CONTAINS $searchTerm
+              OPTIONAL MATCH (e)-[r]-()
+              RETURN e as entity,
+                     'Event' as type,
+                     e.event_name as name,
+                     count(r) as connections
+              ORDER BY connections DESC, e.event_name
+              LIMIT $limit
+            `;
+            break;
+          default:
+            throw new Error(`不支持的节点类型: ${nodeType}`);
+        }
+      } else {
+        // 搜索所有类型的节点
+        cypher = `
+          CALL {
+            MATCH (c:Company)
+            WHERE c.company_name CONTAINS $searchTerm
+            OPTIONAL MATCH (c)-[r]-()
+            RETURN c as entity, 'Company' as type, c.company_name as name, count(r) as connections
+            UNION
+            MATCH (p:Person)
+            WHERE p.person_name CONTAINS $searchTerm
+            OPTIONAL MATCH (p)-[r]-()
+            RETURN p as entity, 'Person' as type, p.person_name as name, count(r) as connections
+            UNION
+            MATCH (o:Organization)
+            WHERE o.organization_name CONTAINS $searchTerm
+            OPTIONAL MATCH (o)-[r]-()
+            RETURN o as entity, 'Organization' as type, o.organization_name as name, count(r) as connections
+            UNION
+            MATCH (l:Location)
+            WHERE l.location_name CONTAINS $searchTerm
+            OPTIONAL MATCH (l)-[r]-()
+            RETURN l as entity, 'Location' as type, l.location_name as name, count(r) as connections
+            UNION
+            MATCH (e:Event)
+            WHERE e.event_name CONTAINS $searchTerm OR e.event_description CONTAINS $searchTerm
+            OPTIONAL MATCH (e)-[r]-()
+            RETURN e as entity, 'Event' as type, e.event_name as name, count(r) as connections
+          }
+          RETURN entity, type, name, connections
+          ORDER BY connections DESC, name
+          LIMIT $limit
+        `;
+      }
+
+      const result = await this.neo4j.executeQuery(cypher, {
+        searchTerm,
+        limit
+      });
+
+      return result.records.map((record: any) => ({
+        entity: record.get('entity').properties,
+        type: record.get('type'),
+        name: record.get('name'),
+        connections: record.get('connections').toNumber()
+      }));
+    } catch (error: any) {
+      console.error('搜索实体失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取图谱数据
+   */
+  async getGraphData(query?: string, limit: number = 100): Promise<any> {
+    try {
+      let cypher: string;
+      let parameters: any = { limit };
+
+      if (query) {
+        // 有查询条件时，搜索相关节点和关系
+        cypher = `
+          CALL {
+            MATCH (n)
+            WHERE ANY(prop IN keys(n) WHERE toString(n[prop]) CONTAINS $query)
+            RETURN n
+            UNION
+            MATCH (n)-[r]->(m)
+            WHERE ANY(prop IN keys(r) WHERE toString(r[prop]) CONTAINS $query)
+            RETURN n
+            UNION
+            MATCH (n)<-[r]-(m)
+            WHERE ANY(prop IN keys(r) WHERE toString(r[prop]) CONTAINS $query)
+            RETURN n
+          }
+          WITH DISTINCT n
+          MATCH (n)-[r]-(m)
+          RETURN n, r, m
+          LIMIT $limit
+        `;
+        parameters.query = query;
+      } else {
+        // 无查询条件时，返回基本的图谱概览
+        cypher = `
+          MATCH (n)-[r]-(m)
+          RETURN n, r, m
+          ORDER BY rand()
+          LIMIT $limit
+        `;
+      }
+
+      const result = await this.neo4j.executeQuery(cypher, parameters);
+
+      const nodes = new Map();
+      const edges: any[] = [];
+
+      result.records.forEach((record: any) => {
+        const n = record.get('n');
+        const r = record.get('r');
+        const m = record.get('m');
+
+        // 添加节点
+        if (!nodes.has(n.identity.toString())) {
+          nodes.set(n.identity.toString(), {
+            id: n.identity.toString(),
+            name: this.getNodeName(n),
+            type: n.labels[0],
+            properties: n.properties
+          });
+        }
+
+        if (!nodes.has(m.identity.toString())) {
+          nodes.set(m.identity.toString(), {
+            id: m.identity.toString(),
+            name: this.getNodeName(m),
+            type: m.labels[0],
+            properties: m.properties
+          });
+        }
+
+        // 添加边
+        edges.push({
+          id: r.identity.toString(),
+          source: r.start.toString(),
+          target: r.end.toString(),
+          type: r.type,
+          properties: r.properties
+        });
+      });
+
+      return {
+        nodes: Array.from(nodes.values()),
+        edges
+      };
+    } catch (error: any) {
+      console.error('获取图谱数据失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取节点名称
+   */
+  private getNodeName(node: any): string {
+    const props = node.properties;
+    if (props.company_name) return props.company_name;
+    if (props.person_name) return props.person_name;
+    if (props.organization_name) return props.organization_name;
+    if (props.location_name) return props.location_name;
+    if (props.event_name) return props.event_name;
+    if (props.time_value) return props.time_value;
+    if (props.title) return props.title;
+    if (props.name) return props.name;
+    return node.labels[0] || 'Unknown';
   }
 
   /**

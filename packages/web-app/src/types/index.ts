@@ -1,55 +1,100 @@
 // 新闻相关类型
 export interface NewsItem {
-  newsId: string;
+  id: string; // 更新：从newsId改为id以匹配数据库schema
   title: string;
   content: string;
-  timestamp: string;
   source: string;
   url?: string;
-  news_level: string;
+  timestamp: string; // DateTime类型，北京时间
+  news_level: string; // Level 1-5
+  level: number; // 数值级别 (0-4)
   processed: boolean;
   created_at: string;
   updated_at: string;
 }
 
-// 实体类型
+// 基础实体类型
 export interface Entity {
   id: string;
   name: string;
-  type: 'Company' | 'Person' | 'Location' | 'Event' | 'Time';
+  type: 'Company' | 'Person' | 'Location' | 'Event' | 'Time' | 'Organization';
   properties: Record<string, string | number | boolean>;
 }
 
+// 公司节点
 export interface Company extends Entity {
   type: 'Company';
   company_name: string;
+  ticker?: string;
   industry?: string;
   market?: string;
   country?: string;
+  aliases?: string[];
+  created_at: string;
+  updated_at: string;
 }
 
+// 人物节点
 export interface Person extends Entity {
   type: 'Person';
   person_name: string;
   title?: string;
+  company?: string;
   nationality?: string;
+  created_at: string;
+  updated_at: string;
 }
 
+// 机构节点
+export interface Organization extends Entity {
+  type: 'Organization';
+  organization_name: string;
+  type_detail?: 'government' | 'regulator' | 'intl_org' | 'fin_inst' | 'industry_assoc' | 'other';
+  country?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 地点节点
 export interface Location extends Entity {
   type: 'Location';
   location_name: string;
-  location_type?: string;
-  coordinates?: string;
+  location_type?: 'country' | 'region' | 'city' | 'facility' | 'other';
+  country?: string;
+  region?: string;
+  created_at: string;
+  updated_at: string;
 }
 
+// 事件节点
 export interface Event extends Entity {
   type: 'Event';
+  event_id: string;
   event_name: string;
-  event_description?: string;
-  event_type?: string;
-  event_level?: string;
-  sentiment?: string;
-  magnitude?: number;
+  event_description: string;
+  event_type: 'macro' | 'policy' | 'market' | 'corporate' | 'industry' | 'tech' | 'geopolitics' | 'other';
+  significance: number; // 1-4
+  sentiment: 'positive' | 'negative' | 'neutral';
+  magnitude: number; // -1.0 到 1.0
+  event_level: string; // Level 1-5
+  event_date: string;
+  raw_event_date?: string;
+  parsed_event_date?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 时间节点
+export interface Time extends Entity {
+  type: 'Time';
+  time_value: string; // ISO 8601格式，北京时间
+  time_type?: 'DATETIME' | 'DATE' | 'TIME' | 'PERIOD' | 'OTHER';
+  precision?: 'YEAR' | 'MONTH' | 'DAY' | 'HOUR' | 'MINUTE' | 'SECOND';
+  timezone?: string; // 统一为 Asia/Shanghai
+  raw_value?: string;
+  parsed_iso?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // 关系类型
@@ -57,7 +102,14 @@ export interface Relationship {
   id: string;
   source: string;
   target: string;
-  type: string;
+  type: 'LOCATED_IN' | 'WORKS_FOR' | 'OWNS' | 'PARTICIPATES_IN' | 'MERGES_WITH' | 'ACQUIRES' | 'SUPPLIES' | 'PARTNERS_WITH' | 'SUED_BY' | 'REGULATED_BY' | 'INVESTS_IN' | 'DESCRIBES' | 'LOCATED_AT' | 'OCCURRED_AT' | 'OTHER';
+  description?: string;
+  confidence?: number; // 0.0-1.0
+  inferred?: boolean;
+  newsId?: string;
+  source_news?: string;
+  created_at: string;
+  updated_at: string;
   properties?: Record<string, string | number | boolean>;
 }
 
@@ -67,7 +119,7 @@ export interface GraphData {
   edges: Relationship[];
 }
 
-// 总结类型
+// 总结类型（保持不变，因为这些是应用层面的）
 export interface HourlySummary {
   id: string;
   hour_start: string;
@@ -118,6 +170,7 @@ export interface GraphStats {
   events: number;
   locations: number;
   times: number;
+  organizations: number; // 新增：机构统计
 }
 
 // API响应类型
@@ -147,6 +200,7 @@ export interface SearchParams {
   source?: string;
   page?: number;
   pageSize?: number;
+  nodeType?: 'Company' | 'Person' | 'Organization' | 'Location' | 'Event' | 'Time'; // 新增：节点类型过滤
 }
 
 // 实时监控
@@ -167,4 +221,23 @@ export interface GraphConfig {
   nodeSize: 'fixed' | 'byConnections' | 'byImportance';
   edgeWidth: 'fixed' | 'byWeight';
   colorScheme: 'default' | 'byType' | 'byLevel';
+}
+
+// 新增：图谱查询结果类型
+export interface GraphQueryResult {
+  nodes: Entity[];
+  relationships: Relationship[];
+  summary: {
+    nodeCount: number;
+    relationshipCount: number;
+    nodeTypes: Record<string, number>;
+    relationshipTypes: Record<string, number>;
+  };
+}
+
+// 新增：实体搜索结果类型
+export interface EntitySearchResult {
+  entity: Entity;
+  score: number; // 搜索相关性评分
+  connections: number; // 连接数量
 } 

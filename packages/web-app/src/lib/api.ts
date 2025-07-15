@@ -10,7 +10,8 @@ import type {
   MonitorAlert,
   SearchParams,
   PaginatedResponse,
-  ApiResponse
+  ApiResponse,
+  EntitySearchResult
 } from '@/types';
 
 class ApiClient {
@@ -50,7 +51,7 @@ class ApiClient {
   }
 
   // 新闻相关API
-  async getNews(params?: SearchParams): Promise<PaginatedResponse<NewsItem>> {
+  async getNews(params?: SearchParams): Promise<ApiResponse<PaginatedResponse<NewsItem>>> {
     return this.client.get('/api/news', { params });
   }
 
@@ -58,32 +59,28 @@ class ApiClient {
     return this.client.get(`/api/news/${id}`);
   }
 
-  async searchNews(query: string, limit = 20): Promise<ApiResponse<NewsItem[]>> {
-    return this.client.get('/api/news/search', { 
-      params: { query, limit } 
+  async searchNews(query: string, filters?: SearchParams): Promise<ApiResponse<NewsItem[]>> {
+    return this.client.get('/api/news/search', {
+      params: { query, ...filters }
     });
   }
 
-  async getNewsByLevel(level: string, limit = 20): Promise<ApiResponse<NewsItem[]>> {
-    return this.client.get('/api/news/by-level', { 
-      params: { level, limit } 
-    });
+  async getNewsByLevel(level: string): Promise<ApiResponse<NewsItem[]>> {
+    return this.client.get(`/api/news/level/${level}`);
   }
 
-  async getNewsStats(days = 7): Promise<ApiResponse<NewsStats>> {
-    return this.client.get('/api/news/stats', { 
-      params: { days } 
-    });
+  async getNewsStats(): Promise<ApiResponse<NewsStats>> {
+    return this.client.get('/api/news/stats');
   }
 
   // 知识图谱相关API
-  async getGraphData(query?: string, limit = 100): Promise<ApiResponse<GraphData>> {
+  async getGraphData(query?: string, limit = 100, nodeType?: string): Promise<ApiResponse<GraphData>> {
     return this.client.get('/api/graph/data', { 
-      params: { query, limit } 
+      params: { query, limit, nodeType } 
     });
   }
 
-  async getGraphStats(): Promise<ApiResponse<GraphStats>> {
+  async getGraphStats(): Promise<ApiResponse<GraphStats & { relationshipDistribution: Record<string, number> }>> {
     return this.client.get('/api/graph/stats');
   }
 
@@ -91,43 +88,53 @@ class ApiClient {
     searchTerm: string, 
     nodeType?: string, 
     limit = 20
-  ): Promise<ApiResponse<unknown[]>> {
+  ): Promise<ApiResponse<EntitySearchResult[]>> {
     return this.client.get('/api/graph/entities/search', {
       params: { searchTerm, nodeType, limit }
     });
   }
 
-  async getCompanyEvents(companyName: string, limit = 50): Promise<ApiResponse<unknown[]>> {
-    return this.client.get('/api/graph/company-events', {
-      params: { companyName, limit }
+  async getEntityNeighborhood(
+    entityId: string,
+    depth = 1,
+    limit = 50
+  ): Promise<ApiResponse<GraphData>> {
+    return this.client.get(`/api/graph/entities/${entityId}/neighborhood`, {
+      params: { depth, limit }
     });
   }
 
-  async getRelatedNews(query: string, limit = 10): Promise<ApiResponse<NewsItem[]>> {
-    return this.client.get('/api/graph/related-news', {
-      params: { query, limit }
+  async getCompanyEvents(companyName: string): Promise<ApiResponse<unknown[]>> {
+    return this.client.get('/api/graph/companies/events', {
+      params: { companyName }
+    });
+  }
+
+  async getRelatedNews(newsId: string, limit = 10): Promise<ApiResponse<NewsItem[]>> {
+    return this.client.get('/api/news/related', {
+      params: { newsId, limit }
     });
   }
 
   // 总结相关API
-  async getHourlySummaries(hours = 24): Promise<ApiResponse<HourlySummary[]>> {
-    return this.client.get('/api/summary/hourly', { 
-      params: { hours } 
+  async getHourlySummaries(date?: string): Promise<ApiResponse<HourlySummary[]>> {
+    return this.client.get('/api/summary/hourly', {
+      params: { date }
     });
   }
 
-  async generateHourlySummary(hour?: number): Promise<ApiResponse<HourlySummary>> {
-    return this.client.post('/api/summary/hourly/generate', { hour });
+  async generateHourlySummary(hour?: number): Promise<ApiResponse<unknown>> {
+    return this.client.post('/api/summary/hourly', { hour });
   }
 
-  async getDailySummaries(days = 7): Promise<ApiResponse<DailySummary[]>> {
-    return this.client.get('/api/summary/daily', { 
-      params: { days } 
+  async getDailySummaries(startDate?: string, endDate?: string): Promise<ApiResponse<DailySummary[]>> {
+    return this.client.get('/api/summary/daily', {
+      params: { startDate, endDate }
     });
   }
 
-  async generateDailySummary(): Promise<ApiResponse<DailySummary>> {
-    return this.client.post('/api/summary/daily/generate');
+  async generateDailySummary(): Promise<ApiResponse<unknown>> {
+    return this.client.post('/api/summary/daily');
   }
 
   async getHourlySummaryStats(): Promise<ApiResponse<unknown>> {
@@ -136,26 +143,24 @@ class ApiClient {
 
   // 监控相关API
   async getMonitorAlerts(limit = 50): Promise<ApiResponse<MonitorAlert[]>> {
-    return this.client.get('/api/monitor/alerts', { 
-      params: { limit } 
+    return this.client.get('/api/monitor/alerts', {
+      params: { limit }
     });
   }
 
-  async scanHighLevelNews(minutes = 30): Promise<ApiResponse<unknown>> {
-    return this.client.post('/api/monitor/scan', { minutes });
+  async scanHighLevelNews(minutes?: number): Promise<ApiResponse<unknown>> {
+    return this.client.post('/api/scan/high-level', { minutes });
   }
 
   async getHighLevelNewsStats(): Promise<ApiResponse<unknown>> {
-    return this.client.get('/api/monitor/high-level/stats');
+    return this.client.get('/api/scan/high-level/stats');
   }
 
-  async getBreakingNews(hours = 24): Promise<ApiResponse<NewsItem[]>> {
-    return this.client.get('/api/monitor/breaking-news', {
-      params: { hours }
-    });
+  async getBreakingNews(): Promise<ApiResponse<NewsItem[]>> {
+    return this.client.get('/api/news/breaking');
   }
 
-  // 系统状态API
+  // 系统相关API
   async getSystemHealth(): Promise<ApiResponse<unknown>> {
     return this.client.get('/api/system/health');
   }
@@ -164,21 +169,28 @@ class ApiClient {
     return this.client.get('/api/system/stats');
   }
 
-  // 处理API
-  async processNews(newsIds: string[]): Promise<ApiResponse<unknown>> {
+  async processNews(newsIds?: string[]): Promise<ApiResponse<unknown>> {
     return this.client.post('/api/process/news', { newsIds });
   }
 
-  async processRecentNews(hours = 24): Promise<ApiResponse<unknown>> {
+  async processRecentNews(hours = 1): Promise<ApiResponse<unknown>> {
     return this.client.post('/api/process/recent', { hours });
   }
 
   async rebuildGraph(): Promise<ApiResponse<unknown>> {
-    return this.client.post('/api/process/rebuild-graph');
+    return this.client.post('/api/graph/rebuild');
+  }
+
+  // 调度器相关API
+  async getSchedulerStatus(): Promise<ApiResponse<unknown>> {
+    return this.client.get('/api/scheduler/status');
+  }
+
+  async triggerJob(jobName: string): Promise<ApiResponse<unknown>> {
+    return this.client.post(`/api/scheduler/trigger/${jobName}`);
   }
 }
 
-// 创建单例实例
 export const apiClient = new ApiClient();
 
 // 导出便捷方法
@@ -191,6 +203,7 @@ export const {
   getGraphData,
   getGraphStats,
   searchEntities,
+  getEntityNeighborhood,
   getCompanyEvents,
   getRelatedNews,
   getHourlySummaries,
@@ -206,5 +219,7 @@ export const {
   getSystemStats,
   processNews,
   processRecentNews,
-  rebuildGraph
+  rebuildGraph,
+  getSchedulerStatus,
+  triggerJob
 } = apiClient; 
