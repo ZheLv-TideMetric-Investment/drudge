@@ -4,6 +4,8 @@ import notificationService from './NotificationService';
 import { z } from 'zod';
 import * as chrono from 'chrono-node';
 import { parseTimeToBeijing } from '../utils/timeUtils';
+import * as fs from 'fs';
+import * as path from 'path';
 import { 
   NewsItem, 
   NewsExtractionResult, 
@@ -88,6 +90,7 @@ const newsExtractionSchema = z.object({
 export class EntityExtractionService {
   private maxRetries = 5;
   private retryDelay = 2000;
+  private failedNewsDir = path.join(process.cwd(), '../..', 'data', 'news', 'failed');
 
   constructor() {}
 
@@ -100,25 +103,12 @@ export class EntityExtractionService {
     try {
       logger.info(`🔍 开始提取新闻六要素: ${newsItem.id}`);
 
-      // 使用AI提取六要素（现在包含内置兜底机制）
+      // 使用AI提取六要素（不允许兜底，必须成功）
       const extractionData = await this.callAIExtraction(newsItem);
       
-      // 检查是否是空的兜底结果
-      const isFallbackResult = !extractionData || (
-        Array.isArray(extractionData.events) && extractionData.events.length === 0 &&
-        Array.isArray(extractionData.companies) && extractionData.companies.length === 0 &&
-        Array.isArray(extractionData.persons) && extractionData.persons.length === 0 &&
-        Array.isArray(extractionData.organizations) && extractionData.organizations.length === 0 &&
-        Array.isArray(extractionData.locations) && extractionData.locations.length === 0 &&
-        Array.isArray(extractionData.times) && extractionData.times.length === 0 &&
-        Array.isArray(extractionData.relationships) && extractionData.relationships.length === 0
-      );
-
-      if (isFallbackResult) {
-        logger.warn(`⚠️ 新闻 ${newsItem.id} 使用兜底结果 - AI 提取未产生有效数据`);
-        const fallbackResult = this.createFallbackResultWithNewsInfo(newsItem);
-        fallbackResult.processing_time = Date.now() - startTime;
-        return fallbackResult;
+      // 检查提取结果是否有效
+      if (!extractionData) {
+        throw new Error('AI提取返回空结果');
       }
       
       // 解析提取结果
@@ -146,6 +136,9 @@ export class EntityExtractionService {
     } catch (error: any) {
       logger.error(`❌ 新闻 ${newsItem.id} 六要素提取异常:`, error);
       
+      // 保存失败的新闻数据
+      await this.saveFailedNews(newsItem, error);
+      
       // 发送实体提取失败通知
       try {
         await notificationService.sendEntityExtractionFailureNotification(
@@ -156,10 +149,8 @@ export class EntityExtractionService {
         logger.error('发送实体提取失败通知失败:', notifyError);
       }
       
-      // 返回带新闻信息的兜底结果
-      const fallbackResult = this.createFallbackResultWithNewsInfo(newsItem);
-      fallbackResult.processing_time = Date.now() - startTime;
-      return fallbackResult;
+      // 重新抛出异常，不使用兜底结果
+      throw error;
     }
   }
 
@@ -177,10 +168,21 @@ export class EntityExtractionService {
       
       logger.info(`处理批次 ${Math.floor(i / batchSize) + 1}/${Math.ceil(newsItems.length / batchSize)}`);
       
-      const batchPromises = batch.map(newsItem => this.extractFromNews(newsItem));
+      const batchPromises = batch.map(async (newsItem) => {
+        try {
+          return await this.extractFromNews(newsItem);
+        } catch (error) {
+          // extractFromNews 已经保存了失败的新闻数据
+          logger.warn(`新闻 ${newsItem.id} 处理失败，跳过继续处理其他新闻`);
+          return null; // 返回null表示处理失败
+        }
+      });
+      
       const batchResults = await Promise.all(batchPromises);
       
-      results.push(...batchResults);
+      // 只添加成功处理的结果
+      const successfulResults = batchResults.filter(result => result !== null);
+      results.push(...successfulResults);
       
       // 添加延迟避免API限制
       if (i + batchSize < newsItems.length) {
@@ -188,12 +190,21 @@ export class EntityExtractionService {
       }
     }
     
-    logger.info(`✅ 批量六要素提取完成: ${results.length} 条新闻`);
+    const totalNews = newsItems.length;
+    const successfulNews = results.length;
+    const failedNews = totalNews - successfulNews;
+    
+    logger.info(`✅ 批量六要素提取完成: 成功 ${successfulNews} 条，失败 ${failedNews} 条，总计 ${totalNews} 条新闻`);
+    
+    if (failedNews > 0) {
+      logger.warn(`⚠️ ${failedNews} 条新闻处理失败，已保存到 data/news/failed 目录`);
+    }
+    
     return results;
   }
 
   /**
-   * 调用AI进行六要素提取（带重试和校验兜底）
+   * 调用AI进行六要素提取（带重试机制）
    */
   private async callAIExtraction(newsItem: NewsItem): Promise<any> {
     const messages: LLMMessage[] = [
@@ -225,8 +236,8 @@ export class EntityExtractionService {
         });
         
         if (response.success) {
-          // 对响应进行校验和兜底处理
-          const validatedData = this.validateAndFallbackParsing(response.data, attempt);
+                  // 对响应进行校验和解析处理
+        const validatedData = this.validateAndParsing(response.data, attempt);
           return validatedData;
         } else {
           throw new Error(response.error || 'AI提取失败');
@@ -272,15 +283,15 @@ export class EntityExtractionService {
       }
     }
 
-    // 如果所有重试都失败，返回兜底结果而不是抛出错误
-    logger.warn(`所有AI提取尝试都失败，返回兜底结果。最后错误:`, lastError?.message);
-    return this.createFallbackResult();
+    // 如果所有重试都失败，抛出最后一个错误
+    logger.error(`所有AI提取尝试都失败。最后错误:`, lastError?.message);
+    throw lastError || new Error('AI提取失败：所有重试都失败');
   }
 
   /**
-   * 校验并兜底解析（增强版）
+   * 校验并解析数据（增强版）
    */
-  private validateAndFallbackParsing(resp: any, attempt: number): any {
+  private validateAndParsing(resp: any, attempt: number): any {
     try {
       // 首先尝试直接解析
       const parsed = newsExtractionSchema.safeParse(resp);
@@ -313,13 +324,13 @@ export class EntityExtractionService {
         }
       }
 
-      // 如果都失败，构造兜底结果
-      logger.warn(`所有解析尝试失败，使用兜底结果 (尝试 ${attempt})`);
-      return this.createFallbackResult();
+      // 如果都失败，抛出错误
+      logger.error(`所有解析尝试失败 (尝试 ${attempt})`);
+      throw new Error(`数据解析失败：无法解析AI返回的数据格式`);
 
     } catch (error) {
-      logger.error(`兜底解析失败 (尝试 ${attempt}):`, error);
-      return this.createFallbackResult();
+      logger.error(`数据解析异常 (尝试 ${attempt}):`, error);
+      throw error;
     }
   }
 
@@ -595,46 +606,7 @@ export class EntityExtractionService {
 
 
 
-  /**
-   * 创建兜底结果
-   */
-  private createFallbackResult(): any {
-    return {
-      events: [],
-      companies: [],
-      persons: [],
-      organizations: [],
-      locations: [],
-      times: [],
-      relationships: []
-    };
-  }
 
-  /**
-   * 创建带新闻信息的兜底结果
-   */
-  private createFallbackResultWithNewsInfo(newsItem: NewsItem): NewsExtractionResult {
-    logger.info(`🆘 为新闻 ${newsItem.id} 创建兜底结果`);
-    
-    return {
-      newsId: newsItem.id,
-      title: newsItem.title,
-      content: newsItem.content,
-      timestamp: parseTimeToBeijing(newsItem.time),
-      source: newsItem.source,
-      url: newsItem.url,
-      news_level: 'Level 5', // 默认最低级别
-      confidence: 0.1, // 低置信度表示这是兜底结果
-      processing_time: 0,
-      events: [],
-      companies: [],
-      persons: [],
-      organizations: [],
-      locations: [],
-      times: [],
-      relationships: []
-    };
-  }
 
   /**
    * 解析提取结果 - 适配新的数据结构
@@ -827,28 +799,7 @@ export class EntityExtractionService {
     return 'Level 5';
   }
 
-  /**
-   * 创建空结果
-   */
-  private createEmptyResult(newsItem: NewsItem): NewsExtractionResult {
-    return {
-      newsId: newsItem.id,
-      title: newsItem.title,
-      content: newsItem.content,
-      timestamp: parseTimeToBeijing(newsItem.time),
-      source: newsItem.source,
-      url: newsItem.url,
-      news_level: 'Level 5', // 默认最低级别
-      confidence: 0,
-      events: [],
-      companies: [],
-      persons: [],
-      organizations: [],
-      locations: [],
-      times: [],
-      relationships: []
-    };
-  }
+
 
   /**
    * 获取强化版系统提示词 - 针对投资场景全面优化
@@ -1043,5 +994,47 @@ export class EntityExtractionService {
    */
   private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 保存失败的新闻数据到指定目录
+   */
+  private async saveFailedNews(newsItem: NewsItem, error: any): Promise<void> {
+    try {
+      // 确保失败新闻目录存在
+      if (!fs.existsSync(this.failedNewsDir)) {
+        fs.mkdirSync(this.failedNewsDir, { recursive: true });
+      }
+
+      // 创建失败新闻的详细信息
+      const failedNewsData = {
+        newsItem,
+        error: {
+          message: error.message || 'Unknown error',
+          stack: error.stack || '',
+          timestamp: new Date().toISOString(),
+          service: 'EntityExtractionService'
+        },
+        metadata: {
+          failedAt: new Date().toISOString(),
+          originalId: newsItem.id,
+          source: newsItem.source,
+          title: newsItem.title
+        }
+      };
+
+      // 生成文件名：使用新闻ID和时间戳
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const filename = `failed_${newsItem.id}_${timestamp}.json`;
+      const filepath = path.join(this.failedNewsDir, filename);
+
+      // 保存文件
+      await fs.promises.writeFile(filepath, JSON.stringify(failedNewsData, null, 2), 'utf8');
+      
+      logger.warn(`❌ 失败新闻已保存: ${filepath}`);
+      
+    } catch (saveError) {
+      logger.error(`保存失败新闻时出错: ${newsItem.id}`, saveError);
+    }
   }
 } 
