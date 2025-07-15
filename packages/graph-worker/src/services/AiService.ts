@@ -43,7 +43,6 @@ export class AiService {
         this.model = google(config.ai.google.model);
         logger.info(`使用 Google 模型: ${config.ai.google.model}`);
       } else if (config.ai.provider === 'qwen') {
-        console.log(config.ai.qwen);
         if (!config.ai.qwen?.model || !config.ai.qwen?.apiKey) {
           throw new Error('千问模型配置不存在');
         }
