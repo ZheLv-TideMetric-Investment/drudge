@@ -59,11 +59,7 @@ const newsExtractionSchema = z.object({
     location_name: z.string().min(1),
     type: z.enum(['country','region','city','facility','other']).optional().or(z.literal('')),
     country: z.string().optional().or(z.literal('')),
-    region: z.string().optional().or(z.literal('')),
-    coordinates: z.object({
-      latitude: z.number(),
-      longitude: z.number()
-    }).optional()
+    region: z.string().optional().or(z.literal(''))
   })),
 
   times: z.array(z.object({
@@ -90,7 +86,7 @@ const newsExtractionSchema = z.object({
  * 负责从新闻内容中提取结构化信息
  */
 export class EntityExtractionService {
-  private maxRetries = 3;
+  private maxRetries = 5;
   private retryDelay = 2000;
 
   constructor() {}
@@ -570,14 +566,29 @@ export class EntityExtractionService {
     // 修复缺少逗号的情况（换行）
     jsonContent = jsonContent.replace(/"\s*\n\s*"/g, '",\n"');
 
+    // 修复空key的问题：删除类似 ,"", 或 "","" 或 {"", 的无效键值对
+    // 1. 修复 "key","","other_key" -> "key","other_key"
+    jsonContent = jsonContent.replace(/,\s*""\s*,/g, ',');
+    
+    // 2. 修复对象开头的空key：{"","key" -> {"key"  
+    jsonContent = jsonContent.replace(/{\s*""\s*,/g, '{');
+    
+    // 3. 修复对象结尾的空key：,"","} -> "}
+    jsonContent = jsonContent.replace(/,\s*""\s*}/g, '}');
+    
+    // 4. 修复单独的空key："key":"value","" -> "key":"value"
+    jsonContent = jsonContent.replace(/,\s*""\s*(?=[,\]\}])/g, '');
+    
+    // 5. 修复空key后跟冒号的情况：""," -> 删除整个部分
+    jsonContent = jsonContent.replace(/,\s*""\s*:\s*"[^"]*"/g, '');
+    jsonContent = jsonContent.replace(/{\s*""\s*:\s*"[^"]*"\s*,/g, '{');
+    
+    // 6. 修复特殊情况：处理 "key","","next":"value" -> "key","next":"value"
+    jsonContent = jsonContent.replace(/"([^"]+)"\s*,\s*""\s*,\s*"([^"]+)"/g, '"$1", "$2"');
+
     // 修复尾随逗号
     jsonContent = jsonContent.replace(/,\s*}/g, '}');
     jsonContent = jsonContent.replace(/,\s*]/g, ']');
-
-    // 修复无效的空键值对
-    jsonContent = jsonContent.replace(/,\s*""\s*,/g, ',');
-    jsonContent = jsonContent.replace(/{\s*""\s*,/g, '{');
-    jsonContent = jsonContent.replace(/,\s*""\s*}/g, '}');
 
     return jsonContent;
   }
@@ -867,7 +878,7 @@ export class EntityExtractionService {
   - \`organization_name\`：法定或官方名称。\`type\` 取枚举："government/regulator/intl_org/fin_inst/industry_assoc/other"。  
 
 ◆ Location  
-  - 提供 \`country\`（ISO Alpha-2 或中文官方），能给坐标则写 \`coordinates\`。  
+  - 提供 \`country\`（ISO Alpha-2 或中文官方）。  
 
 ◆ Time  
   - \`time_value\` 尽量 ISO-8601；若"Q1""上半年" → 写模糊值并设置 \`precision\`。  
@@ -930,8 +941,7 @@ export class EntityExtractionService {
       "location_name":"北京",
       "type":"city",
       "country":"CN",
-      "region":"北京市",
-      "coordinates":{"latitude":39.9042,"longitude":116.4074}
+      "region":"北京市"
     }
   ],
   "times":[
