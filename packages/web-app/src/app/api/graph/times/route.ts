@@ -42,11 +42,11 @@ export async function GET(request: Request) {
 
     const result = await queryService.neo4j.executeQuery(cypher, parameters);
 
-    const times = result.records.map((record) => ({
-      entity: (record as any).get('entity').properties,
-      type: (record as any).get('type'),
-      name: (record as any).get('name'),
-      connections: (record as any).get('connections').toNumber()
+    const times = result.records.map((record: any) => ({
+      entity: record.get('entity').properties,
+      type: record.get('type'),
+      name: record.get('name'),
+      connections: record.get('connections').toNumber()
     }));
 
     return NextResponse.json({
