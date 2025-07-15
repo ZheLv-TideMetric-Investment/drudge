@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "新闻知识图谱系统 - pnpm Monorepo",
   "private": true,
-  "type": "module",
   "engines": {
     "node": ">=18.0.0",
     "pnpm": ">=8.0.0"

@@ -1,6 +1,7 @@
 import { generateObject } from 'ai';
 import { deepseek } from '@ai-sdk/deepseek';
 import { google } from '@ai-sdk/google';
+import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
 import config from '../config/config';
@@ -41,6 +42,20 @@ export class AiService {
         }
         this.model = google(config.ai.google.model);
         logger.info(`使用 Google 模型: ${config.ai.google.model}`);
+      } else if (config.ai.provider === 'qwen') {
+        console.log(config.ai.qwen);
+        if (!config.ai.qwen?.model || !config.ai.qwen?.apiKey) {
+          throw new Error('千问模型配置不存在');
+        }
+        
+        // 创建千问OpenAI兼容客户端
+        const qwenOpenAI = createOpenAI({
+          apiKey: config.ai.qwen.apiKey,
+          baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        });
+        
+        this.model = qwenOpenAI(config.ai.qwen.model);
+        logger.info(`使用 千问 模型: ${config.ai.qwen.model}`);
       } else {
         throw new Error(`不支持的AI提供商: ${config.ai.provider}`);
       }
@@ -54,7 +69,7 @@ export class AiService {
       try {
         await notificationService.sendAiServiceFailureNotification(
           config?.ai?.provider || 'unknown',
-          config?.ai?.deepseek?.model || config?.ai?.google?.model || 'unknown',
+          config?.ai?.deepseek?.model || config?.ai?.google?.model || config?.ai?.qwen?.model || 'unknown',
           error.message || 'AI服务初始化失败'
         );
       } catch (notifyError) {
@@ -110,17 +125,34 @@ export class AiService {
       const schemaToUse = schema || z.object({}).passthrough();
 
       // 创建LLM调用Promise
-      const llmPromise = generateObject({
-        model: this.model,
-        prompt,
-        temperature,
-        system: systemMessage,
-        schema: schemaToUse,
-      });
+      const llmPromise = async () => {
+        try {
+          return await generateObject({
+            model: this.model,
+            prompt,
+            temperature,
+            system: systemMessage,
+            schema: schemaToUse,
+          });
+        } catch(error: any) {
+          // 如果generateObject失败，尝试从错误信息中解析JSON
+          if (error.text) {
+            try {
+              return { 
+                object: JSON.parse(error.text),
+                usage: undefined
+              };
+            } catch (parseError) {
+              throw error;
+            }
+          }
+          throw error;
+        }
+      };
 
       // 使用Promise.race来实现超时控制
       const result = await Promise.race([
-        llmPromise,
+        llmPromise(),
         this.createTimeoutPromise(timeout)
       ]);
 
@@ -160,7 +192,7 @@ export class AiService {
       try {
         await notificationService.sendAiServiceFailureNotification(
           config?.ai?.provider || 'unknown',
-          config?.ai?.deepseek?.model || config?.ai?.google?.model || 'unknown',
+          config?.ai?.deepseek?.model || config?.ai?.google?.model || config?.ai?.qwen?.model || 'unknown',
           error.message || 'LLM调用失败'
         );
       } catch (notifyError) {

@@ -385,8 +385,20 @@ export class Neo4jService {
           cypher = `
             UNWIND $entities AS l
             MERGE (loc:Location {location_name: l.location_name})
-              ON CREATE SET loc += l, loc.created_at = timestamp()
-              ON MATCH SET loc += l, loc.updated_at = timestamp()
+              ON CREATE SET 
+                loc.type = l.type,
+                loc.country = l.country,
+                loc.region = l.region,
+                loc.latitude = CASE WHEN l.coordinates IS NOT NULL THEN l.coordinates.latitude ELSE null END,
+                loc.longitude = CASE WHEN l.coordinates IS NOT NULL THEN l.coordinates.longitude ELSE null END,
+                loc.created_at = timestamp()
+              ON MATCH SET 
+                loc.type = l.type,
+                loc.country = l.country,
+                loc.region = l.region,
+                loc.latitude = CASE WHEN l.coordinates IS NOT NULL THEN l.coordinates.latitude ELSE null END,
+                loc.longitude = CASE WHEN l.coordinates IS NOT NULL THEN l.coordinates.longitude ELSE null END,
+                loc.updated_at = timestamp()
             RETURN loc
           `;
           break;

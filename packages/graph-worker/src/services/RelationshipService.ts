@@ -142,16 +142,31 @@ export class RelationshipService {
 
     if (queries.length > 0) {
       try {
-        const batchCypher = queries.join('\n');
-        await this.neo4j.executeQuery(batchCypher, parameters);
-        logger.info(`批量关系创建完成: ${queries.length} 个关系`);
+        // 单独执行每个查询以避免变量冲突
+        let successCount = 0;
+        for (let i = 0; i < queries.length; i++) {
+          const query = queries[i];
+          if (!query) continue; // 跳过空查询
+          
+          const paramKey = `rel_${i}`;
+          const queryParams = { [paramKey]: parameters[paramKey] };
+          
+          try {
+            await this.neo4j.executeQuery(query, queryParams);
+            successCount++;
+          } catch (queryError) {
+            logger.warn('单个关系创建失败:', queryError);
+          }
+        }
+        logger.info(`批量关系创建完成: ${successCount}/${queries.length} 个关系`);
       } catch (error) {
         logger.error('批量关系创建失败:', error);
         // 回退到单个创建
         for (const result of extractionResults) {
           for (const relationship of result.relationships) {
             try {
-              await this.createRelationship(relationship, result.newsId || '');
+              const newsId = result.newsId ?? '';
+              await this.createRelationship(relationship, newsId);
             } catch (relError) {
               logger.warn(`单个关系创建失败: ${relationship.from} -> ${relationship.to}`, relError);
             }
@@ -260,9 +275,17 @@ export class RelationshipService {
     // 执行推断关系创建
     if (queries.length > 0) {
       try {
-        const batchCypher = queries.join('\n');
-        await this.neo4j.executeQuery(batchCypher);
-        logger.info(`推断关系创建完成: ${queries.length} 个关系`);
+        // 单独执行每个查询以避免变量冲突
+        let successCount = 0;
+        for (const query of queries) {
+          try {
+            await this.neo4j.executeQuery(query);
+            successCount++;
+          } catch (queryError) {
+            logger.warn('单个推断关系创建失败:', queryError);
+          }
+        }
+        logger.info(`推断关系创建完成: ${successCount}/${queries.length} 个关系`);
       } catch (error) {
         logger.error('推断关系创建失败:', error);
       }

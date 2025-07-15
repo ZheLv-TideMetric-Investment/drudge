@@ -20,7 +20,7 @@ const config = {
   
   // AI 配置
   ai: {
-    provider: process.env.AI_PROVIDER || 'deepseek',
+    provider: process.env.AI_PROVIDER || 'qwen',
     deepseek: {
       apiKey: process.env.DEEPSEEK_API_KEY || '',
       model: process.env.DEEPSEEK_MODEL || 'deepseek-reasoner'
@@ -28,6 +28,10 @@ const config = {
     google: {
       apiKey: process.env.GOOGLE_API_KEY || '',
       model: process.env.GOOGLE_MODEL || 'gemini-1.5-flash'
+    },
+    qwen: {
+      apiKey: process.env.QWEN_API_KEY || '',
+      model: process.env.QWEN_MODEL || 'qwen-turbo-latest',
     }
   },
   

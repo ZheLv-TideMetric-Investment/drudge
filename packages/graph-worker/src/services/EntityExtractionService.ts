@@ -244,14 +244,23 @@ export class EntityExtractionService {
         if (error.text || (error.response && error.response.text)) {
           try {
             const errorText = error.text || error.response.text;
+            logger.debug(`🔍 错误文本提取: ${errorText.substring(0, 500)}...`);
+            
             const extractedJson = this.extractJsonFromString(errorText);
             if (extractedJson) {
+              logger.debug(`🔍 JSON 提取成功，开始修复数据...`);
               const fixedJson = this.fixCommonSchemaIssues(extractedJson);
+              logger.debug(`🔍 数据修复完成，验证 schema...`);
+              
               const parsedResult = newsExtractionSchema.safeParse(fixedJson);
               if (parsedResult.success) {
                 logger.info(`✅ 从错误响应中成功提取数据 (尝试 ${attempt})`);
                 return parsedResult.data;
+              } else {
+                logger.warn(`❌ Schema 验证失败:`, parsedResult.error.errors.slice(0, 5));
               }
+            } else {
+              logger.debug(`❌ JSON 提取失败`);
             }
           } catch (extractError) {
             logger.debug(`从错误响应提取数据失败:`, extractError);
@@ -326,6 +335,9 @@ export class EntityExtractionService {
     }
 
     const fixed = JSON.parse(JSON.stringify(data)); // 深拷贝
+    
+    // 修复数组中的字符串化对象
+    this.fixStringifiedObjectsInArrays(fixed);
 
     // 修复 locations 中的 coordinates 问题
     if (fixed.locations && Array.isArray(fixed.locations)) {
@@ -348,17 +360,21 @@ export class EntityExtractionService {
 
     // 修复 companies 中的 aliases 问题
     if (fixed.companies && Array.isArray(fixed.companies)) {
-      fixed.companies = fixed.companies.map((company: any) => {
-        if (!company.aliases || !Array.isArray(company.aliases)) {
-          company.aliases = [];
-        }
-        return company;
-      });
+      fixed.companies = fixed.companies
+        .filter((company: any) => company && typeof company === 'object' && company.company_name)
+        .map((company: any) => {
+          if (!company.aliases || !Array.isArray(company.aliases)) {
+            company.aliases = [];
+          }
+          return company;
+        });
     }
 
     // 修复 events 中的必需字段
     if (fixed.events && Array.isArray(fixed.events)) {
-      fixed.events = fixed.events.map((event: any) => {
+      fixed.events = fixed.events
+        .filter((event: any) => event && typeof event === 'object' && (event.event_name || event.event_id))
+        .map((event: any) => {
         // 确保 event_id 存在
         if (!event.event_id) {
           event.event_id = event.event_name ? 
@@ -399,7 +415,9 @@ export class EntityExtractionService {
 
     // 修复 organizations 中的 type 枚举
     if (fixed.organizations && Array.isArray(fixed.organizations)) {
-      fixed.organizations = fixed.organizations.map((org: any) => {
+      fixed.organizations = fixed.organizations
+        .filter((org: any) => org && typeof org === 'object' && org.organization_name)
+        .map((org: any) => {
         const validOrgTypes = ['government', 'regulator', 'intl_org', 'fin_inst', 'industry_assoc', 'other'];
         if (!validOrgTypes.includes(org.type)) {
           org.type = 'other';
@@ -410,7 +428,9 @@ export class EntityExtractionService {
 
     // 修复 locations 中的 type 枚举
     if (fixed.locations && Array.isArray(fixed.locations)) {
-      fixed.locations = fixed.locations.map((location: any) => {
+      fixed.locations = fixed.locations
+        .filter((location: any) => location && typeof location === 'object' && location.location_name)
+        .map((location: any) => {
         const validLocationTypes = ['country', 'region', 'city', 'facility', 'other'];
         if (!validLocationTypes.includes(location.type)) {
           location.type = 'other';
@@ -421,7 +441,9 @@ export class EntityExtractionService {
 
     // 修复 times 中的枚举值
     if (fixed.times && Array.isArray(fixed.times)) {
-      fixed.times = fixed.times.map((time: any) => {
+      fixed.times = fixed.times
+        .filter((time: any) => time && typeof time === 'object' && time.time_value)
+        .map((time: any) => {
         const validTimeTypes = ['DATETIME', 'DATE', 'TIME', 'PERIOD', 'OTHER'];
         if (!validTimeTypes.includes(time.type)) {
           time.type = 'OTHER';
@@ -438,7 +460,9 @@ export class EntityExtractionService {
 
     // 修复 relationships 中的 type 枚举
     if (fixed.relationships && Array.isArray(fixed.relationships)) {
-      fixed.relationships = fixed.relationships.map((rel: any) => {
+      fixed.relationships = fixed.relationships
+        .filter((rel: any) => rel && typeof rel === 'object' && rel.from && rel.to)
+        .map((rel: any) => {
         const validRelTypes = ['LOCATED_IN', 'WORKS_FOR', 'OWNS', 'PARTICIPATES_IN', 'MERGES_WITH', 'ACQUIRES',
                               'SUPPLIES', 'PARTNERS_WITH', 'SUED_BY', 'REGULATED_BY', 'INVESTS_IN', 'OTHER'];
         if (!validRelTypes.includes(rel.type)) {
@@ -452,67 +476,112 @@ export class EntityExtractionService {
   }
 
   /**
-   * 增强版 JSON 提取
+   * 修复数组中的字符串化对象
    */
-  private extractJsonFromString(text: string): any | null {
-    try {
-      // 方法1: 尝试直接解析
-      return JSON.parse(text);
-    } catch (error1) {
-      // 方法2: 提取第一个完整的JSON对象
-      try {
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          return JSON.parse(jsonMatch[0]);
-        }
-      } catch (error2) {
-        // 方法3: 提取多层嵌套的JSON
-        try {
-          let braceCount = 0;
-          let startIndex = -1;
-          let endIndex = -1;
-
-          for (let i = 0; i < text.length; i++) {
-            if (text[i] === '{') {
-              if (startIndex === -1) startIndex = i;
-              braceCount++;
-            } else if (text[i] === '}') {
-              braceCount--;
-              if (braceCount === 0 && startIndex !== -1) {
-                endIndex = i;
-                break;
+  private fixStringifiedObjectsInArrays(data: any): void {
+    const arrayFields = ['events', 'companies', 'persons', 'organizations', 'locations', 'times', 'relationships'];
+    
+    for (const field of arrayFields) {
+      if (data[field] && Array.isArray(data[field])) {
+        let fixedCount = 0;
+        data[field] = data[field].map((item: any) => {
+          // 如果数组项是字符串，尝试解析为对象
+          if (typeof item === 'string') {
+            try {
+              const parsed = JSON.parse(item);
+              if (typeof parsed === 'object' && parsed !== null) {
+                fixedCount++;
+                logger.debug(`🔧 修复字符串化对象 ${field}[${fixedCount}]: ${item.substring(0, 100)}...`);
+                return parsed;
               }
+            } catch (error) {
+              logger.debug(`无法解析字符串化对象: ${item}`);
             }
           }
-
-          if (startIndex !== -1 && endIndex !== -1) {
-            const jsonStr = text.substring(startIndex, endIndex + 1);
-            return JSON.parse(jsonStr);
-          }
-        } catch (error3) {
-          // 方法4: 尝试修复常见的JSON格式错误
-          try {
-            let fixedText = text
-              .replace(/,\s*}/g, '}')  // 移除尾随逗号
-              .replace(/,\s*]/g, ']')  // 移除数组尾随逗号
-              .replace(/([{,]\s*)(\w+):/g, '$1"$2":')  // 给属性名添加引号
-              .replace(/:\s*'([^']*)'/g, ': "$1"')  // 单引号转双引号
-              .replace(/\n|\r/g, '')  // 移除换行符
-              .trim();
-
-            const jsonMatch = fixedText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              return JSON.parse(jsonMatch[0]);
-            }
-          } catch (error4) {
-            logger.debug('所有JSON提取方法都失败了');
-          }
+          return item;
+        });
+        
+        if (fixedCount > 0) {
+          logger.info(`✅ 修复了 ${fixedCount} 个字符串化的 ${field} 对象`);
         }
       }
     }
-
-    return null;
   }
+
+  /**
+   * 从响应中提取和修复 JSON
+   */
+  private extractJsonFromString(jsonString: string): any | null {
+    try {
+      let jsonContent = '';
+
+      // 优先查找 ```json...``` 代码块
+      const codeBlockMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch && codeBlockMatch[1]) {
+        jsonContent = codeBlockMatch[1].trim();
+      } else {
+        // 如果没有代码块，尝试移除开头和结尾的markdown标记
+        jsonContent = jsonString.replace(/^```json\s*|\s*```$/g, '').trim();
+      }
+
+      // 如果内容不是以 { 开始，尝试提取JSON对象
+      if (!jsonContent.startsWith('{')) {
+        const jsonMatch = jsonContent.match(/\{[\s\S]*?\}/);
+        if (jsonMatch) {
+          jsonContent = jsonMatch[0];
+        }
+      }
+
+      // 如果仍然没有找到有效的JSON，直接尝试从原始文本提取
+      if (!jsonContent || !jsonContent.trim().startsWith('{')) {
+        const jsonMatch = jsonString.match(/\{[\s\S]*?\}/);
+        if (jsonMatch) {
+          jsonContent = jsonMatch[0];
+        } else {
+          logger.debug(`未找到有效的JSON: ${jsonString.substring(0, 200)}...`);
+          return null;
+        }
+      }
+
+      // 修复常见的JSON格式错误
+      jsonContent = this.fixCommonJsonErrors(jsonContent.trim());
+
+      return JSON.parse(jsonContent);
+    } catch (error) {
+      logger.debug(`JSON解析失败: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
+    }
+  }
+
+  /**
+   * 修复常见的JSON格式错误
+   */
+  private fixCommonJsonErrors(jsonContent: string): string {
+    // 修复 "key": ""; "" 这种格式错误 - 将其转换为 "key": ""
+    jsonContent = jsonContent.replace(/"([^"]+)":\s*"[^"]*";\s*"[^"]*"/g, '"$1": ""');
+
+    // 修复 "key": "value"; "key2": "value2" 这种用分号分隔的格式
+    jsonContent = jsonContent.replace(/(":\s*"[^"]*")\s*;\s*"/g, '$1, "');
+
+    // 修复多余的分号（在引号前）
+    jsonContent = jsonContent.replace(/;\s*"/g, ', "');
+
+    // 修复缺少逗号的情况（换行）
+    jsonContent = jsonContent.replace(/"\s*\n\s*"/g, '",\n"');
+
+    // 修复尾随逗号
+    jsonContent = jsonContent.replace(/,\s*}/g, '}');
+    jsonContent = jsonContent.replace(/,\s*]/g, ']');
+
+    // 修复无效的空键值对
+    jsonContent = jsonContent.replace(/,\s*""\s*,/g, ',');
+    jsonContent = jsonContent.replace(/{\s*""\s*,/g, '{');
+    jsonContent = jsonContent.replace(/,\s*""\s*}/g, '}');
+
+    return jsonContent;
+  }
+
+
 
   /**
    * 创建兜底结果
@@ -584,7 +653,9 @@ export class EntityExtractionService {
     try {
       // 解析事件 - 使用新的枚举字段
       if (extractionData.events && Array.isArray(extractionData.events)) {
-        result.events = extractionData.events.map((event: any, index: number) => ({
+        result.events = extractionData.events
+          .filter((event: any) => event && typeof event === 'object' && event.event_name)
+          .map((event: any, index: number) => ({
           event_id: `${newsItem.id}_event_${index}`,
           event_name: event.event_name || '',
           event_description: event.event_description || '',
@@ -601,7 +672,9 @@ export class EntityExtractionService {
 
       // 解析公司 - 处理可选字段
       if (extractionData.companies && Array.isArray(extractionData.companies)) {
-        result.companies = extractionData.companies.map((company: any) => ({
+        result.companies = extractionData.companies
+          .filter((company: any) => company && typeof company === 'object' && company.company_name)
+          .map((company: any) => ({
           company_name: company.company_name || '',
           ticker: company.ticker || '',
           industry: company.industry || '',
@@ -615,7 +688,9 @@ export class EntityExtractionService {
 
       // 解析人物 - 所有字段可选
       if (extractionData.persons && Array.isArray(extractionData.persons)) {
-        result.persons = extractionData.persons.map((person: any) => ({
+        result.persons = extractionData.persons
+          .filter((person: any) => person && typeof person === 'object' && person.person_name)
+          .map((person: any) => ({
           person_name: person.person_name || '',
           title: person.title || '',
           company: person.company || '',
@@ -627,7 +702,9 @@ export class EntityExtractionService {
 
       // 解析机构 - 使用标准枚举
       if (extractionData.organizations && Array.isArray(extractionData.organizations)) {
-        result.organizations = extractionData.organizations.map((org: any) => ({
+        result.organizations = extractionData.organizations
+          .filter((org: any) => org && typeof org === 'object' && org.organization_name)
+          .map((org: any) => ({
           organization_name: org.organization_name || '',
           type: org.type || 'other',
           country: org.country || '',
@@ -638,7 +715,9 @@ export class EntityExtractionService {
 
       // 解析地点 - 使用标准枚举和可选坐标
       if (extractionData.locations && Array.isArray(extractionData.locations)) {
-        result.locations = extractionData.locations.map((location: any) => ({
+        result.locations = extractionData.locations
+          .filter((location: any) => location && typeof location === 'object' && location.location_name)
+          .map((location: any) => ({
           location_name: location.location_name || '',
           type: location.type || 'other',
           country: location.country || '',
@@ -651,7 +730,9 @@ export class EntityExtractionService {
 
       // 解析时间 - 使用标准枚举
       if (extractionData.times && Array.isArray(extractionData.times)) {
-        result.times = extractionData.times.map((time: any) => ({
+        result.times = extractionData.times
+          .filter((time: any) => time && typeof time === 'object' && time.time_value)
+          .map((time: any) => ({
           time_value: time.time_value || '',
           type: time.type || 'OTHER',
           precision: time.precision || 'DAY',
@@ -663,7 +744,9 @@ export class EntityExtractionService {
 
       // 解析关系 - 使用标准关系类型
       if (extractionData.relationships && Array.isArray(extractionData.relationships)) {
-        result.relationships = extractionData.relationships.map((rel: any) => ({
+        result.relationships = extractionData.relationships
+          .filter((rel: any) => rel && typeof rel === 'object' && rel.from && rel.to)
+          .map((rel: any) => ({
           type: rel.type || 'OTHER',
           from: rel.from || '',
           to: rel.to || '',
