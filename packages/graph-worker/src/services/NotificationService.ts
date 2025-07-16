@@ -48,7 +48,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Graph Worker - 实体提取失败',
+        title: '[tide] Graph Worker - 实体提取失败',
         text: markdownText
       },
       at: {
@@ -79,7 +79,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Graph Worker - 知识图谱写入失败',
+        title: '[tide] Graph Worker - 知识图谱写入失败',
         text: markdownText
       },
       at: {
@@ -110,7 +110,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Graph Worker - Neo4j连接失败',
+        title: '[tide] Graph Worker - Neo4j连接失败',
         text: markdownText
       },
       at: {
@@ -142,7 +142,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Graph Worker - AI服务失败',
+        title: '[tide] Graph Worker - AI服务失败',
         text: markdownText
       },
       at: {
@@ -174,7 +174,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Graph Worker - 新闻处理失败',
+        title: '[tide] Graph Worker - 新闻处理失败',
         text: markdownText
       },
       at: {
@@ -206,7 +206,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Graph Worker - 服务异常',
+        title: '[tide] Graph Worker - 服务异常',
         text: markdownText
       },
       at: {
@@ -237,7 +237,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Graph Worker - 服务恢复正常',
+        title: '[tide] Graph Worker - 服务恢复正常',
         text: markdownText
       }
     };
@@ -251,7 +251,7 @@ export class NotificationService {
   private async sendWebhook(payload: NotificationPayload): Promise<void> {
     try {
       logger.info('发送Webhook通知', { title: payload.markdown.title, url: this.config.webhookUrl });
-      
+
       const response = await axios.post(this.config.webhookUrl!, payload, {
         timeout: 10000,
         headers: {

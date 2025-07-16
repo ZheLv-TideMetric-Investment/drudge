@@ -48,7 +48,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Ingest Worker - 新闻API获取失败',
+        title: '[tide] Ingest Worker - 新闻API获取失败',
         text: markdownText
       },
       at: {
@@ -79,7 +79,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Ingest Worker - 文件保存失败',
+        title: '[tide] Ingest Worker - 文件保存失败',
         text: markdownText
       },
       at: {
@@ -111,7 +111,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Ingest Worker - 服务异常',
+        title: '[tide] Ingest Worker - 服务异常',
         text: markdownText
       },
       at: {
@@ -141,7 +141,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Ingest Worker - 健康检查失败',
+        title: '[tide] Ingest Worker - 健康检查失败',
         text: markdownText
       }
     };
@@ -169,7 +169,7 @@ export class NotificationService {
     const payload: NotificationPayload = {
       msgtype: 'markdown',
       markdown: {
-        title: 'Ingest Worker - 服务恢复正常',
+        title: '[tide] Ingest Worker - 服务恢复正常',
         text: markdownText
       }
     };
