@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import moment from 'moment-timezone';
 import { 
   SchedulerTrigger, 
   SchedulerApiRequest, 
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
       success: true,
       trigger: validatedBody.trigger,
       message: result.message,
-      timestamp: new Date().toISOString(),
+      timestamp: moment.tz('Asia/Shanghai').toISOString(),
       data: result.data
     };
     
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest) {
       success: false,
       trigger: SchedulerTrigger.EVERY_MINUTE, // 默认值
       message: `调度器执行失败: ${errorMessage}`,
-      timestamp: new Date().toISOString(),
+      timestamp: moment.tz('Asia/Shanghai').toISOString(),
       error: errorMessage
     };
     
@@ -218,7 +219,7 @@ export async function GET() {
     
     const status = {
       available_triggers: Object.values(SchedulerTrigger),
-      server_time: new Date().toISOString(),
+      server_time: moment.tz('Asia/Shanghai').toISOString(),
       status: 'active'
     };
     

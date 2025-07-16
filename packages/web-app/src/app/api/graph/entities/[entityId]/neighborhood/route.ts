@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import moment from 'moment-timezone';
 import { graphService } from '../../../../../../lib/services/graph';
 
 export async function GET(
@@ -15,7 +16,7 @@ export async function GET(
       return NextResponse.json({
         success: false,
         error: '缺少实体ID',
-        timestamp: new Date().toISOString()
+        timestamp: moment.tz('Asia/Shanghai').toISOString()
       }, { status: 400 });
     }
 
@@ -24,7 +25,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: neighborhoodData,
-      timestamp: new Date().toISOString()
+      timestamp: moment.tz('Asia/Shanghai').toISOString()
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -33,7 +34,7 @@ export async function GET(
     return NextResponse.json({
       success: false,
       error: errorMessage,
-      timestamp: new Date().toISOString()
+      timestamp: moment.tz('Asia/Shanghai').toISOString()
     }, { status: 500 });
   }
 } 

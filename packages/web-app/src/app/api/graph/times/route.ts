@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import moment from 'moment-timezone';
 import { queryService } from '../../../../lib/services/query';
 
 export async function GET(request: Request) {
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
       success: true,
       data: times,
       count: times.length,
-      timestamp: new Date().toISOString()
+      timestamp: moment.tz('Asia/Shanghai').toISOString()
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: false,
       error: errorMessage,
-      timestamp: new Date().toISOString()
+      timestamp: moment.tz('Asia/Shanghai').toISOString()
     }, { status: 500 });
   }
 } 

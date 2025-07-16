@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import moment from 'moment-timezone';
 import { highLevelNewsScanner, ScanOptions } from '../../../lib/services/high-level-scanner';
 import { CallSource } from '../../../types/scheduler';
 import { initializeServices } from '../../../lib/services/init';
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: false,
       error: errorMessage,
-      timestamp: new Date().toISOString()
+      timestamp: moment.tz('Asia/Shanghai').toISOString()
     }, { status: 500 });
   }
 }
@@ -107,7 +108,7 @@ export async function GET() {
           }
         }
       },
-      server_time: new Date().toISOString()
+      server_time: moment.tz('Asia/Shanghai').toISOString()
     };
     
     return NextResponse.json(status);

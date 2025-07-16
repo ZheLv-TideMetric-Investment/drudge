@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import moment from 'moment-timezone';
 import { 
   Button, 
   Card, 
@@ -100,12 +101,14 @@ export default function Home() {
     
     try {
       let body: any = {};
-      const endTime = new Date();
-      let startTime: Date;
+      // 使用北京时区
+      const beijingTz = 'Asia/Shanghai';
+      const endTime = moment.tz(beijingTz);
+      let startTime: moment.Moment;
       
       if (type === 'hourly') {
         // 当前小时的开始时间到现在
-        startTime = new Date(endTime.getFullYear(), endTime.getMonth(), endTime.getDate(), endTime.getHours(), 0, 0, 0);
+        startTime = endTime.clone().startOf('hour');
         body = {
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
@@ -114,7 +117,7 @@ export default function Home() {
         };
       } else if (type === 'daily') {
         // 当天的开始时间到现在
-        startTime = new Date(endTime.getFullYear(), endTime.getMonth(), endTime.getDate(), 0, 0, 0, 0);
+        startTime = endTime.clone().startOf('day');
         body = {
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
@@ -123,7 +126,7 @@ export default function Home() {
         };
       } else {
         // custom: 最近1小时的总结
-        startTime = new Date(endTime.getTime() - 60 * 60 * 1000);
+        startTime = endTime.clone().subtract(1, 'hour');
         body = {
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
@@ -209,7 +212,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           trigger,
-          timestamp: new Date().toISOString()
+          timestamp: moment.tz('Asia/Shanghai').toISOString()
         })
       });
       
@@ -321,14 +324,14 @@ export default function Home() {
                 <Descriptions.Item label="可用触发器">
                   <Text strong>{systemStatus?.scheduler?.available_triggers?.length || 0} 个</Text>
                 </Descriptions.Item>
-                <Descriptions.Item label="最后更新">
-                  <Text type="secondary">
-                    {systemStatus?.scheduler?.server_time ? 
-                      new Date(systemStatus.scheduler.server_time).toLocaleString() : 
-                      '未知'
-                    }
-                  </Text>
-                </Descriptions.Item>
+                                 <Descriptions.Item label="最后更新">
+                   <Text type="secondary">
+                     {systemStatus?.scheduler?.server_time ? 
+                       moment(systemStatus.scheduler.server_time).tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss') : 
+                       '未知'
+                     }
+                   </Text>
+                 </Descriptions.Item>
               </Descriptions>
             </Card>
           </Col>
@@ -383,14 +386,14 @@ export default function Home() {
                     ))}
                   </Space>
                 </Descriptions.Item>
-                <Descriptions.Item label="最后更新">
-                  <Text type="secondary">
-                    {systemStatus?.summary?.server_time ? 
-                      new Date(systemStatus.summary.server_time).toLocaleString() : 
-                      '未知'
-                    }
-                  </Text>
-                </Descriptions.Item>
+                                 <Descriptions.Item label="最后更新">
+                   <Text type="secondary">
+                     {systemStatus?.summary?.server_time ? 
+                       moment(systemStatus.summary.server_time).tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss') : 
+                       '未知'
+                     }
+                   </Text>
+                 </Descriptions.Item>
               </Descriptions>
             </Card>
           </Col>
