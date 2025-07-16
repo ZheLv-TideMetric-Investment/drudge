@@ -231,8 +231,13 @@ export default function Home() {
       every_minute: '每分钟执行任务，用于轻量级监控',
       every_5_minutes: '每5分钟执行任务，高频扫描高级别新闻',
       every_30_minutes: '每30分钟执行任务，中频处理',
-      every_hour: '每小时执行任务，生成小时总结（11-22点）',
-      overnight: '隔夜执行任务，生成每日总结（10点）',
+      every_hour: '每小时执行任务，全天24小时运行',
+      every_hour_05: '每小时05分执行任务，全天24小时延迟处理',
+      daytime: '白天执行任务（11-22点）',
+      daytime_05: '白天05分执行任务，生成小时总结（11-22点）',
+      overnight: '隔夜执行任务（10点）',
+      overnight_05: '隔夜执行任务，生成每日总结（10点05分）',
+      weekly_friday_1605: '每周五16:05分执行任务，周报处理',
     };
     return descriptions[trigger as keyof typeof descriptions] || '未知任务';
   };
@@ -243,7 +248,12 @@ export default function Home() {
       every_5_minutes: 'blue',
       every_30_minutes: 'orange',
       every_hour: 'purple',
+      every_hour_05: 'cyan',
+      daytime: 'geekblue',
+      daytime_05: 'volcano',
       overnight: 'red',
+      overnight_05: 'magenta',
+      weekly_friday_1605: 'gold',
     };
     return colors[trigger as keyof typeof colors] || 'default';
   };
