@@ -14,7 +14,7 @@ import { LLMMessage, LLMCallOptions, LLMResponse } from '../../types/llm';
 export function createMessages(systemPrompt: string, userPrompt: string): LLMMessage[] {
   return [
     { role: 'system', content: systemPrompt },
-    { role: 'user', content: userPrompt }
+    { role: 'user', content: userPrompt },
   ];
 }
 
@@ -34,10 +34,10 @@ class AiService {
 
     try {
       console.log('🤖 正在初始化AI服务...');
-      
+
       // 根据配置选择AI提供商
       const provider = config.ai.provider;
-      
+
       switch (provider) {
         case 'deepseek':
           if (!config.ai.deepseek.apiKey) {
@@ -47,7 +47,7 @@ class AiService {
           process.env.DEEPSEEK_API_KEY = config.ai.deepseek.apiKey;
           this.model = deepseek(config.ai.deepseek.model);
           break;
-          
+
         case 'google':
           if (!config.ai.google.apiKey) {
             throw new Error('Google API Key 未配置');
@@ -56,7 +56,7 @@ class AiService {
           process.env.GOOGLE_GENERATIVE_AI_API_KEY = config.ai.google.apiKey;
           this.model = google(config.ai.google.model);
           break;
-          
+
         case 'qwen':
           if (!config.ai.qwen.apiKey) {
             throw new Error('Qwen API Key 未配置');
@@ -68,23 +68,22 @@ class AiService {
           });
           this.model = qwen(config.ai.qwen.model);
           break;
-          
+
         default:
           throw new Error(`不支持的AI提供商: ${provider}`);
       }
-      
+
       this.initialized = true;
       this.mockMode = false;
       console.log(`✅ AI服务初始化完成: ${provider} - ${this.getModelName()}`);
-      
     } catch (error: any) {
       console.error('❌ AI服务初始化失败，切换到模拟模式:', error);
-      
+
       // 切换到模拟模式
       this.model = { provider: 'mock' };
       this.initialized = true;
       this.mockMode = true;
-      
+
       // 发送AI服务初始化失败通知
       try {
         await notificationService.sendSystemAlert(
@@ -102,7 +101,7 @@ class AiService {
    */
   private getModelName(): string {
     if (this.mockMode) return 'mock';
-    
+
     const provider = config.ai.provider;
     switch (provider) {
       case 'deepseek':
@@ -135,13 +134,12 @@ class AiService {
       // 真实AI调用
       console.log(`🤖 调用AI: ${config.ai.provider} - ${this.getModelName()}`);
       console.log('消息数量:', messages.length);
-      
+
       // 构建消息格式
       const formattedMessages = messages.map(msg => ({
         role: msg.role,
-        content: msg.content
+        content: msg.content,
       }));
-
 
       // 调用AI生成对象
       const result = await generateText({
@@ -152,20 +150,21 @@ class AiService {
       });
 
       console.log('✅ AI调用成功');
-      
+
       return {
         success: true,
         data: result.text,
-        usage: result.usage ? {
-          promptTokens: result.usage.promptTokens,
-          completionTokens: result.usage.completionTokens,
-          totalTokens: result.usage.totalTokens
-        } : undefined
+        usage: result.usage
+          ? {
+              promptTokens: result.usage.promptTokens,
+              completionTokens: result.usage.completionTokens,
+              totalTokens: result.usage.totalTokens,
+            }
+          : undefined,
       };
-
     } catch (error: any) {
       console.error('❌ LLM调用失败:', error);
-      
+
       // 发送AI服务调用失败通知
       try {
         await notificationService.sendSystemAlert(
@@ -175,16 +174,16 @@ class AiService {
       } catch (notifyError) {
         console.error('发送AI服务调用失败通知失败:', notifyError);
       }
-      
+
       // 如果真实调用失败，尝试返回模拟响应
       if (!this.mockMode) {
         console.warn('真实AI调用失败，返回模拟响应');
         return this.getMockResponse<string>(messages, options);
       }
-      
+
       return {
         success: false,
-        error: error.message || 'LLM调用失败'
+        error: error.message || 'LLM调用失败',
       };
     }
   }
@@ -211,22 +210,24 @@ class AiService {
       // 真实AI调用
       console.log(`🤖 调用AI: ${config.ai.provider} - ${this.getModelName()}`);
       console.log('消息数量:', messages.length);
-      
+
       // 构建消息格式
       const formattedMessages = messages.map(msg => ({
         role: msg.role,
-        content: msg.content
+        content: msg.content,
       }));
 
       // 设置默认schema
-      const schema = options.schema || z.object({
-        overall_summary: z.string().describe('整体总结'),
-        key_highlights: z.array(z.string()).describe('关键亮点'),
-        market_impact: z.string().describe('市场影响'),
-        focus_areas: z.array(z.string()).describe('关注领域'),
-        severity_assessment: z.enum(['low', 'medium', 'high']).describe('严重程度评估'),
-        confidence: z.number().min(0).max(1).describe('置信度')
-      });
+      const schema =
+        options.schema ||
+        z.object({
+          overall_summary: z.string().describe('整体总结'),
+          key_highlights: z.array(z.string()).describe('关键亮点'),
+          market_impact: z.string().describe('市场影响'),
+          focus_areas: z.array(z.string()).describe('关注领域'),
+          severity_assessment: z.enum(['low', 'medium', 'high']).describe('严重程度评估'),
+          confidence: z.number().min(0).max(1).describe('置信度'),
+        });
 
       // 调用AI生成对象
       const result = await generateObject({
@@ -238,20 +239,21 @@ class AiService {
       });
 
       console.log('✅ AI调用成功');
-      
+
       return {
         success: true,
         data: result.object as T,
-        usage: result.usage ? {
-          promptTokens: result.usage.promptTokens,
-          completionTokens: result.usage.completionTokens,
-          totalTokens: result.usage.totalTokens
-        } : undefined
+        usage: result.usage
+          ? {
+              promptTokens: result.usage.promptTokens,
+              completionTokens: result.usage.completionTokens,
+              totalTokens: result.usage.totalTokens,
+            }
+          : undefined,
       };
-
     } catch (error: any) {
       console.error('❌ LLM调用失败:', error);
-      
+
       // 发送AI服务调用失败通知
       try {
         await notificationService.sendSystemAlert(
@@ -261,16 +263,16 @@ class AiService {
       } catch (notifyError) {
         console.error('发送AI服务调用失败通知失败:', notifyError);
       }
-      
+
       // 如果真实调用失败，尝试返回模拟响应
       if (!this.mockMode) {
         console.warn('真实AI调用失败，返回模拟响应');
         return this.getMockResponse<T>(messages, options);
       }
-      
+
       return {
         success: false,
-        error: error.message || 'LLM调用失败'
+        error: error.message || 'LLM调用失败',
       };
     }
   }
@@ -284,7 +286,7 @@ class AiService {
       messageCount: messages.length,
       firstMessage: messages[0]?.content?.substring(0, 100) + '...',
       options: { ...options, schema: options.schema ? 'provided' : 'default' },
-      modelProvider: 'mock'
+      modelProvider: 'mock',
     });
 
     // 模拟响应结构
@@ -294,7 +296,7 @@ class AiService {
       market_impact: '市场影响较小（模拟）',
       focus_areas: ['关注点1（模拟）', '关注点2（模拟）'],
       severity_assessment: 'low' as const,
-      confidence: 0.8
+      confidence: 0.8,
     };
 
     return {
@@ -303,8 +305,8 @@ class AiService {
       usage: {
         promptTokens: 100,
         completionTokens: 50,
-        totalTokens: 150
-      }
+        totalTokens: 150,
+      },
     };
   }
 
@@ -325,11 +327,11 @@ class AiService {
   /**
    * 获取当前提供商信息
    */
-  getProviderInfo(): {provider: string, model: string, mockMode: boolean} {
+  getProviderInfo(): { provider: string; model: string; mockMode: boolean } {
     return {
       provider: config.ai.provider,
       model: this.getModelName(),
-      mockMode: this.mockMode
+      mockMode: this.mockMode,
     };
   }
 
@@ -348,36 +350,27 @@ class AiService {
 const aiService = new AiService();
 
 /**
- * 调用 LLM 并返回 JSON 响应
- * 
- * @deprecated 使用 aiService.callLLMWithJsonResponse() 替代
- */
-export async function callLLMWithJsonResponse<T = any>(
-  messages: LLMMessage[],
-  options: LLMCallOptions = {}
-): Promise<LLMResponse<T>> {
-  return aiService.callLLMWithJsonResponse(messages, options);
-}
-
-/**
  * 验证 JSON 响应
  */
-export function validateJsonResponse(data: unknown, schema: z.ZodSchema<unknown>): {success: boolean, data?: unknown, error?: string} {
+export function validateJsonResponse(
+  data: unknown,
+  schema: z.ZodSchema<unknown>
+): { success: boolean; data?: unknown; error?: string } {
   try {
     const validated = schema.parse(data);
     return {
       success: true,
-      data: validated
+      data: validated,
     };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error('JSON 响应验证失败:', error);
     return {
       success: false,
-      error: errorMessage
+      error: errorMessage,
     };
   }
 }
 
 // 导出AI服务实例
-export { aiService }; 
+export { aiService };

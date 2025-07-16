@@ -6,17 +6,17 @@ import * as chrono from 'chrono-node';
 import { parseTimeToBeijing, parseTimeToUTC } from '../utils/timeUtils';
 import * as fs from 'fs';
 import * as path from 'path';
-import { 
-  NewsItem, 
-  NewsExtractionResult, 
-  Event, 
-  Company, 
-  Person, 
-  Organization, 
-  Location, 
-  Time, 
+import {
+  NewsItem,
+  NewsExtractionResult,
+  Event,
+  Company,
+  Person,
+  Organization,
+  Location,
+  Time,
   Relationship,
-  LLMMessage 
+  LLMMessage,
 } from '../types/index';
 
 // ISO-8601 正则表达式
@@ -24,63 +24,102 @@ const iso8601 = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2}
 
 // 强化版新闻六要素提取的schema - 与投资场景完全对齐
 const newsExtractionSchema = z.object({
-  events: z.array(z.object({
-    event_name: z.string().min(1),
-    event_description: z.string().min(1),
-    event_type: z.enum(['macro','policy','market','corporate','industry','tech','geopolitics','other']),
-    significance: z.number().int().min(1).max(4),
-    sentiment: z.enum(['positive','negative','neutral']),
-    magnitude: z.number().min(-1).max(1),
-    event_level: z.enum(['Level 1','Level 2','Level 3','Level 4','Level 5']),
-    event_date: z.string().regex(iso8601).optional().or(z.literal(''))
-  })),
+  events: z.array(
+    z.object({
+      event_name: z.string().min(1),
+      event_description: z.string().min(1),
+      event_type: z.enum([
+        'macro',
+        'policy',
+        'market',
+        'corporate',
+        'industry',
+        'tech',
+        'geopolitics',
+        'other',
+      ]),
+      significance: z.number().int().min(1).max(4),
+      sentiment: z.enum(['positive', 'negative', 'neutral']),
+      magnitude: z.number().min(-1).max(1),
+      event_level: z.enum(['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5']),
+      event_date: z.string().regex(iso8601).optional().or(z.literal('')),
+    })
+  ),
 
-  companies: z.array(z.object({
-    company_name: z.string().min(1),
-    ticker: z.string().optional().or(z.literal('')),
-    industry: z.string().optional().or(z.literal('')),
-    market: z.string().optional().or(z.literal('')),
-    country: z.string().optional().or(z.literal('')),
-    aliases: z.array(z.string()).optional().default([])
-  })),
+  companies: z.array(
+    z.object({
+      company_name: z.string().min(1),
+      ticker: z.string().optional().or(z.literal('')),
+      industry: z.string().optional().or(z.literal('')),
+      market: z.string().optional().or(z.literal('')),
+      country: z.string().optional().or(z.literal('')),
+      aliases: z.array(z.string()).optional().default([]),
+    })
+  ),
 
-  persons: z.array(z.object({
-    person_name: z.string().min(1),
-    title: z.string().optional().or(z.literal('')),
-    company: z.string().optional().or(z.literal('')),
-    nationality: z.string().optional().or(z.literal(''))
-  })),
+  persons: z.array(
+    z.object({
+      person_name: z.string().min(1),
+      title: z.string().optional().or(z.literal('')),
+      company: z.string().optional().or(z.literal('')),
+      nationality: z.string().optional().or(z.literal('')),
+    })
+  ),
 
-  organizations: z.array(z.object({
-    organization_name: z.string().min(1),
-    type: z.enum(['government','regulator','intl_org','fin_inst','industry_assoc','other']).optional().or(z.literal('')),
-    country: z.string().optional().or(z.literal(''))
-  })),
+  organizations: z.array(
+    z.object({
+      organization_name: z.string().min(1),
+      type: z
+        .enum(['government', 'regulator', 'intl_org', 'fin_inst', 'industry_assoc', 'other'])
+        .optional()
+        .or(z.literal('')),
+      country: z.string().optional().or(z.literal('')),
+    })
+  ),
 
-  locations: z.array(z.object({
-    location_name: z.string().min(1),
-    type: z.enum(['country','region','city','facility','other']).optional().or(z.literal('')),
-    country: z.string().optional().or(z.literal('')),
-    region: z.string().optional().or(z.literal(''))
-  })),
+  locations: z.array(
+    z.object({
+      location_name: z.string().min(1),
+      type: z.enum(['country', 'region', 'city', 'facility', 'other']).optional().or(z.literal('')),
+      country: z.string().optional().or(z.literal('')),
+      region: z.string().optional().or(z.literal('')),
+    })
+  ),
 
-  times: z.array(z.object({
-    time_value: z.string().min(1),
-    type: z.enum(['DATETIME','DATE','TIME','PERIOD','OTHER']).optional().or(z.literal('')),
-    precision: z.enum(['YEAR','MONTH','DAY','HOUR','MINUTE','SECOND']).optional().or(z.literal('')),
-    timezone: z.string().optional().or(z.literal(''))
-  })),
+  times: z.array(
+    z.object({
+      time_value: z.string().min(1),
+      type: z.enum(['DATETIME', 'DATE', 'TIME', 'PERIOD', 'OTHER']).optional().or(z.literal('')),
+      precision: z
+        .enum(['YEAR', 'MONTH', 'DAY', 'HOUR', 'MINUTE', 'SECOND'])
+        .optional()
+        .or(z.literal('')),
+      timezone: z.string().optional().or(z.literal('')),
+    })
+  ),
 
-  relationships: z.array(z.object({
-    type: z.enum([
-      'LOCATED_IN','WORKS_FOR','OWNS','PARTICIPATES_IN','MERGES_WITH','ACQUIRES',
-      'SUPPLIES','PARTNERS_WITH','SUED_BY','REGULATED_BY','INVESTS_IN','OTHER'
-    ]),
-    from: z.string().min(1),
-    to: z.string().min(1),
-    description: z.string().optional().or(z.literal('')),
-    confidence: z.number().min(0).max(1).optional()
-  }))
+  relationships: z.array(
+    z.object({
+      type: z.enum([
+        'LOCATED_IN',
+        'WORKS_FOR',
+        'OWNS',
+        'PARTICIPATES_IN',
+        'MERGES_WITH',
+        'ACQUIRES',
+        'SUPPLIES',
+        'PARTNERS_WITH',
+        'SUED_BY',
+        'REGULATED_BY',
+        'INVESTS_IN',
+        'OTHER',
+      ]),
+      from: z.string().min(1),
+      to: z.string().min(1),
+      description: z.string().optional().or(z.literal('')),
+      confidence: z.number().min(0).max(1).optional(),
+    })
+  ),
 });
 
 /**
@@ -99,46 +138,45 @@ export class EntityExtractionService {
    */
   async extractFromNews(newsItem: NewsItem): Promise<NewsExtractionResult> {
     const startTime = Date.now();
-    
+
     try {
       logger.info(`🔍 开始提取新闻六要素: ${newsItem.id}`);
 
       // 使用AI提取六要素（不允许兜底，必须成功）
       const extractionData = await this.callAIExtraction(newsItem);
-      
+
       // 检查提取结果是否有效
       if (!extractionData) {
         throw new Error('AI提取返回空结果');
       }
-      
+
       // 解析提取结果
       const result = this.parseExtractionResult(extractionData, newsItem);
-      
+
       // 判断新闻级别（使用新的冲突处理逻辑）
       result.news_level = this.determineNewsLevelWithConflictHandling(newsItem, result);
-      
+
       // 标准化时间字段
       result.times = this.standardizeTimeFields(result.times);
       result.events = this.standardizeEventDates(result.events);
-      
+
       // 计算处理时间
       result.processing_time = Date.now() - startTime;
 
       logger.info(
         `✅ 新闻 ${newsItem.id} 六要素提取完成: 事件${result.events.length}个, 公司${result.companies.length}个, ` +
-        `人物${result.persons?.length || 0}个, 机构${result.organizations.length}个, ` +
-        `地点${result.locations.length}个, 时间${result.times.length}个, ` +
-        `关系${result.relationships.length}个, 级别: ${result.news_level}`
+          `人物${result.persons?.length || 0}个, 机构${result.organizations.length}个, ` +
+          `地点${result.locations.length}个, 时间${result.times.length}个, ` +
+          `关系${result.relationships.length}个, 级别: ${result.news_level}`
       );
 
       return result;
-      
     } catch (error: any) {
       logger.error(`❌ 新闻 ${newsItem.id} 六要素提取异常:`, error);
-      
+
       // 保存失败的新闻数据
       await this.saveFailedNews(newsItem, error);
-      
+
       // 发送实体提取失败通知
       try {
         await notificationService.sendEntityExtractionFailureNotification(
@@ -148,7 +186,7 @@ export class EntityExtractionService {
       } catch (notifyError) {
         logger.error('发送实体提取失败通知失败:', notifyError);
       }
-      
+
       // 重新抛出异常，不使用兜底结果
       throw error;
     }
@@ -159,16 +197,18 @@ export class EntityExtractionService {
    */
   async batchExtractEntities(newsItems: NewsItem[]): Promise<NewsExtractionResult[]> {
     logger.info(`🔄 开始批量提取六要素: ${newsItems.length} 条新闻`);
-    
+
     const results: NewsExtractionResult[] = [];
     const batchSize = 3; // 小批量处理避免API限制
 
     for (let i = 0; i < newsItems.length; i += batchSize) {
       const batch = newsItems.slice(i, i + batchSize);
-      
-      logger.info(`处理批次 ${Math.floor(i / batchSize) + 1}/${Math.ceil(newsItems.length / batchSize)}`);
-      
-      const batchPromises = batch.map(async (newsItem) => {
+
+      logger.info(
+        `处理批次 ${Math.floor(i / batchSize) + 1}/${Math.ceil(newsItems.length / batchSize)}`
+      );
+
+      const batchPromises = batch.map(async newsItem => {
         try {
           return await this.extractFromNews(newsItem);
         } catch (error) {
@@ -177,29 +217,31 @@ export class EntityExtractionService {
           return null; // 返回null表示处理失败
         }
       });
-      
+
       const batchResults = await Promise.all(batchPromises);
-      
+
       // 只添加成功处理的结果
       const successfulResults = batchResults.filter(result => result !== null);
       results.push(...successfulResults);
-      
+
       // 添加延迟避免API限制
       if (i + batchSize < newsItems.length) {
         await this.delay(2000);
       }
     }
-    
+
     const totalNews = newsItems.length;
     const successfulNews = results.length;
     const failedNews = totalNews - successfulNews;
-    
-    logger.info(`✅ 批量六要素提取完成: 成功 ${successfulNews} 条，失败 ${failedNews} 条，总计 ${totalNews} 条新闻`);
-    
+
+    logger.info(
+      `✅ 批量六要素提取完成: 成功 ${successfulNews} 条，失败 ${failedNews} 条，总计 ${totalNews} 条新闻`
+    );
+
     if (failedNews > 0) {
       logger.warn(`⚠️ ${failedNews} 条新闻处理失败，已保存到 data/news/failed 目录`);
     }
-    
+
     return results;
   }
 
@@ -226,26 +268,26 @@ export class EntityExtractionService {
     ];
 
     let lastError: any;
-    
+
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         const response = await aiService.callLLMWithJsonResponse(messages, {
           schema: newsExtractionSchema,
           timeout: 5 * 60 * 1000,
-          temperature: 0.3
+          temperature: 0.3,
         });
-        
+
         if (response.success) {
-                  // 对响应进行校验和解析处理
-        const validatedData = this.validateAndParsing(response.data, attempt);
+          // 对响应进行校验和解析处理
+          const validatedData = this.validateAndParsing(response.data, attempt);
           return validatedData;
         } else {
           throw new Error(response.error || 'AI提取失败');
         }
       } catch (error: any) {
         lastError = error;
-        logger.warn(`AI六要素提取尝试 ${attempt} 失败: ${error.message}`, { 
-          stack: error.stack 
+        logger.warn(`AI六要素提取尝试 ${attempt} 失败: ${error.message}`, {
+          stack: error.stack,
         });
 
         // 即使出错，也尝试从错误中提取有用信息
@@ -253,13 +295,13 @@ export class EntityExtractionService {
           try {
             const errorText = error.text || error.response.text;
             logger.debug(`🔍 错误文本提取: ${errorText.substring(0, 500)}...`);
-            
+
             const extractedJson = this.extractJsonFromString(errorText);
             if (extractedJson) {
               logger.debug(`🔍 JSON 提取成功，开始修复数据...`);
               const fixedJson = this.fixCommonSchemaIssues(extractedJson);
               logger.debug(`🔍 数据修复完成，验证 schema...`);
-              
+
               const parsedResult = newsExtractionSchema.safeParse(fixedJson);
               if (parsedResult.success) {
                 logger.info(`✅ 从错误响应中成功提取数据 (尝试 ${attempt})`);
@@ -327,7 +369,6 @@ export class EntityExtractionService {
       // 如果都失败，抛出错误
       logger.error(`所有解析尝试失败 (尝试 ${attempt})`);
       throw new Error(`数据解析失败：无法解析AI返回的数据格式`);
-
     } catch (error) {
       logger.error(`数据解析异常 (尝试 ${attempt}):`, error);
       throw error;
@@ -343,7 +384,7 @@ export class EntityExtractionService {
     }
 
     const fixed = JSON.parse(JSON.stringify(data)); // 深拷贝
-    
+
     // 修复数组中的字符串化对象
     this.fixStringifiedObjectsInArrays(fixed);
 
@@ -381,44 +422,59 @@ export class EntityExtractionService {
     // 修复 events 中的必需字段
     if (fixed.events && Array.isArray(fixed.events)) {
       fixed.events = fixed.events
-        .filter((event: any) => event && typeof event === 'object' && (event.event_name || event.event_id))
+        .filter(
+          (event: any) => event && typeof event === 'object' && (event.event_name || event.event_id)
+        )
         .map((event: any) => {
-        // 确保 event_id 存在
-        if (!event.event_id) {
-          event.event_id = event.event_name ? 
-            event.event_name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() + '_' + Date.now() :
-            'event_' + Date.now();
-        }
-        
-        // 修复 event_type 枚举
-        const validEventTypes = ['macro', 'policy', 'market', 'corporate', 'industry', 'tech', 'geopolitics', 'other'];
-        if (!validEventTypes.includes(event.event_type)) {
-          event.event_type = 'other';
-        }
+          // 确保 event_id 存在
+          if (!event.event_id) {
+            event.event_id = event.event_name
+              ? event.event_name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() + '_' + Date.now()
+              : 'event_' + Date.now();
+          }
 
-        // 修复 sentiment 枚举
-        const validSentiments = ['positive', 'negative', 'neutral'];
-        if (!validSentiments.includes(event.sentiment)) {
-          event.sentiment = 'neutral';
-        }
+          // 修复 event_type 枚举
+          const validEventTypes = [
+            'macro',
+            'policy',
+            'market',
+            'corporate',
+            'industry',
+            'tech',
+            'geopolitics',
+            'other',
+          ];
+          if (!validEventTypes.includes(event.event_type)) {
+            event.event_type = 'other';
+          }
 
-        // 修复 event_level 枚举
-        const validLevels = ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'];
-        if (!validLevels.includes(event.event_level)) {
-          event.event_level = 'Level 5';
-        }
+          // 修复 sentiment 枚举
+          const validSentiments = ['positive', 'negative', 'neutral'];
+          if (!validSentiments.includes(event.sentiment)) {
+            event.sentiment = 'neutral';
+          }
 
-        // 确保数值字段有效
-        if (typeof event.significance !== 'number' || event.significance < 1 || event.significance > 4) {
-          event.significance = 2;
-        }
+          // 修复 event_level 枚举
+          const validLevels = ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'];
+          if (!validLevels.includes(event.event_level)) {
+            event.event_level = 'Level 5';
+          }
 
-        if (typeof event.magnitude !== 'number' || event.magnitude < -1 || event.magnitude > 1) {
-          event.magnitude = 0;
-        }
+          // 确保数值字段有效
+          if (
+            typeof event.significance !== 'number' ||
+            event.significance < 1 ||
+            event.significance > 4
+          ) {
+            event.significance = 2;
+          }
 
-        return event;
-      });
+          if (typeof event.magnitude !== 'number' || event.magnitude < -1 || event.magnitude > 1) {
+            event.magnitude = 0;
+          }
+
+          return event;
+        });
     }
 
     // 修复 organizations 中的 type 枚举
@@ -426,25 +482,34 @@ export class EntityExtractionService {
       fixed.organizations = fixed.organizations
         .filter((org: any) => org && typeof org === 'object' && org.organization_name)
         .map((org: any) => {
-        const validOrgTypes = ['government', 'regulator', 'intl_org', 'fin_inst', 'industry_assoc', 'other'];
-        if (!validOrgTypes.includes(org.type)) {
-          org.type = 'other';
-        }
-        return org;
-      });
+          const validOrgTypes = [
+            'government',
+            'regulator',
+            'intl_org',
+            'fin_inst',
+            'industry_assoc',
+            'other',
+          ];
+          if (!validOrgTypes.includes(org.type)) {
+            org.type = 'other';
+          }
+          return org;
+        });
     }
 
     // 修复 locations 中的 type 枚举
     if (fixed.locations && Array.isArray(fixed.locations)) {
       fixed.locations = fixed.locations
-        .filter((location: any) => location && typeof location === 'object' && location.location_name)
+        .filter(
+          (location: any) => location && typeof location === 'object' && location.location_name
+        )
         .map((location: any) => {
-        const validLocationTypes = ['country', 'region', 'city', 'facility', 'other'];
-        if (!validLocationTypes.includes(location.type)) {
-          location.type = 'other';
-        }
-        return location;
-      });
+          const validLocationTypes = ['country', 'region', 'city', 'facility', 'other'];
+          if (!validLocationTypes.includes(location.type)) {
+            location.type = 'other';
+          }
+          return location;
+        });
     }
 
     // 修复 times 中的枚举值
@@ -452,18 +517,18 @@ export class EntityExtractionService {
       fixed.times = fixed.times
         .filter((time: any) => time && typeof time === 'object' && time.time_value)
         .map((time: any) => {
-        const validTimeTypes = ['DATETIME', 'DATE', 'TIME', 'PERIOD', 'OTHER'];
-        if (!validTimeTypes.includes(time.type)) {
-          time.type = 'OTHER';
-        }
+          const validTimeTypes = ['DATETIME', 'DATE', 'TIME', 'PERIOD', 'OTHER'];
+          if (!validTimeTypes.includes(time.type)) {
+            time.type = 'OTHER';
+          }
 
-        const validPrecisions = ['YEAR', 'MONTH', 'DAY', 'HOUR', 'MINUTE', 'SECOND'];
-        if (!validPrecisions.includes(time.precision)) {
-          time.precision = 'DAY';
-        }
+          const validPrecisions = ['YEAR', 'MONTH', 'DAY', 'HOUR', 'MINUTE', 'SECOND'];
+          if (!validPrecisions.includes(time.precision)) {
+            time.precision = 'DAY';
+          }
 
-        return time;
-      });
+          return time;
+        });
     }
 
     // 修复 relationships 中的 type 枚举
@@ -471,13 +536,25 @@ export class EntityExtractionService {
       fixed.relationships = fixed.relationships
         .filter((rel: any) => rel && typeof rel === 'object' && rel.from && rel.to)
         .map((rel: any) => {
-        const validRelTypes = ['LOCATED_IN', 'WORKS_FOR', 'OWNS', 'PARTICIPATES_IN', 'MERGES_WITH', 'ACQUIRES',
-                              'SUPPLIES', 'PARTNERS_WITH', 'SUED_BY', 'REGULATED_BY', 'INVESTS_IN', 'OTHER'];
-        if (!validRelTypes.includes(rel.type)) {
-          rel.type = 'OTHER';
-        }
-        return rel;
-      });
+          const validRelTypes = [
+            'LOCATED_IN',
+            'WORKS_FOR',
+            'OWNS',
+            'PARTICIPATES_IN',
+            'MERGES_WITH',
+            'ACQUIRES',
+            'SUPPLIES',
+            'PARTNERS_WITH',
+            'SUED_BY',
+            'REGULATED_BY',
+            'INVESTS_IN',
+            'OTHER',
+          ];
+          if (!validRelTypes.includes(rel.type)) {
+            rel.type = 'OTHER';
+          }
+          return rel;
+        });
     }
 
     return fixed;
@@ -487,8 +564,16 @@ export class EntityExtractionService {
    * 修复数组中的字符串化对象
    */
   private fixStringifiedObjectsInArrays(data: any): void {
-    const arrayFields = ['events', 'companies', 'persons', 'organizations', 'locations', 'times', 'relationships'];
-    
+    const arrayFields = [
+      'events',
+      'companies',
+      'persons',
+      'organizations',
+      'locations',
+      'times',
+      'relationships',
+    ];
+
     for (const field of arrayFields) {
       if (data[field] && Array.isArray(data[field])) {
         let fixedCount = 0;
@@ -499,7 +584,9 @@ export class EntityExtractionService {
               const parsed = JSON.parse(item);
               if (typeof parsed === 'object' && parsed !== null) {
                 fixedCount++;
-                logger.debug(`🔧 修复字符串化对象 ${field}[${fixedCount}]: ${item.substring(0, 100)}...`);
+                logger.debug(
+                  `🔧 修复字符串化对象 ${field}[${fixedCount}]: ${item.substring(0, 100)}...`
+                );
                 return parsed;
               }
             } catch (error) {
@@ -508,7 +595,7 @@ export class EntityExtractionService {
           }
           return item;
         });
-        
+
         if (fixedCount > 0) {
           logger.info(`✅ 修复了 ${fixedCount} 个字符串化的 ${field} 对象`);
         }
@@ -580,20 +667,20 @@ export class EntityExtractionService {
     // 修复空key的问题：删除类似 ,"", 或 "","" 或 {"", 的无效键值对
     // 1. 修复 "key","","other_key" -> "key","other_key"
     jsonContent = jsonContent.replace(/,\s*""\s*,/g, ',');
-    
-    // 2. 修复对象开头的空key：{"","key" -> {"key"  
+
+    // 2. 修复对象开头的空key：{"","key" -> {"key"
     jsonContent = jsonContent.replace(/{\s*""\s*,/g, '{');
-    
+
     // 3. 修复对象结尾的空key：,"","} -> "}
     jsonContent = jsonContent.replace(/,\s*""\s*}/g, '}');
-    
+
     // 4. 修复单独的空key："key":"value","" -> "key":"value"
     jsonContent = jsonContent.replace(/,\s*""\s*(?=[,\]\}])/g, '');
-    
+
     // 5. 修复空key后跟冒号的情况：""," -> 删除整个部分
     jsonContent = jsonContent.replace(/,\s*""\s*:\s*"[^"]*"/g, '');
     jsonContent = jsonContent.replace(/{\s*""\s*:\s*"[^"]*"\s*,/g, '{');
-    
+
     // 6. 修复特殊情况：处理 "key","","next":"value" -> "key","next":"value"
     jsonContent = jsonContent.replace(/"([^"]+)"\s*,\s*""\s*,\s*"([^"]+)"/g, '"$1", "$2"');
 
@@ -603,10 +690,6 @@ export class EntityExtractionService {
 
     return jsonContent;
   }
-
-
-
-
 
   /**
    * 解析提取结果 - 适配新的数据结构
@@ -627,7 +710,7 @@ export class EntityExtractionService {
       organizations: [],
       locations: [],
       times: [],
-      relationships: []
+      relationships: [],
     };
 
     if (!extractionData) {
@@ -640,18 +723,18 @@ export class EntityExtractionService {
         result.events = extractionData.events
           .filter((event: any) => event && typeof event === 'object' && event.event_name)
           .map((event: any, index: number) => ({
-          event_id: `${newsItem.id}_event_${index}`,
-          event_name: event.event_name || '',
-          event_description: event.event_description || '',
-          event_type: event.event_type || 'other',
-          significance: event.significance || 1,
-          sentiment: event.sentiment || 'neutral',
-          magnitude: event.magnitude || 0,
-          event_level: event.event_level || 'Level 5',
-          event_date: event.event_date || parseTimeToUTC(newsItem.time),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
+            event_id: `${newsItem.id}_event_${index}`,
+            event_name: event.event_name || '',
+            event_description: event.event_description || '',
+            event_type: event.event_type || 'other',
+            significance: event.significance || 1,
+            sentiment: event.sentiment || 'neutral',
+            magnitude: event.magnitude || 0,
+            event_level: event.event_level || 'Level 5',
+            event_date: event.event_date || parseTimeToUTC(newsItem.time),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }));
       }
 
       // 解析公司 - 处理可选字段
@@ -659,15 +742,15 @@ export class EntityExtractionService {
         result.companies = extractionData.companies
           .filter((company: any) => company && typeof company === 'object' && company.company_name)
           .map((company: any) => ({
-          company_name: company.company_name || '',
-          ticker: company.ticker || '',
-          industry: company.industry || '',
-          market: company.market || '',
-          country: company.country || '',
-          aliases: Array.isArray(company.aliases) ? company.aliases : [],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
+            company_name: company.company_name || '',
+            ticker: company.ticker || '',
+            industry: company.industry || '',
+            market: company.market || '',
+            country: company.country || '',
+            aliases: Array.isArray(company.aliases) ? company.aliases : [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }));
       }
 
       // 解析人物 - 所有字段可选
@@ -675,13 +758,13 @@ export class EntityExtractionService {
         result.persons = extractionData.persons
           .filter((person: any) => person && typeof person === 'object' && person.person_name)
           .map((person: any) => ({
-          person_name: person.person_name || '',
-          title: person.title || '',
-          company: person.company || '',
-          nationality: person.nationality || '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
+            person_name: person.person_name || '',
+            title: person.title || '',
+            company: person.company || '',
+            nationality: person.nationality || '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }));
       }
 
       // 解析机构 - 使用标准枚举
@@ -689,27 +772,29 @@ export class EntityExtractionService {
         result.organizations = extractionData.organizations
           .filter((org: any) => org && typeof org === 'object' && org.organization_name)
           .map((org: any) => ({
-          organization_name: org.organization_name || '',
-          type: org.type || 'other',
-          country: org.country || '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
+            organization_name: org.organization_name || '',
+            type: org.type || 'other',
+            country: org.country || '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }));
       }
 
       // 解析地点 - 使用标准枚举和可选坐标
       if (extractionData.locations && Array.isArray(extractionData.locations)) {
         result.locations = extractionData.locations
-          .filter((location: any) => location && typeof location === 'object' && location.location_name)
+          .filter(
+            (location: any) => location && typeof location === 'object' && location.location_name
+          )
           .map((location: any) => ({
-          location_name: location.location_name || '',
-          type: location.type || 'other',
-          country: location.country || '',
-          region: location.region || '',
-          coordinates: location.coordinates || undefined,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
+            location_name: location.location_name || '',
+            type: location.type || 'other',
+            country: location.country || '',
+            region: location.region || '',
+            coordinates: location.coordinates || undefined,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }));
       }
 
       // 解析时间 - 使用标准枚举
@@ -717,13 +802,13 @@ export class EntityExtractionService {
         result.times = extractionData.times
           .filter((time: any) => time && typeof time === 'object' && time.time_value)
           .map((time: any) => ({
-          time_value: time.time_value || '',
-          type: time.type || 'OTHER',
-          precision: time.precision || 'DAY',
-          timezone: time.timezone || '',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        }));
+            time_value: time.time_value || '',
+            type: time.type || 'OTHER',
+            precision: time.precision || 'DAY',
+            timezone: time.timezone || '',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }));
       }
 
       // 解析关系 - 使用标准关系类型
@@ -731,20 +816,24 @@ export class EntityExtractionService {
         result.relationships = extractionData.relationships
           .filter((rel: any) => rel && typeof rel === 'object' && rel.from && rel.to)
           .map((rel: any) => ({
-          type: rel.type || 'OTHER',
-          from: rel.from || '',
-          to: rel.to || '',
-          description: rel.description || '',
-          confidence: rel.confidence || 0.8
-        }));
+            type: rel.type || 'OTHER',
+            from: rel.from || '',
+            to: rel.to || '',
+            description: rel.description || '',
+            confidence: rel.confidence || 0.8,
+          }));
       }
 
       // 计算总体置信度
-      const totalEntities = result.events.length + result.companies.length + (result.persons?.length || 0) + 
-                          result.organizations.length + result.locations.length + result.times.length;
-      
-      result.confidence = totalEntities > 0 ? Math.min(0.9, 0.6 + (totalEntities * 0.05)) : 0.3;
+      const totalEntities =
+        result.events.length +
+        result.companies.length +
+        (result.persons?.length || 0) +
+        result.organizations.length +
+        result.locations.length +
+        result.times.length;
 
+      result.confidence = totalEntities > 0 ? Math.min(0.9, 0.6 + totalEntities * 0.05) : 0.3;
     } catch (error) {
       logger.error('解析提取结果失败:', error);
     }
@@ -755,13 +844,16 @@ export class EntityExtractionService {
   /**
    * 新闻级别冲突处理（改进版）
    */
-  private determineNewsLevelWithConflictHandling(newsItem: NewsItem, result: NewsExtractionResult): string {
+  private determineNewsLevelWithConflictHandling(
+    newsItem: NewsItem,
+    result: NewsExtractionResult
+  ): string {
     // 若 events[].event_level 至少一个非空 → 直接取最高级
     if (result.events.length > 0) {
       const eventLevels = result.events
         .map(e => e.event_level)
         .filter(level => level && level !== undefined);
-      
+
       if (eventLevels.length > 0) {
         // 取最高级别（数字越小级别越高）
         if (eventLevels.includes('Level 1')) return 'Level 1';
@@ -783,7 +875,7 @@ export class EntityExtractionService {
     // 如果事件中有明确的级别，使用最高级别
     if (result.events.length > 0) {
       const levels = result.events.map(e => e.event_level);
-      
+
       if (levels.includes('Level 1')) return 'Level 1';
       if (levels.includes('Level 2')) return 'Level 2';
       if (levels.includes('Level 3')) return 'Level 3';
@@ -791,15 +883,14 @@ export class EntityExtractionService {
     }
 
     // 根据实体数量和类型判断
-    const entityCount = result.events.length + result.companies.length + (result.persons?.length || 0);
-    
+    const entityCount =
+      result.events.length + result.companies.length + (result.persons?.length || 0);
+
     if (entityCount >= 5) return 'Level 3';
     if (entityCount >= 3) return 'Level 4';
-    
+
     return 'Level 5';
   }
-
-
 
   /**
    * 获取强化版系统提示词 - 针对投资场景全面优化
@@ -935,11 +1026,11 @@ export class EntityExtractionService {
   private standardizeTimeFields(times: Time[]): Time[] {
     return times.map(time => {
       const standardized = { ...time };
-      
+
       try {
         // 使用 chrono-node 解析时间
         const parsed = chrono.parseDate(time.time_value);
-        
+
         if (parsed) {
           standardized.raw_value = time.time_value;
           standardized.parsed_iso = parsed.toISOString();
@@ -954,7 +1045,7 @@ export class EntityExtractionService {
         standardized.raw_value = time.time_value;
         standardized.parsed_iso = '';
       }
-      
+
       return standardized;
     });
   }
@@ -965,11 +1056,11 @@ export class EntityExtractionService {
   private standardizeEventDates(events: Event[]): Event[] {
     return events.map(event => {
       const standardized = { ...event };
-      
+
       try {
         // 使用 chrono-node 解析事件日期
         const parsed = chrono.parseDate(event.event_date);
-        
+
         if (parsed) {
           standardized.raw_event_date = event.event_date;
           standardized.parsed_event_date = parsed.toISOString();
@@ -984,7 +1075,7 @@ export class EntityExtractionService {
         standardized.raw_event_date = event.event_date;
         standardized.parsed_event_date = '';
       }
-      
+
       return standardized;
     });
   }
@@ -1013,14 +1104,14 @@ export class EntityExtractionService {
           message: error.message || 'Unknown error',
           stack: error.stack || '',
           timestamp: new Date().toISOString(),
-          service: 'EntityExtractionService'
+          service: 'EntityExtractionService',
         },
         metadata: {
           failedAt: new Date().toISOString(),
           originalId: newsItem.id,
           source: newsItem.source,
-          title: newsItem.title
-        }
+          title: newsItem.title,
+        },
       };
 
       // 生成文件名：使用新闻ID和时间戳
@@ -1030,11 +1121,10 @@ export class EntityExtractionService {
 
       // 保存文件
       await fs.promises.writeFile(filepath, JSON.stringify(failedNewsData, null, 2), 'utf8');
-      
+
       logger.warn(`❌ 失败新闻已保存: ${filepath}`);
-      
     } catch (saveError) {
       logger.error(`保存失败新闻时出错: ${newsItem.id}`, saveError);
     }
   }
-} 
+}

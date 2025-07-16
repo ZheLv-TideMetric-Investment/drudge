@@ -46,13 +46,13 @@ export class AiService {
         if (!config.ai.qwen?.model || !config.ai.qwen?.apiKey) {
           throw new Error('千问模型配置不存在');
         }
-        
+
         // 创建千问OpenAI兼容客户端
         const qwenOpenAI = createOpenAI({
           apiKey: config.ai.qwen.apiKey,
           baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         });
-        
+
         this.model = qwenOpenAI(config.ai.qwen.model);
         logger.info(`使用 千问 模型: ${config.ai.qwen.model}`);
       } else {
@@ -63,7 +63,7 @@ export class AiService {
       logger.info('✅ AI服务初始化完成');
     } catch (error: any) {
       logger.error('❌ AI服务初始化失败:', error);
-      
+
       // 发送AI服务初始化失败通知
       try {
         await notificationService.sendAiServiceFailureNotification(
@@ -74,7 +74,7 @@ export class AiService {
       } catch (notifyError) {
         logger.error('发送AI服务失败通知失败:', notifyError);
       }
-      
+
       this.initialized = false;
       throw error;
     }
@@ -102,14 +102,14 @@ export class AiService {
       const {
         temperature = 0.7,
         timeout = 10 * 60 * 1000, // 默认10分钟超时
-        schema
+        schema,
       } = options;
 
       logger.debug('调用LLM (JSON):', {
         messageCount: messages.length,
         firstMessage: messages[0]?.content?.substring(0, 100) + '...',
         options: { ...options, schema: schema ? 'provided' : 'default' },
-        modelProvider: config?.ai?.provider
+        modelProvider: config?.ai?.provider,
       });
 
       // 将messages转换为prompt格式
@@ -118,7 +118,8 @@ export class AiService {
         .map(msg => msg.content)
         .join('\n\n');
 
-      const systemMessage = messages.find(msg => msg.role === 'system')?.content || '你是一个专业的AI助手。';
+      const systemMessage =
+        messages.find(msg => msg.role === 'system')?.content || '你是一个专业的AI助手。';
 
       // 使用传入的schema，如果没有传入则使用默认宽松schema
       const schemaToUse = schema || z.object({}).passthrough();
@@ -133,13 +134,13 @@ export class AiService {
             system: systemMessage,
             schema: schemaToUse,
           });
-        } catch(error: any) {
+        } catch (error: any) {
           // 如果generateObject失败，尝试从错误信息中解析JSON
           if (error.text) {
             try {
-              return { 
+              return {
                 object: JSON.parse(error.text),
-                usage: undefined
+                usage: undefined,
               };
             } catch (parseError) {
               throw error;
@@ -150,10 +151,7 @@ export class AiService {
       };
 
       // 使用Promise.race来实现超时控制
-      const result = await Promise.race([
-        llmPromise(),
-        this.createTimeoutPromise(timeout)
-      ]);
+      const result = await Promise.race([llmPromise(), this.createTimeoutPromise(timeout)]);
 
       // 解析结果
       let parsedData: T;
@@ -171,42 +169,36 @@ export class AiService {
 
       logger.debug('LLM JSON响应成功:', {
         hasObject: !!result.object,
-        usage: result.usage
+        usage: result.usage,
       });
 
       return {
         success: true,
         data: parsedData,
-        usage: result.usage ? {
-          promptTokens: result.usage.promptTokens,
-          completionTokens: result.usage.completionTokens,
-          totalTokens: result.usage.totalTokens
-        } : undefined
+        usage: result.usage
+          ? {
+              promptTokens: result.usage.promptTokens,
+              completionTokens: result.usage.completionTokens,
+              totalTokens: result.usage.totalTokens,
+            }
+          : undefined,
       };
-
     } catch (error: any) {
       logger.error('LLM JSON调用失败:', error);
-      
-      // 发送AI服务调用失败通知
-      try {
-        await notificationService.sendAiServiceFailureNotification(
-          config?.ai?.provider || 'unknown',
-          (config?.ai?.[config.ai.provider as keyof typeof config.ai] as any)?.model || 'unknown',
-          error.message || 'LLM调用失败'
-        );
-      } catch (notifyError) {
-        logger.error('发送AI服务调用失败通知失败:', notifyError);
-      }
-      
+
       // 如果是初始化相关错误，重置状态
-      if (error.message?.includes('provider') || error.message?.includes('模型') || error.message?.includes('配置')) {
+      if (
+        error.message?.includes('provider') ||
+        error.message?.includes('模型') ||
+        error.message?.includes('配置')
+      ) {
         this.initialized = false;
         this.model = null;
       }
-      
+
       return {
         success: false,
-        error: error.message || 'LLM JSON调用失败'
+        error: error.message || 'LLM JSON调用失败',
       };
     }
   }
@@ -239,4 +231,4 @@ export class AiService {
   }
 }
 
-export default new AiService(); 
+export default new AiService();

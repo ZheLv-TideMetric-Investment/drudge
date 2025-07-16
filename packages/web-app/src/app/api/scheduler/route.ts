@@ -7,7 +7,7 @@ import {
   SchedulerApiResponse,
   CallSource,
 } from '../../../types/scheduler';
-import { highLevelNewsScanner } from '../../../lib/services/high-level-scanner';
+// import { highLevelNewsScanner } from '../../../lib/services/high-level-scanner';
 import { summaryService } from '../../../lib/services/summary';
 import { initializeServices } from '../../../lib/services/init';
 
@@ -139,12 +139,11 @@ async function handleEvery5Minutes(timestamp: string, metadata?: Record<string, 
 
   try {
     // 使用定时扫描方法，会自动使用上次扫描时间作为起始时间
-    const scanResult = await highLevelNewsScanner.scanHighLevelNewsScheduled(CallSource.SCHEDULER);
+    // const scanResult = await highLevelNewsScanner.scanHighLevelNewsScheduled(CallSource.SCHEDULER);
 
     return {
-      message: `高级别新闻扫描完成，发现 ${scanResult.found} 条，发送 ${scanResult.sent} 条通知`,
+      message: `每5分钟触发器执行成功`,
       data: {
-        ...scanResult,
         executedAt: timestamp,
         metadata,
       },
