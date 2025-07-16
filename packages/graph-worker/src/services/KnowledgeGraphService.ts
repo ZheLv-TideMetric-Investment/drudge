@@ -271,10 +271,20 @@ export class KnowledgeGraphService {
         `;
         params = { limit: neo4j.int(safeLimit) };
       } else {
-        // 使用更灵活的查询，检查节点的所有字符串属性
+        // 使用安全的查询方式，只对已知的字符串属性进行搜索，避免数组属性
         cypher = `
           MATCH (n)
-          WHERE ANY(prop IN keys(n) WHERE toString(n[prop]) CONTAINS $query)
+          WHERE 
+            (n.company_name IS NOT NULL AND toString(n.company_name) CONTAINS $query) OR
+            (n.person_name IS NOT NULL AND toString(n.person_name) CONTAINS $query) OR
+            (n.organization_name IS NOT NULL AND toString(n.organization_name) CONTAINS $query) OR
+            (n.location_name IS NOT NULL AND toString(n.location_name) CONTAINS $query) OR
+            (n.event_name IS NOT NULL AND toString(n.event_name) CONTAINS $query) OR
+            (n.title IS NOT NULL AND toString(n.title) CONTAINS $query) OR
+            (n.time_value IS NOT NULL AND toString(n.time_value) CONTAINS $query) OR
+            (n.ticker IS NOT NULL AND toString(n.ticker) CONTAINS $query) OR
+            (n.industry IS NOT NULL AND toString(n.industry) CONTAINS $query) OR
+            (n.event_description IS NOT NULL AND toString(n.event_description) CONTAINS $query)
           RETURN labels(n) as labels, n
           LIMIT $limit
         `;
