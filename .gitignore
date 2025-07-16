@@ -1,11 +1,16 @@
+# 数据库
+dist
+
 # 依赖
 node_modules/
-package-lock.json
 
 # 环境配置
 .env
-.env.local
-.env.*.local
+!.env.example
+
+# 包级别环境变量
+packages/*/.env
+!packages/*/.env.example
 
 # 日志
 logs/
@@ -32,3 +37,11 @@ coverage/
 # 操作系统
 .DS_Store
 Thumbs.db 
+
+# Next.js
+.next/
+out/
+
+# 编译输出
+packages/*/dist/
+packages/*/.next/ 

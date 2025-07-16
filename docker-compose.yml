@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  neo4j:
+    image: neo4j:latest
+    container_name: drudge-neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/niuniuniu
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: apoc.*
+      NEO4J_dbms_memory_heap_initial_size: 512m
+      NEO4J_dbms_memory_heap_max_size: 1G
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - ./shared/neo4j:/var/lib/neo4j/import
+    networks:
+      - drudge-network
+    restart: unless-stopped
+
+  web-app:
+    build:
+      context: ./packages/web-app
+      dockerfile: Dockerfile
+    container_name: drudge-web-app
+    ports:
+      - "39112:39112"
+    env_file:
+      - ./packages/web-app/.env
+    depends_on:
+      - neo4j
+    networks:
+      - drudge-network
+    restart: unless-stopped
+
+  ingest-worker:
+    build:
+      context: ./packages/ingest-worker
+      dockerfile: Dockerfile
+    container_name: drudge-ingest-worker
+    ports:
+      - "39110:39110"
+    env_file:
+      - ./packages/ingest-worker/.env
+    depends_on:
+      - neo4j
+    networks:
+      - drudge-network
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+
+  graph-worker:
+    build:
+      context: ./packages/graph-worker
+      dockerfile: Dockerfile
+    container_name: drudge-graph-worker
+    ports:
+      - "39111:39111"
+    env_file:
+      - ./packages/graph-worker/.env
+    depends_on:
+      - neo4j
+    networks:
+      - drudge-network
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+
+networks:
+  drudge-network:
+    driver: bridge
+
+volumes:
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local 
