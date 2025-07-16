@@ -167,8 +167,31 @@ async function handleEveryHour(timestamp: string, metadata?: Record<string, unkn
   console.log(`[每小时触发器] 执行小时总结: ${timestamp}`);
   
   try {
-    // 使用便捷方法生成小时总结，会自动检查时间范围
-    const summaryResult = await summaryService.generateHourlySummary(undefined, CallSource.SCHEDULER);
+    const currentHour = moment().hour();
+    
+    // 只在11-22点生成总结
+    if (currentHour < 11 || currentHour > 22) {
+      return {
+        message: `当前时间 ${currentHour}:00 不在工作时间范围 (11:00-22:00)`,
+        data: {
+          skipped: true,
+          reason: '不在工作时间范围',
+          executedAt: timestamp,
+          metadata
+        }
+      };
+    }
+
+    // 计算小时时间范围
+    const hourStart = moment().hour(currentHour).minute(0).second(0).millisecond(0);
+    const hourEnd = moment(hourStart).add(1, 'hour');
+    
+    const summaryResult = await summaryService.generateSummary(
+      hourStart.toISOString(),
+      hourEnd.toISOString(),
+      CallSource.SCHEDULER,
+      true // 发送通知
+    );
     
     return {
       message: `小时总结生成完成: ${summaryResult.period}`,
@@ -192,8 +215,31 @@ async function handleOvernight(timestamp: string, metadata?: Record<string, unkn
   console.log(`[隔夜触发器] 执行每日总结: ${timestamp}`);
   
   try {
-    // 使用便捷方法生成每日总结，会自动检查时间范围
-    const summaryResult = await summaryService.generateDailySummary(CallSource.SCHEDULER);
+    const currentTime = moment();
+    
+    // 只在每天10:00-11:00之间执行
+    if (currentTime.hour() !== 10) {
+      return {
+        message: `当前时间 ${currentTime.format('HH:mm')} 不是每日总结时间 (10:00)`,
+        data: {
+          skipped: true,
+          reason: '不是每日总结时间',
+          executedAt: timestamp,
+          metadata
+        }
+      };
+    }
+
+    // 计算总结时间范围：前一天22:00 - 今天10:00
+    const summaryEnd = moment().hour(10).minute(0).second(0).millisecond(0);
+    const summaryStart = moment(summaryEnd).subtract(1, 'day').hour(22);
+    
+    const summaryResult = await summaryService.generateSummary(
+      summaryStart.toISOString(),
+      summaryEnd.toISOString(),
+      CallSource.SCHEDULER,
+      true // 发送通知
+    );
     
     return {
       message: `每日总结生成完成: ${summaryResult.period}`,

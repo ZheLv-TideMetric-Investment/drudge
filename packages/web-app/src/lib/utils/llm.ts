@@ -1,5 +1,5 @@
 // AI SDK imports
-import { generateObject } from 'ai';
+import { generateObject, generateText } from 'ai';
 import { deepseek } from '@ai-sdk/deepseek';
 import { google } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -113,6 +113,79 @@ class AiService {
         return config.ai.qwen.model;
       default:
         return 'unknown';
+    }
+  }
+
+  async callLLM(
+    messages: LLMMessage[],
+    options: LLMCallOptions = {}
+  ): Promise<LLMResponse<string>> {
+    try {
+      // 确保AI服务已初始化
+      if (!this.initialized) {
+        console.log('AI服务未初始化，正在自动初始化...');
+        await this.initialize();
+      }
+
+      // 如果是模拟模式，返回模拟响应
+      if (this.mockMode) {
+        return this.getMockResponse<string>(messages, options);
+      }
+
+      // 真实AI调用
+      console.log(`🤖 调用AI: ${config.ai.provider} - ${this.getModelName()}`);
+      console.log('消息数量:', messages.length);
+      
+      // 构建消息格式
+      const formattedMessages = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+
+      // 调用AI生成对象
+      const result = await generateText({
+        model: this.model,
+        messages: formattedMessages,
+        temperature: options.temperature || 0.7,
+        // timeout: options.timeout || 30000, // 30秒超时
+      });
+
+      console.log('✅ AI调用成功');
+      
+      return {
+        success: true,
+        data: result.text,
+        usage: result.usage ? {
+          promptTokens: result.usage.promptTokens,
+          completionTokens: result.usage.completionTokens,
+          totalTokens: result.usage.totalTokens
+        } : undefined
+      };
+
+    } catch (error: any) {
+      console.error('❌ LLM调用失败:', error);
+      
+      // 发送AI服务调用失败通知
+      try {
+        await notificationService.sendSystemAlert(
+          `AI服务调用失败: ${config?.ai?.provider || 'unknown'}`,
+          `模型: ${this.getModelName()}\n错误: ${error.message || 'LLM调用失败'}`
+        );
+      } catch (notifyError) {
+        console.error('发送AI服务调用失败通知失败:', notifyError);
+      }
+      
+      // 如果真实调用失败，尝试返回模拟响应
+      if (!this.mockMode) {
+        console.warn('真实AI调用失败，返回模拟响应');
+        return this.getMockResponse<T>(messages, options);
+      }
+      
+      return {
+        success: false,
+        error: error.message || 'LLM调用失败'
+      };
     }
   }
 

@@ -1,36 +1,27 @@
 import moment from 'moment-timezone';
 import { queryService } from './query';
 import { notificationService } from './notification';
-import { callLLMWithJsonResponse, createMessages } from '../utils/llm';
 import { SummaryResult, CallSource } from '../../types/scheduler';
-import { z } from 'zod';
-
-/**
- * 总结类型枚举
- */
-export enum SummaryType {
-  HOURLY = 'hourly',
-  DAILY = 'daily',
-  CUSTOM = 'custom'
-}
+import { aiService, createMessages } from '../utils/llm';
 
 /**
  * 总结服务
- * 提供统一的新闻总结功能
+ * 提供通用的时间区间新闻总结功能（不落库）
  */
 class SummaryService {
+
   /**
    * 生成新闻总结
    * @param startTime 开始时间（ISO字符串或moment对象）
    * @param endTime 结束时间（ISO字符串或moment对象）
-   * @param summaryType 总结类型
    * @param source 调用来源
+   * @param sendNotification 是否发送通知，默认为false
    */
   async generateSummary(
     startTime: string | moment.Moment,
     endTime: string | moment.Moment,
-    summaryType: SummaryType = SummaryType.CUSTOM,
-    source: CallSource = CallSource.API
+    source: CallSource = CallSource.API,
+    sendNotification: boolean = false
   ): Promise<SummaryResult> {
     try {
       // 转换时间格式
@@ -45,44 +36,174 @@ class SummaryService {
         throw new Error('开始时间不能晚于结束时间');
       }
 
-      console.log(`开始生成${this.getSummaryTypeName(summaryType)}总结: ${start.format('YYYY-MM-DD HH:mm')} - ${end.format('YYYY-MM-DD HH:mm')}`);
+      const timeRangeDesc = this.formatPeriod(start, end);
+      console.log(`开始生成新闻总结: ${timeRangeDesc}`);
 
       // 1. 从Neo4j获取时间范围内的新闻数据
-      const newsData = await this.getNewsData(start, end, summaryType);
+      const newsData = await this.getNewsData(start, end);
 
       if (newsData.news_count === 0) {
         return {
           success: true,
-          message: `${start.format('MM-DD HH:mm')} - ${end.format('MM-DD HH:mm')} 时段没有新闻`,
-          period: this.formatPeriod(start, end),
+          message: `${timeRangeDesc} 时段没有新闻`,
+          period: timeRangeDesc,
           timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
-          data: { empty: true, type: summaryType }
+          data: { 
+            empty: true, 
+            time_range: {
+              start: start.toISOString(),
+              end: end.toISOString()
+            }
+          }
         };
       }
 
-      // 2. 使用AI生成总结
-      const summaryResult = await this.generateAISummary(newsData, start, end, summaryType);
+      // 2. 按级别分组新闻
+      const groupedNews = this.groupNewsByLevel(newsData.news_items);
+
+      // 3. 使用AI生成总结
+      const newsContent = Object.entries(groupedNews)
+        .map(([level, news]) => {
+          const levelContent = news
+            .map(item => {
+              return `标题：${item.title}\n内容：${item.content}\n时间：${moment(item.time * 1000).format('YYYY-MM-DD HH:mm:ss')}\n`;
+            })
+            .join('\n');
+          return `【${level}级新闻】\n${levelContent}`;
+        })
+        .join('\n\n');
+
+      const systemPrompt = `You are "宏观‑量化快讯引擎", an LLM that converts raw multilingual financial headlines into an actionable Markdown briefing for global portfolio managers and economists.
+
+############################################################
+◆ 一、重要级映射与无地域偏好  
+1. 输入若含"【N级新闻】"，**N越大越重要**，全部保留；在输出中以 "### N级新闻" 单独分段呈现，按 N 递减排序。  
+2. 无级别新闻由模型自动归档，不因国家/市场来源加权或降权。  
+3. 每个段内再依下表 **Scope Tier** 排序（同级只按时间倒序）。  
+
+| Scope Tier | 定义 | 典型示例 |
+|------------|------|----------|
+| **宏观政策/系统风险** | 任一央行/财政部决议、主权违约、G‑20 / IMF / 世行决策，或关键宏观指标（GDP、CPI、PMI、失业率等） | 欧央行加息；土耳其通胀爆表 |
+| **跨市场价格冲击** | 股、债、汇、期货、商品等当日波动 ≥ ±1 σ 或异常成交/资金流 | 原油⏫5%、比特币⏬8% |
+| **行业／主题驱动** | 行业政策、供需冲击、跨国监管文件、重大并购、集体涨跌 | 全球半导体补贴法案 |
+| **大型主体事件** | 全球前 100 市值公司、G‑SIB、AAA/AA 主权或机构债信变动、IPO > 10 亿美元 | 台积电财报；沙特阿美配股 |
+| **一般公司／区域新闻** | 中小市值公司、地方经济、社会/科技/民生资讯 | 手机品牌新品发布 |
+
+> **同级别不同国家事件一律平等排序**。
+
+############################################################
+◆ 二、聚合与去重  
+- 30 分钟内同主题多条 → 合并，保留最大冲击数字 & 最新时间，用 *(截至 HH:MM)*。  
+- 删除无新增数据的纯重复。  
+
+############################################################
+◆ 三、着重与标记规则  
+- **加粗**：所有数字、指数/品种、机构/公司/人名。  
+- Emoji 方向：▲ 涨；▼ 跌；⏫ 创新高；⏬ 创新低。  
+- 颜色：  
+  • ⬆︎涨幅 / 利好 → <span style="color:#16a34a">…</span>  
+  • ⬇︎跌幅 / 利空 → <span style="color:#dc2626">…</span>  
+  (宏观中性或日期、时间无需上色)
+
+############################################################
+◆ 四、Markdown 输出模板  
+### 概览  
+一句 ≤ 25 字，高亮 **方向 + 关键数字/事件**。  
+
+### N级新闻(N数值大的排最前；若存在)  
+- **…** *(HH:MM)*  
+- …  
+
+### 宏观政策 / 系统风险  
+- **…** *(HH:MM)*  
+- …  
+
+### 跨市场价格冲击  
+- **…** *(HH:MM)*  
+- …  
+
+### 行业 / 主题  
+- **…** *(HH:MM)*  
+- …  
+
+### 大型主体事件  
+- **…** *(HH:MM)*  
+- …  
+
+### 其他  
+- **…** *(HH:MM)*  
+- …  
+
+############################################################
+◆ 五、硬性排版规范
+
+* 列表符统一 - ；每条 ≤ 40 字，仅陈述事实。
+* 时间统一用 *斜体(HH:MM)*；跨日则 *YYYY‑MM‑DD HH:MM*。
+* **数字原样输出**（不转中文大写、不加千位分隔符）。
+* 若某分段无内容，则整段省略。
+* 全文中文；除模板 Emoji 与标、颜色签外不加其他装饰；禁止评论、预测或情绪化字眼。
+
+############################################################
+◆ 六、输出示例
+
+### 概览
+
+**A股、港股午后齐升**，两市成交再破**1万亿**
+
+### 1级新闻
+
+* **A股三大指数▲翻红**，大金融板块领涨 *(13:12)*
+
+### 宏观政策 / 系统风险
+
+* **北约**拟至 **2032** 年防务支出占 **GDP 5 %** *(13:34)*
+
+### 跨市场价格冲击
+
+* <span style="color:#16a34a">**恒指▲2 %**</span>；<span style="color:#16a34a">**恒生科技▲2.3 %**</span> *(13:42)*
+* <span style="color:#16a34a">**富时中国 A50 期指▲2 %**</span> *(13:39)*
+
+### L2 行业 / 主题
+
+* **港股中资券商股▲6–22 %**，**弘业期货**领涨 *(13:46)*
+* **国际能源署**：2025 年电动车销量或破 **2000万辆** *(13:45)*
+
+### L3 大型主体事件
+
+* **中国平安市值重返 1 万亿元** *(13:41)*
+* **东方财富成交额达 100 亿元**，股价▲5.8 % *(13:42)*
+
+### L4 其他
+
+* **京东外卖**午间部分地区出现无人接单 *(13:08)*`;
+
+      const userPrompt = `新闻内容：\n\n${newsContent}`;
+      const messages = createMessages(systemPrompt, userPrompt);
       
-      if (!summaryResult.success) {
-        throw new Error(`AI总结生成失败: ${summaryResult.error}`);
+      const result = await aiService.callLLM(messages, {
+        temperature: 0.7,
+      });
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'AI生成的内容为空');
       }
 
-      // 3. 保存总结到Neo4j
-      await this.saveSummary(summaryResult.data, start, end, newsData, summaryType);
+      const summaryContent = result.data;
 
       // 4. 发送通知（如果需要）
-      await this.sendNotificationIfNeeded(summaryResult.data, start, end, newsData, summaryType, source);
+      if (sendNotification) {
+        await this.sendNotification(summaryContent, start, end, newsData, source);
+      }
 
       return {
         success: true,
-        message: `${this.getSummaryTypeName(summaryType)}总结生成完成`,
-        period: this.formatPeriod(start, end),
+        message: `新闻总结生成完成`,
+        period: timeRangeDesc,
         timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
         data: {
-          type: summaryType,
           news_count: newsData.news_count,
           high_level_count: this.getHighLevelCount(newsData),
-          summary: summaryResult.data,
+          summary: summaryContent,
           time_range: {
             start: start.toISOString(),
             end: end.toISOString()
@@ -92,10 +213,11 @@ class SummaryService {
 
     } catch (error: any) {
       console.error('生成总结失败:', error);
+      const timeRangeDesc = this.formatPeriod(moment(startTime), moment(endTime));
       return {
         success: false,
-        message: `生成${this.getSummaryTypeName(summaryType)}总结失败`,
-        period: this.formatPeriod(moment(startTime), moment(endTime)),
+        message: `生成新闻总结失败`,
+        period: timeRangeDesc,
         error: error.message,
         timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
       };
@@ -103,238 +225,69 @@ class SummaryService {
   }
 
   /**
-   * 生成小时总结的便捷方法
-   * @param hour 小时数，默认为当前小时
-   * @param source 调用来源
-   */
-  async generateHourlySummary(hour?: number, source: CallSource = CallSource.API): Promise<SummaryResult> {
-    const currentHour = hour || moment().hour();
-    
-    // 只在11-22点生成总结
-    if (currentHour < 11 || currentHour > 22) {
-      return {
-        success: true,
-        message: `当前时间 ${currentHour}:00 不在工作时间范围 (11:00-22:00)`,
-        period: `${currentHour}:00`,
-        timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
-        data: { skipped: true, reason: '不在工作时间范围', type: SummaryType.HOURLY }
-      };
-    }
-
-    const hourStart = moment().hour(currentHour).minute(0).second(0).millisecond(0);
-    const hourEnd = moment(hourStart).add(1, 'hour');
-    
-    return this.generateSummary(hourStart, hourEnd, SummaryType.HOURLY, source);
-  }
-
-  /**
-   * 生成每日总结的便捷方法
-   * @param source 调用来源
-   */
-  async generateDailySummary(source: CallSource = CallSource.API): Promise<SummaryResult> {
-    const currentTime = moment();
-    
-    // 只在每天10:00-11:00之间执行
-    if (currentTime.hour() !== 10) {
-      return {
-        success: true,
-        message: `当前时间 ${currentTime.format('HH:mm')} 不是每日总结时间 (10:00)`,
-        period: currentTime.format('HH:mm'),
-        timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
-        data: { skipped: true, reason: '不是每日总结时间', type: SummaryType.DAILY }
-      };
-    }
-
-    // 计算总结时间范围：前一天22:00 - 今天10:00
-    const summaryEnd = moment().hour(10).minute(0).second(0).millisecond(0);
-    const summaryStart = moment(summaryEnd).subtract(1, 'day').hour(22);
-    
-    return this.generateSummary(summaryStart, summaryEnd, SummaryType.DAILY, source);
-  }
-
-  /**
    * 获取新闻数据
    */
-  private async getNewsData(start: moment.Moment, end: moment.Moment, summaryType: SummaryType): Promise<any> {
+  private async getNewsData(start: moment.Moment, end: moment.Moment): Promise<any> {
     // 注意：这里传递的是北京时间的ISO字符串，query服务会自动转换为UTC
-    if (summaryType === SummaryType.DAILY) {
-      return await queryService.getDailyNewsData(start.toISOString(), end.toISOString());
-    } else {
-      return await queryService.getHourlySummary(start.toISOString(), end.toISOString());
-    }
+    return await queryService.getHourlySummary(start.toISOString(), end.toISOString());
   }
 
   /**
-   * 使用AI生成总结
+   * 按级别分组新闻
    */
-  private async generateAISummary(
-    newsData: any, 
-    start: moment.Moment, 
-    end: moment.Moment, 
-    summaryType: SummaryType
-  ): Promise<any> {
-    const isDaily = summaryType === SummaryType.DAILY;
+  private groupNewsByLevel(newsItems: any[]): Record<string, any[]> {
+    const grouped: Record<string, any[]> = {};
     
-    const userPrompt = isDaily ? this.createDailyPrompt(newsData, start, end) : this.createHourlyPrompt(newsData, start, end);
+    newsItems.forEach(item => {
+      const level = item.level || 'Unknown';
+      if (!grouped[level]) {
+        grouped[level] = [];
+      }
+      
+      // 转换时间戳格式
+      const timeValue = typeof item.timestamp === 'number' ? 
+        item.timestamp : 
+        moment(item.timestamp).unix();
+      
+      grouped[level].push({
+        title: item.title,
+        content: item.content || '',
+        time: timeValue
+      });
+    });
     
-    const systemPrompt = isDaily ? 
-      '你是一个资深的新闻分析师，擅长生成综合性的每日新闻总结报告。' :
-      '你是一个专业的新闻分析师，擅长生成简洁清晰的新闻总结报告。';
-
-    const messages = createMessages(systemPrompt, userPrompt);
-
-    const schema = isDaily ? this.getDailySchema() : this.getHourlySchema();
-
-    return await callLLMWithJsonResponse(messages, {
-      temperature: 0.3,
-      schema
-    });
+    return grouped;
   }
 
   /**
-   * 创建小时总结提示词
+   * 发送通知
    */
-  private createHourlyPrompt(newsData: any, start: moment.Moment, end: moment.Moment): string {
-    return `
-请为以下时段新闻数据生成总结报告：
-
-时间段：${start.format('YYYY-MM-DD HH:mm')} - ${end.format('HH:mm')}
-新闻总数：${newsData.news_count}
-事件总数：${newsData.event_count || 0}
-
-涉及公司：${newsData.companies?.slice(0, 10).join(', ') || '无'}
-涉及人物：${newsData.persons?.slice(0, 10).join(', ') || '无'}
-涉及机构：${newsData.organizations?.slice(0, 10).join(', ') || '无'}
-涉及地点：${newsData.locations?.slice(0, 5).join(', ') || '无'}
-
-主要新闻：
-${newsData.news_items?.map((item: any, index: number) => 
-  `${index + 1}. [${item.level || 'N/A'}] ${item.title}`
-).join('\n') || '无'}
-
-请生成一个简洁的总结，包括：
-1. 整体概况
-2. 重要事件亮点
-3. 市场影响评估
-4. 关键关注点
-
-总结应该专业、简洁，适合快速阅读。`;
-  }
-
-  /**
-   * 创建每日总结提示词
-   */
-  private createDailyPrompt(newsData: any, start: moment.Moment, end: moment.Moment): string {
-    return `
-请为以下夜间新闻数据生成每日总结报告：
-
-时间段：${start.format('YYYY-MM-DD HH:mm')} - ${end.format('YYYY-MM-DD HH:mm')} (夜间到早晨)
-新闻总数：${newsData.news_count}
-事件总数：${newsData.event_count || 0}
-高级别新闻：${newsData.high_level_count || 0}
-紧急新闻：${newsData.critical_count || 0}
-
-涉及主要公司：${newsData.companies?.slice(0, 15).join(', ') || '无'}
-涉及重要人物：${newsData.persons?.slice(0, 10).join(', ') || '无'}
-涉及关键机构：${newsData.organizations?.slice(0, 10).join(', ') || '无'}
-
-重要新闻列表：
-${newsData.news_items
-  ?.filter((item: any) => item.level === 'Level 1' || item.level === 'Level 2')
-  .slice(0, 10)
-  .map((item: any, index: number) => 
-    `${index + 1}. [${item.level}] ${item.title}`
-  ).join('\n') || '无'}
-
-请生成一个综合的每日总结，包括：
-1. 夜间总体情况概述
-2. 关键事件和趋势分析
-3. 市场影响和风险评估
-4. 今日重点关注建议
-
-总结应该专业、全面，适合作为晨间简报。`;
-  }
-
-  /**
-   * 获取小时总结Schema
-   */
-  private getHourlySchema() {
-    return z.object({
-      overall_summary: z.string().describe('整体概况，2-3句话概括该时段的新闻情况'),
-      key_highlights: z.array(z.string()).describe('重要事件亮点，最多5个要点'),
-      market_impact: z.string().describe('市场影响评估，1-2句话'),
-      focus_areas: z.array(z.string()).describe('关键关注点，最多3个'),
-      severity_assessment: z.enum(['low', 'medium', 'high', 'critical']).describe('严重程度评估'),
-      confidence: z.number().min(0).max(1).describe('总结置信度')
-    });
-  }
-
-  /**
-   * 获取每日总结Schema
-   */
-  private getDailySchema() {
-    return z.object({
-      overnight_overview: z.string().describe('夜间总体情况概述'),
-      key_trends: z.array(z.string()).describe('关键事件和趋势分析'),
-      market_risk_assessment: z.string().describe('市场影响和风险评估'),
-      today_focus: z.array(z.string()).describe('今日重点关注建议'),
-      overall_severity: z.enum(['low', 'medium', 'high', 'critical']).describe('整体严重程度评估'),
-      confidence: z.number().min(0).max(1).describe('总结置信度')
-    });
-  }
-
-  /**
-   * 保存总结到数据库
-   */
-  private async saveSummary(
-    summaryData: any, 
-    start: moment.Moment, 
-    end: moment.Moment, 
-    newsData: any, 
-    summaryType: SummaryType
-  ): Promise<void> {
-    if (summaryType === SummaryType.DAILY) {
-      await queryService.saveDailySummary(summaryData, start.toISOString(), end.toISOString(), newsData);
-    } else {
-      await queryService.saveHourlySummary(summaryData, start.toISOString(), end.toISOString(), newsData);
-    }
-  }
-
-  /**
-   * 发送通知（如果需要）
-   */
-  private async sendNotificationIfNeeded(
-    summaryData: any,
+  private async sendNotification(
+    summaryData: string,
     start: moment.Moment,
     end: moment.Moment,
     newsData: any,
-    summaryType: SummaryType,
     source: CallSource
   ): Promise<void> {
-    if (summaryType === SummaryType.DAILY) {
-      // 每日总结总是发送通知
-      await notificationService.sendDailySummaryNotification(
-        summaryData, 
-        start.toISOString(), 
-        end.toISOString(), 
-        newsData, 
-        source
-      );
-    } else {
-      // 小时总结只在有高级别新闻时发送通知
+    try {
+      // 检查是否有高级别新闻
       const highLevelNews = newsData.news_items?.filter((item: any) => 
         item.level === 'Level 1' || item.level === 'Level 2'
       ) || [];
 
       if (highLevelNews.length > 0) {
+        // 有高级别新闻时发送通知
         await notificationService.sendHourlySummaryNotification(
-          summaryData, 
+          { summary: summaryData }, 
           start.toISOString(), 
           end.toISOString(), 
           highLevelNews, 
           source
         );
       }
+    } catch (error) {
+      console.error('发送通知失败:', error);
+      // 通知失败不影响总结生成，只记录错误
     }
   }
 
@@ -345,22 +298,6 @@ ${newsData.news_items
     return newsData.news_items?.filter((item: any) => 
       item.level === 'Level 1' || item.level === 'Level 2'
     ).length || 0;
-  }
-
-  /**
-   * 获取总结类型名称
-   */
-  private getSummaryTypeName(summaryType: SummaryType): string {
-    switch (summaryType) {
-      case SummaryType.HOURLY:
-        return '小时';
-      case SummaryType.DAILY:
-        return '每日';
-      case SummaryType.CUSTOM:
-        return '自定义';
-      default:
-        return '';
-    }
   }
 
   /**

@@ -1,18 +1,17 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { config } from './config';
-import type {
-  NewsItem,
-  GraphData,
-  HourlySummary,
-  DailySummary,
-  NewsStats,
-  GraphStats,
-  MonitorAlert,
-  SearchParams,
-  PaginatedResponse,
-  ApiResponse,
-  EntitySearchResult
-} from '@/types';
+import { 
+  ApiResponse, 
+  PaginatedResponse, 
+  NewsItem, 
+  ScanResult,
+  GraphData, 
+  Entity, 
+  SearchParams, 
+  MonitorAlert, 
+  NewsStats, 
+  GraphStats
+} from '../types';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -88,7 +87,7 @@ class ApiClient {
     searchTerm: string, 
     nodeType?: string, 
     limit = 20
-  ): Promise<ApiResponse<EntitySearchResult[]>> {
+  ): Promise<ApiResponse<Entity[]>> {
     return this.client.get('/api/graph/entities/search', {
       params: { searchTerm, nodeType, limit }
     });
@@ -117,38 +116,43 @@ class ApiClient {
   }
 
   // 总结相关API
-  async getHourlySummaries(date?: string): Promise<ApiResponse<HourlySummary[]>> {
-    return this.client.get('/api/summary/hourly', {
-      params: { date }
+  /**
+   * 生成新闻总结
+   */
+  async generateSummary(
+    startTime: string,
+    endTime: string,
+    sendNotification: boolean = false,
+    source: string = 'api'
+  ): Promise<any> {
+    const params = new URLSearchParams({
+      startTime,
+      endTime,
+      sendNotification: sendNotification.toString(),
+      source
     });
-  }
 
-  async generateHourlySummary(hour?: number): Promise<ApiResponse<unknown>> {
-    return this.client.post('/api/summary/hourly', { hour });
-  }
-
-  async getDailySummaries(startDate?: string, endDate?: string): Promise<ApiResponse<DailySummary[]>> {
-    return this.client.get('/api/summary/daily', {
-      params: { startDate, endDate }
+    const response = await fetch(`/api/summary?${params}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return response.json();
   }
 
-  async generateDailySummary(): Promise<ApiResponse<unknown>> {
-    return this.client.post('/api/summary/daily');
-  }
-
-  async getHourlySummaryStats(): Promise<ApiResponse<unknown>> {
-    return this.client.get('/api/summary/hourly/stats');
-  }
-
-  // 监控相关API
   async getMonitorAlerts(limit = 50): Promise<ApiResponse<MonitorAlert[]>> {
     return this.client.get('/api/monitor/alerts', {
       params: { limit }
     });
   }
 
-  async scanHighLevelNews(minutes?: number): Promise<ApiResponse<unknown>> {
+  async scanHighLevelNews(minutes?: number): Promise<ApiResponse<ScanResult>> {
     return this.client.post('/api/scan/high-level', { minutes });
   }
 
@@ -206,11 +210,7 @@ export const {
   getEntityNeighborhood,
   getCompanyEvents,
   getRelatedNews,
-  getHourlySummaries,
-  generateHourlySummary,
-  getDailySummaries,
-  generateDailySummary,
-  getHourlySummaryStats,
+  generateSummary,
   getMonitorAlerts,
   scanHighLevelNews,
   getHighLevelNewsStats,

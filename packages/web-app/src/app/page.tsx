@@ -100,7 +100,6 @@ export default function Home() {
     setTriggerLoading(prev => ({ ...prev, [key]: true }));
     
     try {
-      let body: any = {};
       // 使用北京时区
       const beijingTz = 'Asia/Shanghai';
       const endTime = moment.tz(beijingTz);
@@ -109,36 +108,25 @@ export default function Home() {
       if (type === 'hourly') {
         // 当前小时的开始时间到现在
         startTime = endTime.clone().startOf('hour');
-        body = {
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
-          summaryType: 'hourly',
-          source: 'api'
-        };
       } else if (type === 'daily') {
         // 当天的开始时间到现在
         startTime = endTime.clone().startOf('day');
-        body = {
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
-          summaryType: 'daily',
-          source: 'api'
-        };
       } else {
         // custom: 最近1小时的总结
         startTime = endTime.clone().subtract(1, 'hour');
-        body = {
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
-          summaryType: 'custom',
-          source: 'api'
-        };
       }
 
-      const response = await fetch('/api/summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+      // 构建查询参数
+      const params = new URLSearchParams({
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        sendNotification: 'true',
+        source: 'manual'
+      });
+
+      const response = await fetch(`/api/summary?${params.toString()}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
       });
       
       const data = await response.json();

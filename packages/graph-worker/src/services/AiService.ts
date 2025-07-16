@@ -68,7 +68,7 @@ export class AiService {
       try {
         await notificationService.sendAiServiceFailureNotification(
           config?.ai?.provider || 'unknown',
-          config?.ai?.deepseek?.model || config?.ai?.google?.model || config?.ai?.qwen?.model || 'unknown',
+          (config?.ai?.[config.ai.provider as keyof typeof config.ai] as any)?.model || 'unknown',
           error.message || 'AI服务初始化失败'
         );
       } catch (notifyError) {
@@ -191,7 +191,7 @@ export class AiService {
       try {
         await notificationService.sendAiServiceFailureNotification(
           config?.ai?.provider || 'unknown',
-          config?.ai?.deepseek?.model || config?.ai?.google?.model || config?.ai?.qwen?.model || 'unknown',
+          (config?.ai?.[config.ai.provider as keyof typeof config.ai] as any)?.model || 'unknown',
           error.message || 'LLM调用失败'
         );
       } catch (notifyError) {

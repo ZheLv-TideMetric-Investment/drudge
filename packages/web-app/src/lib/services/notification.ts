@@ -93,7 +93,7 @@ class NotificationService {
 
   /**
    * 发送小时总结通知
-   * @param summary 总结数据
+   * @param summary 总结数据（现在是markdown字符串）
    * @param hourStart 开始时间
    * @param hourEnd 结束时间
    * @param highLevelNews 高级别新闻
@@ -113,27 +113,17 @@ class NotificationService {
     }
 
     try {
+      // 提取markdown总结内容
+      const summaryContent = typeof summary === 'string' ? summary : summary.summary;
+      
       const message = `📊 **小时新闻总结** (${moment(hourStart).format('HH:00')}-${moment(hourEnd).format('HH:00')})
 
-🔍 **整体概况**
-${summary.overall_summary}
-
-🎯 **重要亮点**
-${summary.key_highlights.map((item: string, index: number) => `${index + 1}. ${item}`).join('\n')}
-
-📈 **市场影响**
-${summary.market_impact}
-
-⚠️ **关注焦点**
-${summary.focus_areas.map((item: string, index: number) => `• ${item}`).join('\n')}
+${summaryContent}
 
 🚨 **高级别新闻** (${highLevelNews.length}条)
 ${highLevelNews.slice(0, 3).map((item: any, index: number) => 
   `${index + 1}. [${item.level}] ${item.title}`
-).join('\n')}
-
-📊 **严重程度**: ${summary.severity_assessment.toUpperCase()}
-🎯 **置信度**: ${Math.round(summary.confidence * 100)}%`;
+).join('\n')}`;
 
       await this.webhook.sendMessage(message);
       console.log(`小时总结通知已发送: ${moment(hourStart).format('HH:00')}-${moment(hourEnd).format('HH:00')}`);
@@ -146,7 +136,7 @@ ${highLevelNews.slice(0, 3).map((item: any, index: number) =>
 
   /**
    * 发送每日总结通知
-   * @param summary 总结数据
+   * @param summary 总结数据（现在是markdown字符串）
    * @param start 开始时间
    * @param end 结束时间
    * @param dailyData 每日数据
@@ -168,25 +158,15 @@ ${highLevelNews.slice(0, 3).map((item: any, index: number) =>
     try {
       const date = moment(end).format('YYYY年MM月DD日');
 
+      // 提取markdown总结内容
+      const summaryContent = typeof summary === 'string' ? summary : summary.summary;
+
       const message = `🌅 **每日新闻总结** ${date} 晨报
 
 📅 **时间段**: ${moment(start).format('MM-DD HH:00')} - ${moment(end).format('MM-DD HH:00')}
-📊 **数据概览**: ${dailyData.news_count}条新闻 | ${dailyData.high_level_count}条高级别
+📊 **数据概览**: ${dailyData.news_count}条新闻 | ${dailyData.high_level_count || 0}条高级别
 
-🌙 **夜间概况**
-${summary.overnight_overview}
-
-📈 **关键趋势**
-${summary.key_trends.map((trend: string, index: number) => `${index + 1}. ${trend}`).join('\n')}
-
-⚠️ **风险评估**
-${summary.market_risk_assessment}
-
-🎯 **今日关注**
-${summary.today_focus.map((focus: string, index: number) => `• ${focus}`).join('\n')}
-
-📊 **严重程度**: ${summary.overall_severity.toUpperCase()}
-🎯 **置信度**: ${Math.round(summary.confidence * 100)}%`;
+${summaryContent}`;
 
       await this.webhook.sendMessage(message);
       console.log(`每日总结通知已发送: ${date}`);
