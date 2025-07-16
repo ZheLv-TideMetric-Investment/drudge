@@ -31,7 +31,7 @@ const config = {
     },
     qwen: {
       apiKey: process.env.QWEN_API_KEY || '',
-      model: process.env.QWEN_MODEL || 'qwen-turbo-latest',
+      model: process.env.QWEN_MODEL || 'qwen-turbo',
     }
   },
   
