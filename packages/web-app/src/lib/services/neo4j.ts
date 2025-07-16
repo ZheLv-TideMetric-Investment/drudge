@@ -57,6 +57,11 @@ class Neo4jService {
    * 执行查询
    */
   async executeQuery(cypher: string, parameters: any = {}): Promise<any> {
+    // 确保连接已建立
+    if (!this.driver) {
+      await this.connect();
+    }
+    
     const session = this.getSession();
     try {
       const result = await session.run(cypher, parameters);
@@ -73,6 +78,11 @@ class Neo4jService {
    * 执行事务
    */
   async executeTransaction(work: (tx: any) => Promise<any>): Promise<any> {
+    // 确保连接已建立
+    if (!this.driver) {
+      await this.connect();
+    }
+    
     const session = this.getSession();
     try {
       return await session.executeWrite(work);
@@ -90,8 +100,18 @@ class Neo4jService {
   async healthCheck(): Promise<boolean> {
     try {
       if (!this.driver) {
+        try {
+          await this.connect();
+        } catch (error) {
+          console.error('Neo4j 自动连接失败:', error);
+          return false;
+        }
+      }
+      
+      if (!this.driver) {
         return false;
       }
+      
       await this.driver.verifyConnectivity();
       return true;
     } catch (error) {
