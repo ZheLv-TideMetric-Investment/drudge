@@ -1,4 +1,6 @@
-import { cn } from '@/lib/utils';
+import { Card as AntCard, Typography, Space } from 'antd';
+
+const { Title, Text } = Typography;
 
 interface CardProps {
   children: React.ReactNode;
@@ -6,36 +8,52 @@ interface CardProps {
   title?: string;
   subtitle?: string;
   action?: React.ReactNode;
+  loading?: boolean;
+  bordered?: boolean;
+  hoverable?: boolean;
+  size?: 'default' | 'small';
+  style?: React.CSSProperties;
+  extra?: React.ReactNode;
 }
 
-export function Card({ children, className, title, subtitle, action }: CardProps) {
-  return (
-    <div className={cn(
-      'bg-white overflow-hidden shadow rounded-lg',
-      className
-    )}>
-      {(title || subtitle || action) && (
-        <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              {title && (
-                <h3 className="text-lg leading-6 font-medium text-gray-900">
-                  {title}
-                </h3>
-              )}
-              {subtitle && (
-                <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                  {subtitle}
-                </p>
-              )}
-            </div>
-            {action && <div>{action}</div>}
-          </div>
-        </div>
+export function Card({
+  children,
+  className,
+  title,
+  subtitle,
+  action,
+  loading = false,
+  bordered = true,
+  hoverable = false,
+  size = 'default',
+  style,
+  extra,
+}: CardProps) {
+  const cardTitle = title ? (
+    <Space direction="vertical" size={0}>
+      <Title level={5} style={{ margin: 0 }}>
+        {title}
+      </Title>
+      {subtitle && (
+        <Text type="secondary" style={{ fontSize: '14px' }}>
+          {subtitle}
+        </Text>
       )}
-      <div className="px-4 py-5 sm:p-6">
-        {children}
-      </div>
-    </div>
+    </Space>
+  ) : undefined;
+
+  return (
+    <AntCard
+      title={cardTitle}
+      extra={extra || action}
+      loading={loading}
+      bordered={bordered}
+      hoverable={hoverable}
+      size={size}
+      className={className}
+      style={style}
+    >
+      {children}
+    </AntCard>
   );
-} 
+}

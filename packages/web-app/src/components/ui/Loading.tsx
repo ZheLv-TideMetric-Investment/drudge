@@ -1,44 +1,69 @@
-import { cn } from '@/lib/utils';
+import { Spin, Typography } from 'antd';
+
+const { Text } = Typography;
 
 interface LoadingProps {
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'small' | 'default' | 'large';
   className?: string;
   text?: string;
+  spinning?: boolean;
+  style?: React.CSSProperties;
 }
 
-export function Loading({ size = 'md', className, text }: LoadingProps) {
-  const sizeClasses = {
-    sm: 'w-4 h-4',
-    md: 'w-8 h-8',
-    lg: 'w-12 h-12'
-  };
-
+export function Loading({
+  size = 'default',
+  className,
+  text,
+  spinning = true,
+  style,
+}: LoadingProps) {
   return (
-    <div className={cn('flex flex-col items-center justify-center', className)}>
-      <div className={cn(
-        'animate-spin rounded-full border-2 border-gray-300 border-t-blue-600',
-        sizeClasses[size]
-      )} />
+    <div
+      className={className}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '20px',
+        ...style,
+      }}
+    >
+      <Spin size={size} spinning={spinning} />
       {text && (
-        <p className="mt-2 text-sm text-gray-500">{text}</p>
+        <Text
+          type="secondary"
+          style={{
+            marginTop: '12px',
+            textAlign: 'center',
+            fontSize: size === 'large' ? '16px' : size === 'small' ? '12px' : '14px',
+          }}
+        >
+          {text}
+        </Text>
       )}
     </div>
   );
 }
 
-export function LoadingOverlay({ children, loading, text }: {
+interface LoadingOverlayProps {
   children: React.ReactNode;
   loading: boolean;
   text?: string;
-}) {
+  size?: 'small' | 'default' | 'large';
+  style?: React.CSSProperties;
+}
+
+export function LoadingOverlay({
+  children,
+  loading,
+  text,
+  size = 'default',
+  style,
+}: LoadingOverlayProps) {
   return (
-    <div className="relative">
+    <Spin spinning={loading} tip={text} size={size} style={style}>
       {children}
-      {loading && (
-        <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-10">
-          <Loading text={text} />
-        </div>
-      )}
-    </div>
+    </Spin>
   );
-} 
+}
