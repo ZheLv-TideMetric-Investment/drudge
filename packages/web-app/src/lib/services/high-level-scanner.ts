@@ -251,13 +251,17 @@ class HighLevelNewsScanner {
   }
 
   /**
-   * 格式化时间段
+   * 格式化时间段 - 显示北京时间
    */
   private formatPeriod(start: moment.Moment, end: moment.Moment): string {
-    if (start.isSame(end, 'day')) {
-      return `${start.format('MM-DD HH:mm')}-${end.format('HH:mm')}`;
+    // 转换为北京时间显示
+    const beijingStart = start.clone().tz('Asia/Shanghai');
+    const beijingEnd = end.clone().tz('Asia/Shanghai');
+    
+    if (beijingStart.isSame(beijingEnd, 'day')) {
+      return `${beijingStart.format('MM-DD HH:mm')}-${beijingEnd.format('HH:mm')}`;
     } else {
-      return `${start.format('MM-DD HH:mm')}-${end.format('MM-DD HH:mm')}`;
+      return `${beijingStart.format('MM-DD HH:mm')}-${beijingEnd.format('MM-DD HH:mm')}`;
     }
   }
 

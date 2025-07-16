@@ -41,7 +41,7 @@ class QueryService {
       const utcStartTime = convertBeijingToUTC(startTime);
       const utcEndTime = convertBeijingToUTC(endTime);
       
-      console.log(`[QueryService] 时间转换: 北京时间 ${startTime} - ${endTime} -> UTC ${utcStartTime} - ${utcEndTime}`);
+      console.log(`[QueryService] 时间查询: 输入时间 ${startTime} - ${endTime} -> 数据库查询 ${utcStartTime} - ${utcEndTime}`);
       
       const cypher = `
         MATCH (n:News)
@@ -123,7 +123,7 @@ class QueryService {
       const utcStartTime = convertBeijingToUTC(startTime);
       const utcEndTime = convertBeijingToUTC(endTime);
       
-      console.log(`[QueryService] 高级别新闻时间转换: 北京时间 ${startTime} - ${endTime} -> UTC ${utcStartTime} - ${utcEndTime}`);
+      console.log(`[QueryService] 高级别新闻查询: 输入时间 ${startTime} - ${endTime} -> 数据库查询 ${utcStartTime} - ${utcEndTime}`);
       
       const cypher = `
         MATCH (n:News)
