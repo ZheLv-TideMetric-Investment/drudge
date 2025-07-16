@@ -2,34 +2,34 @@
 
 import { useState, useEffect } from 'react';
 import moment from 'moment-timezone';
-import { 
-  Button, 
-  Card, 
-  Spin, 
-  Badge, 
-  message, 
-  Row, 
-  Col, 
-  Divider, 
-  Space, 
-  Typography, 
+import {
+  Button,
+  Card,
+  Spin,
+  Badge,
+  message,
+  Row,
+  Col,
+  Divider,
+  Space,
+  Typography,
   Alert,
   Descriptions,
   Tag,
   Progress,
-  notification
+  notification,
 } from 'antd';
-import { 
-  PlayCircleOutlined, 
-  ScanOutlined, 
-  FileTextOutlined, 
+import {
+  PlayCircleOutlined,
+  ScanOutlined,
+  FileTextOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   ReloadOutlined,
   RobotOutlined,
   DatabaseOutlined,
-  ScheduleOutlined
+  ScheduleOutlined,
 } from '@ant-design/icons';
 import { Layout } from '../components/Layout';
 
@@ -46,10 +46,6 @@ interface SystemStatus {
     processedNewsCount: number;
     isRunning: boolean;
     timestamp: string;
-  };
-  summary: {
-    available_types: string[];
-    server_time: string;
   };
 }
 
@@ -69,22 +65,16 @@ export default function Home() {
 
   const fetchSystemStatus = async () => {
     try {
-      const [schedulerRes, scanRes, summaryRes] = await Promise.all([
+      const [schedulerRes, scanRes] = await Promise.all([
         fetch('/api/scheduler'),
         fetch('/api/scan'),
-        fetch('/api/summary')
       ]);
 
-      const [schedulerData, scanData, summaryData] = await Promise.all([
-        schedulerRes.json(),
-        scanRes.json(),
-        summaryRes.json()
-      ]);
+      const [schedulerData, scanData] = await Promise.all([schedulerRes.json(), scanRes.json()]);
 
       setSystemStatus({
         scheduler: schedulerData,
         scanner: scanData.scanner_status,
-        summary: summaryData
       });
       setError(null);
     } catch (err) {
@@ -98,13 +88,13 @@ export default function Home() {
   const triggerSummary = async (type: 'hourly' | 'daily' | 'custom') => {
     const key = `summary-${type}`;
     setTriggerLoading(prev => ({ ...prev, [key]: true }));
-    
+
     try {
       // 使用北京时区
       const beijingTz = 'Asia/Shanghai';
       const endTime = moment.tz(beijingTz);
       let startTime: moment.Moment;
-      
+
       if (type === 'hourly') {
         // 当前小时的开始时间到现在
         startTime = endTime.clone().startOf('hour');
@@ -121,21 +111,20 @@ export default function Home() {
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
         sendNotification: 'true',
-        source: 'manual'
       });
 
       const response = await fetch(`/api/summary?${params.toString()}`, {
         method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         const typeName = type === 'hourly' ? '小时' : type === 'daily' ? '每日' : '自定义';
         notificationApi.success({
           message: '总结生成成功',
-          description: `${typeName}总结已生成完成`,
+          description: `${typeName}总结已生成完成 - ${data.period}`,
           icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
         });
       } else {
@@ -151,32 +140,43 @@ export default function Home() {
   const triggerScan = async (type: 'auto' | 'manual') => {
     const key = `scan-${type}`;
     setTriggerLoading(prev => ({ ...prev, [key]: true }));
-    
+
     try {
       let body: any = {};
-      
+
       if (type === 'auto') {
-        body = {}; // 自动扫描使用默认参数
-      } else {
+        // 自动扫描使用默认参数（使用上次扫描时间到现在）
         body = {
           sendNotifications: true,
-          skipProcessed: false
+          skipProcessed: true,
+          source: 'api',
+        };
+      } else {
+        // 手动扫描最近30分钟，不跳过已处理的内容
+        const endTime = moment().toISOString();
+        const startTime = moment().subtract(30, 'minutes').toISOString();
+        body = {
+          startTime,
+          endTime,
+          sendNotifications: true,
+          skipProcessed: false,
+          source: 'api',
         };
       }
 
       const response = await fetch('/api/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         const typeName = type === 'auto' ? '自动' : '手动';
         notificationApi.success({
           message: '扫描完成',
-          description: `${typeName}扫描已完成`,
+          description: `${typeName}扫描已完成 - ${data.period}，发现 ${data.found} 条高级别新闻，发送 ${data.sent} 条通知`,
           icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
         });
         fetchSystemStatus(); // 刷新状态
@@ -193,23 +193,27 @@ export default function Home() {
   const triggerScheduler = async (trigger: string) => {
     const key = `scheduler-${trigger}`;
     setTriggerLoading(prev => ({ ...prev, [key]: true }));
-    
+
     try {
       const response = await fetch('/api/scheduler', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           trigger,
-          timestamp: moment.tz('Asia/Shanghai').toISOString()
-        })
+          timestamp: moment.tz('Asia/Shanghai').toISOString(),
+          metadata: {
+            source: 'manual_trigger',
+            user_initiated: true,
+          },
+        }),
       });
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         notificationApi.success({
           message: '调度器触发成功',
-          description: data.message,
+          description: `${data.message} (${data.trigger})`,
           icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
         });
       } else {
@@ -224,22 +228,22 @@ export default function Home() {
 
   const getTriggerDescription = (trigger: string) => {
     const descriptions = {
-      'every_minute': '每分钟执行任务，用于轻量级监控',
-      'every_5_minutes': '每5分钟执行任务，高频扫描新闻',
-      'every_30_minutes': '每30分钟执行任务，中频处理',
-      'every_hour': '每小时执行任务，生成小时总结',
-      'overnight': '夜间执行任务，处理大批量数据'
+      every_minute: '每分钟执行任务，用于轻量级监控',
+      every_5_minutes: '每5分钟执行任务，高频扫描高级别新闻',
+      every_30_minutes: '每30分钟执行任务，中频处理',
+      every_hour: '每小时执行任务，生成小时总结（11-22点）',
+      overnight: '隔夜执行任务，生成每日总结（10点）',
     };
     return descriptions[trigger as keyof typeof descriptions] || '未知任务';
   };
 
   const getTriggerColor = (trigger: string) => {
     const colors = {
-      'every_minute': 'green',
-      'every_5_minutes': 'blue',
-      'every_30_minutes': 'orange',
-      'every_hour': 'purple',
-      'overnight': 'red'
+      every_minute: 'green',
+      every_5_minutes: 'blue',
+      every_30_minutes: 'orange',
+      every_hour: 'purple',
+      overnight: 'red',
     };
     return colors[trigger as keyof typeof colors] || 'default';
   };
@@ -247,12 +251,14 @@ export default function Home() {
   if (loading) {
     return (
       <Layout>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          height: '50vh' 
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '50vh',
+          }}
+        >
           <Spin size="large" tip="加载系统状态中..." />
         </div>
       </Layout>
@@ -273,7 +279,7 @@ export default function Home() {
           <Paragraph style={{ fontSize: '16px', color: '#666' }}>
             基于AI的新闻知识图谱分析和可视化平台，集成定时任务调度、新闻扫描和AI总结功能
           </Paragraph>
-          
+
           {error && (
             <Alert
               message="系统错误"
@@ -292,8 +298,8 @@ export default function Home() {
           系统状态概览
         </Title>
         <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
-          <Col xs={24} sm={8}>
-            <Card 
+          <Col xs={24} sm={12}>
+            <Card
               title={
                 <Space>
                   <ScheduleOutlined />
@@ -304,28 +310,29 @@ export default function Home() {
             >
               <Descriptions column={1} size="small">
                 <Descriptions.Item label="运行状态">
-                  <Badge 
-                    status={systemStatus?.scheduler?.status === 'active' ? 'processing' : 'error'} 
-                    text={systemStatus?.scheduler?.status === 'active' ? '运行中' : '已停止'} 
+                  <Badge
+                    status={systemStatus?.scheduler?.status === 'active' ? 'processing' : 'error'}
+                    text={systemStatus?.scheduler?.status === 'active' ? '运行中' : '已停止'}
                   />
                 </Descriptions.Item>
                 <Descriptions.Item label="可用触发器">
                   <Text strong>{systemStatus?.scheduler?.available_triggers?.length || 0} 个</Text>
                 </Descriptions.Item>
-                                 <Descriptions.Item label="最后更新">
-                   <Text type="secondary">
-                     {systemStatus?.scheduler?.server_time ? 
-                       moment(systemStatus.scheduler.server_time).tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss') : 
-                       '未知'
-                     }
-                   </Text>
-                 </Descriptions.Item>
+                <Descriptions.Item label="最后更新">
+                  <Text type="secondary">
+                    {systemStatus?.scheduler?.server_time
+                      ? moment(systemStatus.scheduler.server_time)
+                          .tz('Asia/Shanghai')
+                          .format('YYYY-MM-DD HH:mm:ss')
+                      : '未知'}
+                  </Text>
+                </Descriptions.Item>
               </Descriptions>
             </Card>
           </Col>
 
-          <Col xs={24} sm={8}>
-            <Card 
+          <Col xs={24} sm={12}>
+            <Card
               title={
                 <Space>
                   <ScanOutlined />
@@ -336,52 +343,17 @@ export default function Home() {
             >
               <Descriptions column={1} size="small">
                 <Descriptions.Item label="运行状态">
-                  <Badge 
-                    status={systemStatus?.scanner?.isRunning ? 'processing' : 'default'} 
-                    text={systemStatus?.scanner?.isRunning ? '扫描中' : '空闲'} 
+                  <Badge
+                    status={systemStatus?.scanner?.isRunning ? 'processing' : 'default'}
+                    text={systemStatus?.scanner?.isRunning ? '扫描中' : '空闲'}
                   />
                 </Descriptions.Item>
                 <Descriptions.Item label="已处理新闻">
                   <Text strong>{systemStatus?.scanner?.processedNewsCount || 0} 条</Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="上次扫描">
-                  <Text type="secondary">
-                    {systemStatus?.scanner?.lastScanTime || '从未扫描'}
-                  </Text>
+                  <Text type="secondary">{systemStatus?.scanner?.lastScanTime || '从未扫描'}</Text>
                 </Descriptions.Item>
-              </Descriptions>
-            </Card>
-          </Col>
-
-          <Col xs={24} sm={8}>
-            <Card 
-              title={
-                <Space>
-                  <RobotOutlined />
-                  AI总结服务
-                </Space>
-              }
-              size="small"
-            >
-              <Descriptions column={1} size="small">
-                <Descriptions.Item label="可用类型">
-                  <Text strong>{systemStatus?.summary?.available_types?.length || 0} 种</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="支持格式">
-                  <Space wrap>
-                    {systemStatus?.summary?.available_types?.map(type => (
-                      <Tag key={type} color="blue">{type}</Tag>
-                    ))}
-                  </Space>
-                </Descriptions.Item>
-                                 <Descriptions.Item label="最后更新">
-                   <Text type="secondary">
-                     {systemStatus?.summary?.server_time ? 
-                       moment(systemStatus.summary.server_time).tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss') : 
-                       '未知'
-                     }
-                   </Text>
-                 </Descriptions.Item>
               </Descriptions>
             </Card>
           </Col>
@@ -395,9 +367,9 @@ export default function Home() {
           调度器触发器
         </Title>
         <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
-          {systemStatus?.scheduler?.available_triggers?.map((trigger) => (
+          {systemStatus?.scheduler?.available_triggers?.map(trigger => (
             <Col xs={24} sm={12} lg={8} key={trigger}>
-              <Card 
+              <Card
                 size="small"
                 title={
                   <Space>
@@ -416,7 +388,7 @@ export default function Home() {
                     block
                   >
                     {triggerLoading[`scheduler-${trigger}`] ? '触发中...' : '立即触发'}
-                  </Button>
+                  </Button>,
                 ]}
               >
                 <Paragraph style={{ minHeight: '60px', margin: 0 }}>
@@ -436,7 +408,7 @@ export default function Home() {
         </Title>
         <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
           <Col xs={24} sm={12}>
-            <Card 
+            <Card
               title="自动扫描"
               size="small"
               actions={[
@@ -449,17 +421,15 @@ export default function Home() {
                   block
                 >
                   {triggerLoading['scan-auto'] ? '扫描中...' : '开始自动扫描'}
-                </Button>
+                </Button>,
               ]}
             >
-              <Paragraph>
-                使用上次扫描时间到现在的时间范围自动扫描新闻，智能处理增量数据
-              </Paragraph>
+              <Paragraph>使用上次扫描时间到现在的时间范围自动扫描新闻，智能处理增量数据</Paragraph>
             </Card>
           </Col>
 
           <Col xs={24} sm={12}>
-            <Card 
+            <Card
               title="手动扫描"
               size="small"
               actions={[
@@ -472,12 +442,10 @@ export default function Home() {
                   block
                 >
                   {triggerLoading['scan-manual'] ? '扫描中...' : '开始手动扫描'}
-                </Button>
+                </Button>,
               ]}
             >
-              <Paragraph>
-                手动扫描最近30分钟的新闻，发送通知且不跳过已处理的内容
-              </Paragraph>
+              <Paragraph>手动扫描最近30分钟的新闻，发送通知且不跳过已处理的内容</Paragraph>
             </Card>
           </Col>
         </Row>
@@ -491,7 +459,7 @@ export default function Home() {
         </Title>
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={8}>
-            <Card 
+            <Card
               title={
                 <Space>
                   <ClockCircleOutlined />
@@ -509,17 +477,15 @@ export default function Home() {
                   block
                 >
                   {triggerLoading['summary-hourly'] ? '生成中...' : '生成小时总结'}
-                </Button>
+                </Button>,
               ]}
             >
-              <Paragraph>
-                生成当前小时的新闻总结报告，快速了解最新动态
-              </Paragraph>
+              <Paragraph>生成当前小时的新闻总结报告，快速了解最新动态</Paragraph>
             </Card>
           </Col>
 
           <Col xs={24} sm={8}>
-            <Card 
+            <Card
               title={
                 <Space>
                   <DatabaseOutlined />
@@ -537,17 +503,15 @@ export default function Home() {
                   block
                 >
                   {triggerLoading['summary-daily'] ? '生成中...' : '生成每日总结'}
-                </Button>
+                </Button>,
               ]}
             >
-              <Paragraph>
-                生成当日的新闻总结报告，全面回顾一天的重要新闻
-              </Paragraph>
+              <Paragraph>生成当日的新闻总结报告，全面回顾一天的重要新闻</Paragraph>
             </Card>
           </Col>
 
           <Col xs={24} sm={8}>
-            <Card 
+            <Card
               title={
                 <Space>
                   <RobotOutlined />
@@ -565,12 +529,10 @@ export default function Home() {
                   block
                 >
                   {triggerLoading['summary-custom'] ? '生成中...' : '生成自定义总结'}
-                </Button>
+                </Button>,
               ]}
             >
-              <Paragraph>
-                生成最近1小时的自定义新闻总结，灵活控制时间范围
-              </Paragraph>
+              <Paragraph>生成最近1小时的自定义新闻总结，灵活控制时间范围</Paragraph>
             </Card>
           </Col>
         </Row>
