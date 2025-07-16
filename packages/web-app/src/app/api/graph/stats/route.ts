@@ -4,16 +4,18 @@ import { graphService } from '../../../../lib/services/graph';
 
 export async function GET() {
   try {
-    const [graphStats, relationshipDistribution] = await Promise.all([
+    const [graphStats, relationshipDistribution, timeStats] = await Promise.all([
       graphService.getGraphStats(),
-      graphService.getRelationshipDistribution()
+      graphService.getRelationshipDistribution(),
+      graphService.getTimeStats()
     ]);
 
     return NextResponse.json({
       success: true,
       data: {
         ...graphStats,
-        relationshipDistribution
+        relationshipDistribution,
+        timeStats
       },
       timestamp: moment.tz('Asia/Shanghai').toISOString()
     });

@@ -24,7 +24,9 @@ import {
   CalendarOutlined,
   FlagOutlined,
   NodeIndexOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  ClockCircleOutlined,
+  BarChartOutlined
 } from '@ant-design/icons';
 import { Layout } from '../../components/Layout';
 
@@ -38,11 +40,31 @@ interface NodeStatsRecord {
   percentage: string;
 }
 
-interface RelationshipStatsRecord {
+interface RelationshipRecord {
   key: string;
   relationType: string;
   count: number;
   percentage: string;
+}
+
+interface TimeStatsData {
+  todayHourly: Array<{
+    hour: number;
+    newsCount: number;
+    highLevelCount: number;
+    time: string;
+  }>;
+  daily: Array<{
+    date: string;
+    dateDisplay: string;
+    newsCount: number;
+    highLevelCount: number;
+  }>;
+  metadata: {
+    todayStart: string;
+    yesterdayStart: string;
+    sevenDaysAgo: string;
+  };
 }
 
 interface GraphStatsData {
@@ -58,6 +80,7 @@ interface GraphStatsData {
     times: number;
   };
   relationshipDistribution: Record<string, number>;
+  timeStats: TimeStatsData;
 }
 
 export default function StatsPage() {
@@ -120,6 +143,119 @@ export default function StatsPage() {
     };
     return colorMap[nodeType] || '#666';
   };
+
+  // 节点表格列定义
+  const nodeColumns = [
+    {
+      title: '节点类型',
+      dataIndex: 'nodeType',
+      key: 'nodeType',
+      render: (type: string, record: NodeStatsRecord) => (
+        <Space>
+          {getNodeIcon(type)}
+          <Text strong>{record.name}</Text>
+        </Space>
+      ),
+    },
+    {
+      title: '数量',
+      dataIndex: 'count',
+      key: 'count',
+      render: (count: number) => <Text strong>{count.toLocaleString()}</Text>,
+    },
+    {
+      title: '占比',
+      dataIndex: 'percentage',
+      key: 'percentage',
+      render: (percentage: string, record: NodeStatsRecord) => (
+        <Space direction="vertical" size={2} style={{ width: '100%' }}>
+          <Text>{percentage}%</Text>
+          <Progress 
+            percent={parseFloat(percentage)} 
+            size="small" 
+            strokeColor={getNodeColor(record.nodeType)}
+            showInfo={false}
+          />
+        </Space>
+      ),
+    },
+  ];
+
+  // 关系表格列定义
+  const relationshipColumns = [
+    {
+      title: '关系类型',
+      dataIndex: 'relationType',
+      key: 'relationType',
+      render: (type: string) => <Tag color="blue">{type}</Tag>,
+    },
+    {
+      title: '数量',
+      dataIndex: 'count',
+      key: 'count',
+      render: (count: number) => <Text strong>{count.toLocaleString()}</Text>,
+    },
+    {
+      title: '占比',
+      dataIndex: 'percentage',
+      key: 'percentage',
+      render: (percentage: string) => (
+        <Space direction="vertical" size={2} style={{ width: '100%' }}>
+          <Text>{percentage}%</Text>
+          <Progress 
+            percent={parseFloat(percentage)} 
+            size="small" 
+            strokeColor="#52c41a"
+            showInfo={false}
+          />
+        </Space>
+      ),
+    },
+  ];
+
+  // 今天小时统计表格列定义
+  const hourlyColumns = [
+    {
+      title: '时间',
+      dataIndex: 'time',
+      key: 'time',
+      render: (time: string) => <Text strong>{time}</Text>,
+    },
+    {
+      title: '新闻数量',
+      dataIndex: 'newsCount',
+      key: 'newsCount',
+      render: (count: number) => <Text>{count}</Text>,
+    },
+    {
+      title: '高级别新闻',
+      dataIndex: 'highLevelCount',
+      key: 'highLevelCount',
+      render: (count: number) => count > 0 ? <Tag color="red">{count}</Tag> : <Text>0</Text>,
+    },
+  ];
+
+  // 每日统计表格列定义
+  const dailyColumns = [
+    {
+      title: '日期',
+      dataIndex: 'dateDisplay',
+      key: 'dateDisplay',
+      render: (dateDisplay: string) => <Text strong>{dateDisplay}</Text>,
+    },
+    {
+      title: '新闻数量',
+      dataIndex: 'newsCount',
+      key: 'newsCount',
+      render: (count: number) => <Text>{count}</Text>,
+    },
+    {
+      title: '高级别新闻',
+      dataIndex: 'highLevelCount',
+      key: 'highLevelCount',
+      render: (count: number) => count > 0 ? <Tag color="red">{count}</Tag> : <Text>0</Text>,
+    },
+  ];
 
   if (loading) {
     return (
@@ -188,77 +324,6 @@ export default function StatsPage() {
     percentage: data.overview.relationships > 0 ? ((Number(count) / data.overview.relationships) * 100).toFixed(1) : '0'
   }));
 
-  const nodeColumns = [
-    {
-      title: '节点类型',
-      dataIndex: 'nodeType',
-      key: 'nodeType',
-      render: (type: string, record: NodeStatsRecord) => (
-        <Space>
-          {getNodeIcon(type)}
-          <Text strong>{record.name}</Text>
-        </Space>
-      ),
-    },
-    {
-      title: '数量',
-      dataIndex: 'count',
-      key: 'count',
-      render: (count: number) => (
-        <Text style={{ fontWeight: 'bold', fontSize: '16px' }}>
-          {count.toLocaleString()}
-        </Text>
-      ),
-      sorter: (a: NodeStatsRecord, b: NodeStatsRecord) => a.count - b.count,
-      defaultSortOrder: 'descend' as const,
-    },
-    {
-      title: '占比',
-      dataIndex: 'percentage',
-      key: 'percentage',
-      render: (percentage: string, record: NodeStatsRecord) => (
-        <Space direction="vertical" size={4} style={{ width: '100%' }}>
-          <Text>{percentage}%</Text>
-          <Progress 
-            percent={parseFloat(percentage)} 
-            size="small" 
-            strokeColor={getNodeColor(record.nodeType)}
-            showInfo={false}
-          />
-        </Space>
-      ),
-    },
-  ];
-
-  const relationshipColumns = [
-    {
-      title: '关系类型',
-      dataIndex: 'relationType',
-      key: 'relationType',
-      render: (type: string) => (
-        <Tag color="blue">{type}</Tag>
-      ),
-    },
-    {
-      title: '数量',
-      dataIndex: 'count',
-      key: 'count',
-      render: (count: number) => (
-        <Text style={{ fontWeight: 'bold' }}>
-          {count.toLocaleString()}
-        </Text>
-      ),
-      sorter: (a: RelationshipStatsRecord, b: RelationshipStatsRecord) => a.count - b.count,
-      defaultSortOrder: 'descend' as const,
-    },
-    {
-      title: '占比',
-      dataIndex: 'percentage',
-      key: 'percentage',
-      render: (percentage: string) => `${percentage}%`,
-    },
-  ];
-
   return (
     <Layout>
       <div style={{ padding: '24px' }}>
@@ -320,6 +385,47 @@ export default function StatsPage() {
                   value={data.overview.events}
                   prefix={<FlagOutlined />}
                   valueStyle={{ color: '#fa8c16' }}
+                />
+              </Card>
+            </Col>
+          </Row>
+
+          {/* 时间统计模块 */}
+          <Row gutter={[16, 16]}>
+            <Col xs={24} lg={12}>
+              <Card 
+                title={
+                  <Space>
+                    <ClockCircleOutlined />
+                    <Text strong>今日小时统计</Text>
+                  </Space>
+                }
+              >
+                <Table
+                  dataSource={data.timeStats?.todayHourly || []}
+                  columns={hourlyColumns}
+                  pagination={false}
+                  size="small"
+                  scroll={{ y: 300 }}
+                />
+              </Card>
+            </Col>
+
+            <Col xs={24} lg={12}>
+              <Card 
+                title={
+                  <Space>
+                    <BarChartOutlined />
+                    <Text strong>最近7天统计</Text>
+                  </Space>
+                }
+              >
+                <Table
+                  dataSource={data.timeStats?.daily || []}
+                  columns={dailyColumns}
+                  pagination={false}
+                  size="small"
+                  scroll={{ y: 300 }}
                 />
               </Card>
             </Col>
