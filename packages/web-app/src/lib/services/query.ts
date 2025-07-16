@@ -2,6 +2,30 @@ import { neo4jService } from './neo4j';
 import moment from 'moment-timezone';
 
 /**
+ * 将北京时间转换为UTC时间用于数据库查询
+ * @param beijingTime 北京时间字符串（ISO格式或moment对象）
+ * @returns UTC时间字符串
+ */
+function convertBeijingToUTC(beijingTime: string | moment.Moment): string {
+  let time: moment.Moment;
+  
+  if (typeof beijingTime === 'string') {
+    // 如果输入是字符串，先解析为moment对象
+    // 如果包含时区信息就直接解析，否则假定为北京时间
+    if (beijingTime.includes('+') || beijingTime.includes('Z')) {
+      time = moment(beijingTime);
+    } else {
+      time = moment.tz(beijingTime, 'Asia/Shanghai');
+    }
+  } else {
+    time = beijingTime;
+  }
+  
+  // 转换为UTC时间
+  return time.utc().toISOString();
+}
+
+/**
  * 查询服务
  * 提供从 Neo4j 数据库查询数据的方法
  */
@@ -13,6 +37,12 @@ class QueryService {
    */
   async getHourlySummary(startTime: string, endTime: string): Promise<any> {
     try {
+      // 转换北京时间为UTC时间查询数据库
+      const utcStartTime = convertBeijingToUTC(startTime);
+      const utcEndTime = convertBeijingToUTC(endTime);
+      
+      console.log(`[QueryService] 时间转换: 北京时间 ${startTime} - ${endTime} -> UTC ${utcStartTime} - ${utcEndTime}`);
+      
       const cypher = `
         MATCH (n:News)
         WHERE n.timestamp >= $startTime AND n.timestamp <= $endTime
@@ -38,8 +68,8 @@ class QueryService {
       `;
 
       const result = await this.neo4j.executeQuery(cypher, {
-        startTime,
-        endTime
+        startTime: utcStartTime,
+        endTime: utcEndTime
       });
 
       if (result.records.length === 0) {
@@ -75,6 +105,12 @@ class QueryService {
    */
   async getHighLevelNews(startTime: string, endTime: string): Promise<any[]> {
     try {
+      // 转换北京时间为UTC时间查询数据库
+      const utcStartTime = convertBeijingToUTC(startTime);
+      const utcEndTime = convertBeijingToUTC(endTime);
+      
+      console.log(`[QueryService] 高级别新闻时间转换: 北京时间 ${startTime} - ${endTime} -> UTC ${utcStartTime} - ${utcEndTime}`);
+      
       const cypher = `
         MATCH (n:News)
         WHERE n.timestamp >= $startTime 
@@ -101,8 +137,8 @@ class QueryService {
       `;
 
       const result = await this.neo4j.executeQuery(cypher, {
-        startTime,
-        endTime
+        startTime: utcStartTime,
+        endTime: utcEndTime
       });
 
       return result.records.map((record: any) => {
@@ -136,6 +172,12 @@ class QueryService {
    */
   async getDailyNewsData(startTime: string, endTime: string): Promise<any> {
     try {
+      // 转换北京时间为UTC时间查询数据库
+      const utcStartTime = convertBeijingToUTC(startTime);
+      const utcEndTime = convertBeijingToUTC(endTime);
+      
+      console.log(`[QueryService] 每日数据时间转换: 北京时间 ${startTime} - ${endTime} -> UTC ${utcStartTime} - ${utcEndTime}`);
+      
       const cypher = `
         MATCH (n:News)
         WHERE n.timestamp >= $startTime AND n.timestamp <= $endTime
@@ -161,8 +203,8 @@ class QueryService {
       `;
 
       const result = await this.neo4j.executeQuery(cypher, {
-        startTime,
-        endTime
+        startTime: utcStartTime,
+        endTime: utcEndTime
       });
 
       if (result.records.length === 0) {
@@ -525,4 +567,34 @@ class QueryService {
   }
 }
 
-export const queryService = new QueryService(); 
+// 导出查询服务实例
+export const queryService = new QueryService();
+
+/**
+ * 时区转换测试函数（开发调试用）
+ */
+export function testTimezoneConversion() {
+  console.log('=== 时区转换测试 ===');
+  
+  // 测试1: 北京时间字符串（包含时区）
+  const beijingTimeWithTz = '2025-01-16T14:00:00.000+08:00';
+  const utc1 = convertBeijingToUTC(beijingTimeWithTz);
+  console.log(`北京时间 ${beijingTimeWithTz} -> UTC ${utc1}`);
+  
+  // 测试2: UTC时间字符串
+  const utcTime = '2025-01-16T06:00:00.000Z';
+  const utc2 = convertBeijingToUTC(utcTime);
+  console.log(`UTC时间 ${utcTime} -> UTC ${utc2}`);
+  
+  // 测试3: 无时区信息的字符串（假定北京时间）
+  const noTzTime = '2025-01-16T14:00:00.000';
+  const utc3 = convertBeijingToUTC(noTzTime);
+  console.log(`无时区时间 ${noTzTime} -> UTC ${utc3}`);
+  
+  // 测试4: moment对象
+  const momentObj = moment.tz('2025-01-16T14:00:00', 'Asia/Shanghai');
+  const utc4 = convertBeijingToUTC(momentObj);
+  console.log(`Moment对象 ${momentObj.toISOString()} -> UTC ${utc4}`);
+  
+  console.log('=== 测试完成 ===');
+} 

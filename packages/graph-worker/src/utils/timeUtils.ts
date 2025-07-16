@@ -156,4 +156,60 @@ export function formatBeijingTime(timeInput: any, format?: string): string {
  */
 export function getCurrentBeijingTime(): string {
   return TimeParser.getCurrentBeijingTime();
+}
+
+/**
+ * 解析时间为UTC ISO字符串（用于存储层）
+ * 只解析格式，不做时区转换
+ */
+export function parseTimeToUTC(timeInput: any): string {
+  if (!timeInput) {
+    return new Date().toISOString();
+  }
+
+  try {
+    // 1. 处理数字类型的 timestamp
+    if (typeof timeInput === 'number') {
+      const timestamp = timeInput;
+      if (timestamp < 10000000000) {
+        // 秒级时间戳
+        return new Date(timestamp * 1000).toISOString();
+      } else {
+        // 毫秒级时间戳
+        return new Date(timestamp).toISOString();
+      }
+    }
+    // 2. 处理字符串类型
+    else if (typeof timeInput === 'string') {
+      // 尝试直接解析
+      const parsed = new Date(timeInput);
+      if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString();
+      }
+      
+      // 尝试使用 chrono-node 解析自然语言时间
+      const chronoResult = chrono.parseDate(timeInput);
+      if (chronoResult) {
+        return chronoResult.toISOString();
+      }
+      
+      // 尝试解析纯数字字符串
+      const numericTime = parseInt(timeInput);
+      if (!isNaN(numericTime)) {
+        return parseTimeToUTC(numericTime);
+      }
+    }
+    // 3. 处理 Date 对象
+    else if (timeInput instanceof Date) {
+      return timeInput.toISOString();
+    }
+
+    // 如果解析失败，使用当前UTC时间
+    console.warn(`时间解析失败，使用当前UTC时间: ${timeInput}`);
+    return new Date().toISOString();
+
+  } catch (error) {
+    console.error(`时间解析错误: ${timeInput}`, error);
+    return new Date().toISOString();
+  }
 } 

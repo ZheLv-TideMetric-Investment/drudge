@@ -156,6 +156,7 @@ class SummaryService {
    * 获取新闻数据
    */
   private async getNewsData(start: moment.Moment, end: moment.Moment, summaryType: SummaryType): Promise<any> {
+    // 注意：这里传递的是北京时间的ISO字符串，query服务会自动转换为UTC
     if (summaryType === SummaryType.DAILY) {
       return await queryService.getDailyNewsData(start.toISOString(), end.toISOString());
     } else {

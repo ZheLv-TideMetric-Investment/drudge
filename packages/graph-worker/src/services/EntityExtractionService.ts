@@ -3,7 +3,7 @@ import aiService from './AiService';
 import notificationService from './NotificationService';
 import { z } from 'zod';
 import * as chrono from 'chrono-node';
-import { parseTimeToBeijing } from '../utils/timeUtils';
+import { parseTimeToBeijing, parseTimeToUTC } from '../utils/timeUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { 
@@ -616,7 +616,7 @@ export class EntityExtractionService {
       newsId: newsItem.id,
       title: newsItem.title,
       content: newsItem.content,
-      timestamp: parseTimeToBeijing(newsItem.time),
+      timestamp: parseTimeToUTC(newsItem.time),
       source: newsItem.source,
       url: newsItem.url,
       news_level: 'Level 5', // 默认最低级别
@@ -648,7 +648,7 @@ export class EntityExtractionService {
           sentiment: event.sentiment || 'neutral',
           magnitude: event.magnitude || 0,
           event_level: event.event_level || 'Level 5',
-          event_date: event.event_date || parseTimeToBeijing(newsItem.time),
+          event_date: event.event_date || parseTimeToUTC(newsItem.time),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }));
