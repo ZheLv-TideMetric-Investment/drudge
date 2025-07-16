@@ -18,6 +18,7 @@ import {
   Relationship,
   LLMMessage,
 } from '../types/index';
+import config from '../config/config';
 
 // ISO-8601 正则表达式
 const iso8601 = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/;
@@ -193,56 +194,113 @@ export class EntityExtractionService {
   }
 
   /**
-   * 批量提取新闻六要素
+   * 批量提取新闻六要素 - 优化版本，分块处理避免内存溢出
    */
   async batchExtractEntities(newsItems: NewsItem[]): Promise<NewsExtractionResult[]> {
     logger.info(`🔄 开始批量提取六要素: ${newsItems.length} 条新闻`);
+    
+    // 从配置文件读取分块大小配置
+    const CHUNK_SIZE = config.processing.memory.extractionChunkSize;
+    const BATCH_SIZE = config.processing.memory.aiBatchSize;
+    const CHUNK_DELAY = config.processing.memory.chunkDelayMs;
+    const MEMORY_THRESHOLD = config.processing.memory.dangerThreshold * config.processing.memory.maxHeapSizeMB * 1024 * 1024;
+    
+    logger.info(`📊 内存优化配置: 分块大小=${CHUNK_SIZE}, AI批次=${BATCH_SIZE}, 延迟=${CHUNK_DELAY}ms`);
+    
+    const allResults: NewsExtractionResult[] = [];
+    let totalSuccessful = 0;
+    let totalFailed = 0;
+    
+    // 分块处理所有新闻
+    for (let chunkStart = 0; chunkStart < newsItems.length; chunkStart += CHUNK_SIZE) {
+      const chunk = newsItems.slice(chunkStart, chunkStart + CHUNK_SIZE);
+      const chunkIndex = Math.floor(chunkStart / CHUNK_SIZE) + 1;
+      const totalChunks = Math.ceil(newsItems.length / CHUNK_SIZE);
+      
+      logger.info(`🔄 处理分块 ${chunkIndex}/${totalChunks}: ${chunk.length} 条新闻`);
+      
+      // 记录分块开始时的内存使用情况
+      const memoryBefore = process.memoryUsage();
+      logger.debug(`内存使用 (分块${chunkIndex}开始): ${Math.round(memoryBefore.heapUsed / 1024 / 1024)}MB`);
+      
+      const chunkResults = await this.processNewsChunk(chunk, BATCH_SIZE);
+      
+      // 累计统计
+      const chunkSuccessful = chunkResults.length;
+      const chunkFailed = chunk.length - chunkSuccessful;
+      totalSuccessful += chunkSuccessful;
+      totalFailed += chunkFailed;
+      
+      // 将结果添加到总结果中
+      allResults.push(...chunkResults);
+      
+      // 记录分块结束后的内存使用情况
+      const memoryAfter = process.memoryUsage();
+      logger.debug(`内存使用 (分块${chunkIndex}结束): ${Math.round(memoryAfter.heapUsed / 1024 / 1024)}MB`);
+      
+      // 如果内存使用超过阈值，触发垃圾回收
+      if (memoryAfter.heapUsed > MEMORY_THRESHOLD) {
+        logger.warn(`⚠️ 内存使用达到${Math.round(memoryAfter.heapUsed / 1024 / 1024)}MB，触发垃圾回收`);
+        if (global.gc && config.processing.memory.enableAutoGC) {
+          global.gc();
+          const memoryAfterGC = process.memoryUsage();
+          logger.info(`🗑️ 垃圾回收完成，内存释放到${Math.round(memoryAfterGC.heapUsed / 1024 / 1024)}MB`);
+        }
+      }
+      
+      // 分块间添加延迟，给系统喘息时间
+      if (chunkStart + CHUNK_SIZE < newsItems.length) {
+        await this.delay(CHUNK_DELAY);
+      }
+      
+      logger.info(`✅ 分块${chunkIndex}处理完成: 成功${chunkSuccessful}条，失败${chunkFailed}条`);
+    }
 
-    const results: NewsExtractionResult[] = [];
-    const batchSize = 3; // 小批量处理避免API限制
+    const totalNews = newsItems.length;
+    logger.info(
+      `✅ 批量六要素提取完成: 成功 ${totalSuccessful} 条，失败 ${totalFailed} 条，总计 ${totalNews} 条新闻`
+    );
 
-    for (let i = 0; i < newsItems.length; i += batchSize) {
-      const batch = newsItems.slice(i, i + batchSize);
+    if (totalFailed > 0) {
+      logger.warn(`⚠️ ${totalFailed} 条新闻处理失败，已保存到 data/news/failed 目录`);
+    }
 
-      logger.info(
-        `处理批次 ${Math.floor(i / batchSize) + 1}/${Math.ceil(newsItems.length / batchSize)}`
-      );
+    return allResults;
+  }
+
+  /**
+   * 处理单个新闻分块
+   */
+  private async processNewsChunk(newsChunk: NewsItem[], batchSize: number): Promise<NewsExtractionResult[]> {
+    const chunkResults: NewsExtractionResult[] = [];
+    
+    for (let i = 0; i < newsChunk.length; i += batchSize) {
+      const batch = newsChunk.slice(i, i + batchSize);
+      
+      logger.debug(`处理子批次: ${i + 1}-${Math.min(i + batchSize, newsChunk.length)}/${newsChunk.length}`);
 
       const batchPromises = batch.map(async newsItem => {
         try {
           return await this.extractFromNews(newsItem);
         } catch (error) {
-          // extractFromNews 已经保存了失败的新闻数据
           logger.warn(`新闻 ${newsItem.id} 处理失败，跳过继续处理其他新闻`);
-          return null; // 返回null表示处理失败
+          return null;
         }
       });
 
       const batchResults = await Promise.all(batchPromises);
-
+      
       // 只添加成功处理的结果
-      const successfulResults = batchResults.filter(result => result !== null);
-      results.push(...successfulResults);
+      const successfulResults = batchResults.filter(result => result !== null) as NewsExtractionResult[];
+      chunkResults.push(...successfulResults);
 
-      // 添加延迟避免API限制
-      if (i + batchSize < newsItems.length) {
+      // 批次间添加延迟避免API限制
+      if (i + batchSize < newsChunk.length) {
         await this.delay(2000);
       }
     }
-
-    const totalNews = newsItems.length;
-    const successfulNews = results.length;
-    const failedNews = totalNews - successfulNews;
-
-    logger.info(
-      `✅ 批量六要素提取完成: 成功 ${successfulNews} 条，失败 ${failedNews} 条，总计 ${totalNews} 条新闻`
-    );
-
-    if (failedNews > 0) {
-      logger.warn(`⚠️ ${failedNews} 条新闻处理失败，已保存到 data/news/failed 目录`);
-    }
-
-    return results;
+    
+    return chunkResults;
   }
 
   /**

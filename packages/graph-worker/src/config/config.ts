@@ -42,11 +42,34 @@ const config = {
     supportedPrefixes: ['futu_live']
   },
   
-  // 处理配置
+  // 处理配置 - 优化内存使用
   processing: {
+    // 基础批次配置
     batchSize: parseInt(process.env.BATCH_SIZE || '10', 10),
     retryAttempts: parseInt(process.env.RETRY_ATTEMPTS || '3', 10),
-    retryDelay: parseInt(process.env.RETRY_DELAY || '1000', 10)
+    retryDelay: parseInt(process.env.RETRY_DELAY || '1000', 10),
+    
+    // 内存优化配置
+    memory: {
+      // 实体提取分块大小 (每次处理多少条新闻)
+      extractionChunkSize: parseInt(process.env.EXTRACTION_CHUNK_SIZE || '20', 10),
+      // 新闻处理分块大小 (总体批量处理分块)
+      processingChunkSize: parseInt(process.env.PROCESSING_CHUNK_SIZE || '50', 10),
+      // AI调用批次大小
+      aiBatchSize: parseInt(process.env.AI_BATCH_SIZE || '3', 10),
+      // 内存警告阈值 (百分比)
+      warningThreshold: parseFloat(process.env.MEMORY_WARNING_THRESHOLD || '0.7'),
+      // 内存危险阈值 (百分比)
+      dangerThreshold: parseFloat(process.env.MEMORY_DANGER_THRESHOLD || '0.85'),
+      // 最大堆内存大小 (MB)
+      maxHeapSizeMB: parseInt(process.env.MAX_HEAP_SIZE_MB || '2048', 10),
+      // 内存监控间隔 (毫秒)
+      monitoringIntervalMs: parseInt(process.env.MEMORY_MONITORING_INTERVAL_MS || '30000', 10),
+      // 分块间延迟 (毫秒)
+      chunkDelayMs: parseInt(process.env.CHUNK_DELAY_MS || '1000', 10),
+      // 自动垃圾回收
+      enableAutoGC: process.env.ENABLE_AUTO_GC !== 'false' // 默认启用
+    }
   },
   
   // 通知配置
