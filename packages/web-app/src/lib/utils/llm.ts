@@ -179,7 +179,7 @@ class AiService {
       // 如果真实调用失败，尝试返回模拟响应
       if (!this.mockMode) {
         console.warn('真实AI调用失败，返回模拟响应');
-        return this.getMockResponse<T>(messages, options);
+        return this.getMockResponse<string>(messages, options);
       }
       
       return {
