@@ -57,15 +57,38 @@ class Neo4jService {
   /**
    * 执行查询
    */
+  /**
+   * 转换参数中的数字为Neo4j整数类型
+   */
+  private convertNumbersToNeo4jInts(obj: any): any {
+    if (typeof obj === 'number' && Number.isInteger(obj)) {
+      return neo4j.int(obj);
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.convertNumbersToNeo4jInts(item));
+    }
+    if (obj !== null && typeof obj === 'object') {
+      const converted: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        converted[key] = this.convertNumbersToNeo4jInts(value);
+      }
+      return converted;
+    }
+    return obj;
+  }
+
   async executeQuery(cypher: string, parameters: any = {}): Promise<any> {
     // 确保连接已建立
     if (!this.driver) {
       await this.connect();
     }
     
+    // 转换参数中的数字为Neo4j整数类型
+    const convertedParameters = this.convertNumbersToNeo4jInts(parameters);
+    
     const session = this.getSession();
     try {
-      const result = await session.run(cypher, parameters);
+      const result = await session.run(cypher, convertedParameters);
       return result;
     } catch (error) {
       console.error('Neo4j 查询执行失败:', error);

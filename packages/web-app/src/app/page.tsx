@@ -30,6 +30,8 @@ import {
   RobotOutlined,
   DatabaseOutlined,
   ScheduleOutlined,
+  ShareAltOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import { Layout } from '../components/Layout';
 
@@ -289,6 +291,55 @@ export default function Home() {
           <Paragraph style={{ fontSize: '16px', color: '#666' }}>
             基于AI的新闻知识图谱分析和可视化平台，集成定时任务调度、新闻扫描和AI总结功能
           </Paragraph>
+
+          {/* 快速访问 */}
+          <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
+            <Col xs={24} sm={8} md={6}>
+              <Card size="small" hoverable>
+                <Button 
+                  type="primary" 
+                  icon={<FileTextOutlined />} 
+                  href="/news"
+                  style={{ width: '100%' }}
+                >
+                  新闻浏览
+                </Button>
+                <Paragraph style={{ fontSize: '12px', color: '#999', marginTop: '8px', marginBottom: 0 }}>
+                  查看和搜索原始新闻数据
+                </Paragraph>
+              </Card>
+            </Col>
+            <Col xs={24} sm={8} md={6}>
+              <Card size="small" hoverable>
+                <Button 
+                  type="default" 
+                  icon={<ShareAltOutlined />} 
+                  href="/graph"
+                  style={{ width: '100%' }}
+                >
+                  知识图谱
+                </Button>
+                <Paragraph style={{ fontSize: '12px', color: '#999', marginTop: '8px', marginBottom: 0 }}>
+                  探索实体关系网络
+                </Paragraph>
+              </Card>
+            </Col>
+            <Col xs={24} sm={8} md={6}>
+              <Card size="small" hoverable>
+                <Button 
+                  type="default" 
+                  icon={<BarChartOutlined />} 
+                  href="/stats"
+                  style={{ width: '100%' }}
+                >
+                  数据统计
+                </Button>
+                <Paragraph style={{ fontSize: '12px', color: '#999', marginTop: '8px', marginBottom: 0 }}>
+                  查看系统统计信息
+                </Paragraph>
+              </Card>
+            </Col>
+          </Row>
 
           {error && (
             <Alert
