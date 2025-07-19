@@ -3,7 +3,7 @@ import aiService from './AiService';
 import notificationService from './NotificationService';
 import { z } from 'zod';
 import * as chrono from 'chrono-node';
-import { parseTimeToBeijing, parseTimeToUTC } from '../utils/timeUtils';
+import { parseTime } from '../utils/timeUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -198,61 +198,75 @@ export class EntityExtractionService {
    */
   async batchExtractEntities(newsItems: NewsItem[]): Promise<NewsExtractionResult[]> {
     logger.info(`🔄 开始批量提取六要素: ${newsItems.length} 条新闻`);
-    
+
     // 从配置文件读取分块大小配置
     const CHUNK_SIZE = config.processing.memory.extractionChunkSize;
     const BATCH_SIZE = config.processing.memory.aiBatchSize;
     const CHUNK_DELAY = config.processing.memory.chunkDelayMs;
-    const MEMORY_THRESHOLD = config.processing.memory.dangerThreshold * config.processing.memory.maxHeapSizeMB * 1024 * 1024;
-    
-    logger.info(`📊 内存优化配置: 分块大小=${CHUNK_SIZE}, AI批次=${BATCH_SIZE}, 延迟=${CHUNK_DELAY}ms`);
-    
+    const MEMORY_THRESHOLD =
+      config.processing.memory.dangerThreshold *
+      config.processing.memory.maxHeapSizeMB *
+      1024 *
+      1024;
+
+    logger.info(
+      `📊 内存优化配置: 分块大小=${CHUNK_SIZE}, AI批次=${BATCH_SIZE}, 延迟=${CHUNK_DELAY}ms`
+    );
+
     const allResults: NewsExtractionResult[] = [];
     let totalSuccessful = 0;
     let totalFailed = 0;
-    
+
     // 分块处理所有新闻
     for (let chunkStart = 0; chunkStart < newsItems.length; chunkStart += CHUNK_SIZE) {
       const chunk = newsItems.slice(chunkStart, chunkStart + CHUNK_SIZE);
       const chunkIndex = Math.floor(chunkStart / CHUNK_SIZE) + 1;
       const totalChunks = Math.ceil(newsItems.length / CHUNK_SIZE);
-      
+
       logger.info(`🔄 处理分块 ${chunkIndex}/${totalChunks}: ${chunk.length} 条新闻`);
-      
+
       // 记录分块开始时的内存使用情况
       const memoryBefore = process.memoryUsage();
-      logger.debug(`内存使用 (分块${chunkIndex}开始): ${Math.round(memoryBefore.heapUsed / 1024 / 1024)}MB`);
-      
+      logger.debug(
+        `内存使用 (分块${chunkIndex}开始): ${Math.round(memoryBefore.heapUsed / 1024 / 1024)}MB`
+      );
+
       const chunkResults = await this.processNewsChunk(chunk, BATCH_SIZE);
-      
+
       // 累计统计
       const chunkSuccessful = chunkResults.length;
       const chunkFailed = chunk.length - chunkSuccessful;
       totalSuccessful += chunkSuccessful;
       totalFailed += chunkFailed;
-      
+
       // 将结果添加到总结果中
       allResults.push(...chunkResults);
-      
+
       // 记录分块结束后的内存使用情况
       const memoryAfter = process.memoryUsage();
-      logger.debug(`内存使用 (分块${chunkIndex}结束): ${Math.round(memoryAfter.heapUsed / 1024 / 1024)}MB`);
-      
+      logger.debug(
+        `内存使用 (分块${chunkIndex}结束): ${Math.round(memoryAfter.heapUsed / 1024 / 1024)}MB`
+      );
+
       // 如果内存使用超过阈值，触发垃圾回收
       if (memoryAfter.heapUsed > MEMORY_THRESHOLD) {
-        logger.warn(`⚠️ 内存使用达到${Math.round(memoryAfter.heapUsed / 1024 / 1024)}MB，触发垃圾回收`);
+        logger.warn(
+          `⚠️ 内存使用达到${Math.round(memoryAfter.heapUsed / 1024 / 1024)}MB，触发垃圾回收`
+        );
         if (global.gc && config.processing.memory.enableAutoGC) {
           global.gc();
           const memoryAfterGC = process.memoryUsage();
-          logger.info(`🗑️ 垃圾回收完成，内存释放到${Math.round(memoryAfterGC.heapUsed / 1024 / 1024)}MB`);
+          logger.info(
+            `🗑️ 垃圾回收完成，内存释放到${Math.round(memoryAfterGC.heapUsed / 1024 / 1024)}MB`
+          );
         }
       }
-      
+
       // 分块间添加延迟，给系统喘息时间
       if (chunkStart + CHUNK_SIZE < newsItems.length) {
         await this.delay(CHUNK_DELAY);
       }
-      
+
       logger.info(`✅ 分块${chunkIndex}处理完成: 成功${chunkSuccessful}条，失败${chunkFailed}条`);
     }
 
@@ -271,13 +285,18 @@ export class EntityExtractionService {
   /**
    * 处理单个新闻分块
    */
-  private async processNewsChunk(newsChunk: NewsItem[], batchSize: number): Promise<NewsExtractionResult[]> {
+  private async processNewsChunk(
+    newsChunk: NewsItem[],
+    batchSize: number
+  ): Promise<NewsExtractionResult[]> {
     const chunkResults: NewsExtractionResult[] = [];
-    
+
     for (let i = 0; i < newsChunk.length; i += batchSize) {
       const batch = newsChunk.slice(i, i + batchSize);
-      
-      logger.debug(`处理子批次: ${i + 1}-${Math.min(i + batchSize, newsChunk.length)}/${newsChunk.length}`);
+
+      logger.debug(
+        `处理子批次: ${i + 1}-${Math.min(i + batchSize, newsChunk.length)}/${newsChunk.length}`
+      );
 
       const batchPromises = batch.map(async newsItem => {
         try {
@@ -289,9 +308,11 @@ export class EntityExtractionService {
       });
 
       const batchResults = await Promise.all(batchPromises);
-      
+
       // 只添加成功处理的结果
-      const successfulResults = batchResults.filter(result => result !== null) as NewsExtractionResult[];
+      const successfulResults = batchResults.filter(
+        result => result !== null
+      ) as NewsExtractionResult[];
       chunkResults.push(...successfulResults);
 
       // 批次间添加延迟避免API限制
@@ -299,7 +320,7 @@ export class EntityExtractionService {
         await this.delay(2000);
       }
     }
-    
+
     return chunkResults;
   }
 
@@ -319,7 +340,7 @@ export class EntityExtractionService {
 
 标题：${newsItem.title}
 内容：${newsItem.content}
-        发布时间：${parseTimeToBeijing(newsItem.time)}
+        发布时间：${parseTime(newsItem.time)}
 来源：${newsItem.source}
         `,
       },
@@ -757,7 +778,7 @@ export class EntityExtractionService {
       newsId: newsItem.id,
       title: newsItem.title,
       content: newsItem.content,
-      timestamp: parseTimeToUTC(newsItem.time),
+      timestamp: parseTime(newsItem.time),
       source: newsItem.source,
       url: newsItem.url,
       news_level: 'Level 5', // 默认最低级别
@@ -789,7 +810,7 @@ export class EntityExtractionService {
             sentiment: event.sentiment || 'neutral',
             magnitude: event.magnitude || 0,
             event_level: event.event_level || 'Level 5',
-            event_date: event.event_date || parseTimeToUTC(newsItem.time),
+            event_date: event.event_date || parseTime(newsItem.time),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }));

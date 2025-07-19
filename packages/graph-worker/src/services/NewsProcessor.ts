@@ -5,6 +5,7 @@ import knowledgeGraphService from './KnowledgeGraphService';
 import notificationService from './NotificationService';
 import { FileInfo, markFileAsProcessed } from './FileScanner';
 import { NewsItem, ProcessResult } from '../types/index';
+import { parseTimestamp } from '../utils/timeUtils';
 
 /**
  * 新闻处理服务
@@ -221,11 +222,11 @@ function convertSingleNewsItem(item: any, fileInfo: FileInfo): NewsItem | null {
     // 处理时间戳
     let timestamp: Date;
     if (item.timestamp) {
-      timestamp = new Date(typeof item.timestamp === 'number' ? item.timestamp * 1000 : item.timestamp);
+      timestamp = parseTimestamp(item.timestamp);
     } else if (item.time) {
-      timestamp = new Date(typeof item.time === 'number' ? item.time * 1000 : item.time);
+      timestamp = parseTimestamp(item.time);
     } else if (item.publishTime || item.publish_time) {
-      timestamp = new Date(item.publishTime || item.publish_time);
+      timestamp = parseTimestamp(item.publishTime || item.publish_time);
     } else {
       timestamp = fileInfo.modifiedTime; // 使用文件修改时间作为默认值
     }
@@ -241,9 +242,9 @@ function convertSingleNewsItem(item: any, fileInfo: FileInfo): NewsItem | null {
       description,
       content,
       source: item.source || 'futu_live',
-      url: item.url || item.link || '',
+      url: item.url || item.link || item.detailUrl || '',
       timestamp,
-      level: item.level || item.news_level || 5,
+      level: 5,
       processed: false
     };
 

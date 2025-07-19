@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
-import { parseTimeToUTC } from '../utils/timeUtils';
+import { parseTime } from '../utils/timeUtils';
+
 import { 
   NewsExtractionResult, 
   Event, 
@@ -62,7 +63,7 @@ export class EntityService {
       id: newsItem.id,
       title: newsItem.title,
       content: newsItem.content,
-      timestamp: parseTimeToUTC(newsItem.time),
+      timestamp: parseTime(newsItem.time),
       source: newsItem.source || '',
       url: newsItem.url || '',
       level: newsItem.level || 0,
