@@ -1,6 +1,7 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
 import { parseTime, getCurrentTime } from '../utils/timeUtils';
+import { EVENT_LEVELS, EVENT_TYPES, SENTIMENTS, ORGANIZATION_TYPES, LOCATION_TYPES, SYSTEM_RELATIONSHIP_TYPES } from '../constants/enums';
 
 import { 
   NewsExtractionResult, 
@@ -42,7 +43,7 @@ export class EntityService {
   /**
    * 创建新闻节点
    */
-  async createNews(newsItem: NewsItem, newsLevel: string = 'Level 5'): Promise<void> {
+  async createNews(newsItem: NewsItem, newsLevel: string = EVENT_LEVELS.LEVEL_5): Promise<void> {
     const cypher = `
       MERGE (n:News {id: $id})
       SET n.title = $title,
@@ -104,12 +105,12 @@ export class EntityService {
       eventId: event.event_id,
       eventName: event.event_name,
       eventDescription: event.event_description || '',
-      eventType: event.event_type || 'other',
+      eventType: event.event_type || EVENT_TYPES.OTHER,
       timestamp: event.timestamp || getCurrentTime(),
       rawTime: event.raw_time || null,
-      sentiment: event.sentiment || 'neutral',
+      sentiment: event.sentiment || SENTIMENTS.NEUTRAL,
       magnitude: event.magnitude || 0,
-      eventLevel: event.event_level || 'Level 5',
+      eventLevel: event.event_level || EVENT_LEVELS.LEVEL_5,
       significance: event.significance || 1,
       createdAt: getCurrentTime(),
       updatedAt: getCurrentTime(),
@@ -204,7 +205,7 @@ export class EntityService {
 
     const parameters = {
       organizationName: organization.organization_name,
-      type: organization.type || 'other',
+      type: organization.type || ORGANIZATION_TYPES.OTHER,
       country: organization.country || '',
       createdAt: getCurrentTime(),
       updatedAt: getCurrentTime(),
@@ -237,7 +238,7 @@ export class EntityService {
 
     const parameters = {
       locationName: location.location_name,
-      type: location.type || 'other',
+      type: location.type || LOCATION_TYPES.OTHER,
       country: location.country || '',
       region: location.region || '',
       coordinates: location.coordinates ? JSON.stringify(location.coordinates) : null,
@@ -334,7 +335,7 @@ export class EntityService {
         toType: 'Event',
         toKey: 'event_id',
         toValue: event.event_id,
-        relType: 'DESCRIBES',
+        relType: SYSTEM_RELATIONSHIP_TYPES.DESCRIBES,
         properties: { confidence: 0.9 }
       });
     }
@@ -348,7 +349,7 @@ export class EntityService {
         toType: 'Company',
         toKey: 'company_name',
         toValue: company.company_name,
-        relType: 'INVOLVES',
+        relType: SYSTEM_RELATIONSHIP_TYPES.INVOLVES,
         properties: { confidence: 0.8 }
       });
     }
@@ -362,7 +363,7 @@ export class EntityService {
         toType: 'Person',
         toKey: 'person_name',
         toValue: person.person_name,
-        relType: 'MENTIONS',
+        relType: SYSTEM_RELATIONSHIP_TYPES.MENTIONS,
         properties: { confidence: 0.8 }
       });
     }
@@ -376,7 +377,7 @@ export class EntityService {
         toType: 'Organization',
         toKey: 'organization_name',
         toValue: organization.organization_name,
-        relType: 'INVOLVES',
+        relType: SYSTEM_RELATIONSHIP_TYPES.INVOLVES,
         properties: { confidence: 0.8 }
       });
     }
@@ -390,7 +391,7 @@ export class EntityService {
         toType: 'Location',
         toKey: 'location_name',
         toValue: location.location_name,
-        relType: 'LOCATED_AT',
+        relType: SYSTEM_RELATIONSHIP_TYPES.LOCATED_AT,
         properties: { confidence: 0.7 }
       });
     }

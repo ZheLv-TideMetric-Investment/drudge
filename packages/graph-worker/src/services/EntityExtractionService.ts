@@ -4,6 +4,15 @@ import notificationService from './NotificationService';
 import { z } from 'zod';
 import * as chrono from 'chrono-node';
 import { parseTime, getCurrentTime } from '../utils/timeUtils';
+import { 
+  EVENT_TYPE_VALUES, 
+  SENTIMENT_VALUES, 
+  EVENT_LEVEL_VALUES,
+  ORGANIZATION_TYPE_VALUES,
+  LOCATION_TYPE_VALUES,
+  RELATIONSHIP_TYPE_VALUES,
+  EventLevel
+} from '../constants/enums';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -28,20 +37,11 @@ const newsExtractionSchema = z.object({
     z.object({
       event_name: z.string().min(1),
       event_description: z.string().min(1),
-      event_type: z.enum([
-        'macro',
-        'policy',
-        'market',
-        'corporate',
-        'industry',
-        'tech',
-        'geopolitics',
-        'other',
-      ]),
+      event_type: z.enum(EVENT_TYPE_VALUES as [string, ...string[]]),
       significance: z.number().int().min(1).max(4),
-      sentiment: z.enum(['positive', 'negative', 'neutral']),
+      sentiment: z.enum(SENTIMENT_VALUES as [string, ...string[]]),
       magnitude: z.number().min(-1).max(1),
-      event_level: z.enum(['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5']),
+      event_level: z.enum(EVENT_LEVEL_VALUES as [string, ...string[]]),
       timestamp: z.string().regex(iso8601).optional().or(z.literal('')),
     })
   ),
@@ -70,7 +70,7 @@ const newsExtractionSchema = z.object({
     z.object({
       organization_name: z.string().min(1),
       type: z
-        .enum(['government', 'regulator', 'intl_org', 'fin_inst', 'industry_assoc', 'other'])
+        .enum(ORGANIZATION_TYPE_VALUES as [string, ...string[]])
         .optional()
         .or(z.literal('')),
       country: z.string().optional().or(z.literal('')),
@@ -80,7 +80,7 @@ const newsExtractionSchema = z.object({
   locations: z.array(
     z.object({
       location_name: z.string().min(1),
-      type: z.enum(['country', 'region', 'city', 'facility', 'other']).optional().or(z.literal('')),
+      type: z.enum(LOCATION_TYPE_VALUES as [string, ...string[]]).optional().or(z.literal('')),
       country: z.string().optional().or(z.literal('')),
       region: z.string().optional().or(z.literal('')),
     })
@@ -88,20 +88,7 @@ const newsExtractionSchema = z.object({
 
   relationships: z.array(
     z.object({
-      type: z.enum([
-        'LOCATED_IN',
-        'WORKS_FOR',
-        'OWNS',
-        'PARTICIPATES_IN',
-        'MERGES_WITH',
-        'ACQUIRES',
-        'SUPPLIES',
-        'PARTNERS_WITH',
-        'SUED_BY',
-        'REGULATED_BY',
-        'INVESTS_IN',
-        'OTHER',
-      ]),
+      type: z.enum(RELATIONSHIP_TYPE_VALUES as [string, ...string[]]),
       from: z.string().min(1),
       to: z.string().min(1),
       description: z.string().optional().or(z.literal('')),
@@ -495,29 +482,17 @@ export class EntityExtractionService {
           }
 
           // 修复 event_type 枚举
-          const validEventTypes = [
-            'macro',
-            'policy',
-            'market',
-            'corporate',
-            'industry',
-            'tech',
-            'geopolitics',
-            'other',
-          ];
-          if (!validEventTypes.includes(event.event_type)) {
+          if (!EVENT_TYPE_VALUES.includes(event.event_type)) {
             event.event_type = 'other';
           }
 
           // 修复 sentiment 枚举
-          const validSentiments = ['positive', 'negative', 'neutral'];
-          if (!validSentiments.includes(event.sentiment)) {
+          if (!SENTIMENT_VALUES.includes(event.sentiment)) {
             event.sentiment = 'neutral';
           }
 
           // 修复 event_level 枚举
-          const validLevels = ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5'];
-          if (!validLevels.includes(event.event_level)) {
+          if (!EVENT_LEVEL_VALUES.includes(event.event_level)) {
             event.event_level = 'Level 5';
           }
 
@@ -578,21 +553,7 @@ export class EntityExtractionService {
       fixed.relationships = fixed.relationships
         .filter((rel: any) => rel && typeof rel === 'object' && rel.from && rel.to)
         .map((rel: any) => {
-          const validRelTypes = [
-            'LOCATED_IN',
-            'WORKS_FOR',
-            'OWNS',
-            'PARTICIPATES_IN',
-            'MERGES_WITH',
-            'ACQUIRES',
-            'SUPPLIES',
-            'PARTNERS_WITH',
-            'SUED_BY',
-            'REGULATED_BY',
-            'INVESTS_IN',
-            'OTHER',
-          ];
-          if (!validRelTypes.includes(rel.type)) {
+          if (!RELATIONSHIP_TYPE_VALUES.includes(rel.type)) {
             rel.type = 'OTHER';
           }
           return rel;
@@ -882,11 +843,11 @@ export class EntityExtractionService {
 
       if (eventLevels.length > 0) {
         // 取最高级别（数字越小级别越高）
-        if (eventLevels.includes('Level 1')) return 'Level 1';
-        if (eventLevels.includes('Level 2')) return 'Level 2';
-        if (eventLevels.includes('Level 3')) return 'Level 3';
-        if (eventLevels.includes('Level 4')) return 'Level 4';
-        if (eventLevels.includes('Level 5')) return 'Level 5';
+        if (eventLevels.includes(EventLevel.LEVEL_1)) return EventLevel.LEVEL_1;
+        if (eventLevels.includes(EventLevel.LEVEL_2)) return EventLevel.LEVEL_2;
+        if (eventLevels.includes(EventLevel.LEVEL_3)) return EventLevel.LEVEL_3;
+        if (eventLevels.includes(EventLevel.LEVEL_4)) return EventLevel.LEVEL_4;
+        if (eventLevels.includes(EventLevel.LEVEL_5)) return EventLevel.LEVEL_5;
       }
     }
 
@@ -902,10 +863,10 @@ export class EntityExtractionService {
     if (result.events.length > 0) {
       const levels = result.events.map(e => e.event_level);
 
-      if (levels.includes('Level 1')) return 'Level 1';
-      if (levels.includes('Level 2')) return 'Level 2';
-      if (levels.includes('Level 3')) return 'Level 3';
-      if (levels.includes('Level 4')) return 'Level 4';
+      if (levels.includes(EventLevel.LEVEL_1)) return EventLevel.LEVEL_1;
+      if (levels.includes(EventLevel.LEVEL_2)) return EventLevel.LEVEL_2;
+      if (levels.includes(EventLevel.LEVEL_3)) return EventLevel.LEVEL_3;
+      if (levels.includes(EventLevel.LEVEL_4)) return EventLevel.LEVEL_4;
     }
 
     // 根据实体数量和类型判断

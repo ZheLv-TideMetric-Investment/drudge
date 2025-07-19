@@ -4,6 +4,7 @@ import { EntityService } from './EntityService';
 import relationshipService from './RelationshipService';
 import config from '../config/config';
 import { getCurrentTime } from '../utils/timeUtils';
+import { RelationshipType } from '../constants/enums';
 import { 
   NewsItem, 
   NewsExtractionResult, 
@@ -73,7 +74,7 @@ export class KnowledgeGraphService {
       
       // 3. 创建关系
       await relationshipService.createRelationship(
-        { from: '', to: '', type: 'OTHER', description: '', confidence: 0.8 }, 
+        { from: '', to: '', type: RelationshipType.OTHER, description: '', confidence: 0.8 }, 
         extractionResult.newsId || ''
       );
       
