@@ -1,17 +1,24 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
 import { parseTime, getCurrentTime } from '../utils/timeUtils';
-import { EVENT_LEVELS, EVENT_TYPES, SENTIMENTS, ORGANIZATION_TYPES, LOCATION_TYPES, SYSTEM_RELATIONSHIP_TYPES } from '../constants/enums';
+import {
+  EVENT_LEVELS,
+  EVENT_TYPES,
+  SENTIMENTS,
+  ORGANIZATION_TYPES,
+  LOCATION_TYPES,
+  SYSTEM_RELATIONSHIP_TYPES,
+} from '../constants/enums';
 
-import { 
-  NewsExtractionResult, 
-  Event, 
-  Company, 
-  Person, 
-  Organization, 
-  Location, 
+import {
+  NewsExtractionResult,
+  Event,
+  Company,
+  Person,
+  Organization,
+  Location,
   Relationship,
-  NewsItem 
+  NewsItem,
 } from '../types/index';
 
 /**
@@ -71,7 +78,7 @@ export class EntityService {
       level: newsItem.level || 0,
       newsLevel,
       createdAt: getCurrentTime(),
-      updatedAt: getCurrentTime()
+      updatedAt: getCurrentTime(),
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -114,7 +121,7 @@ export class EntityService {
       significance: event.significance || 1,
       createdAt: getCurrentTime(),
       updatedAt: getCurrentTime(),
-      newsId
+      newsId,
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -149,7 +156,7 @@ export class EntityService {
       aliases: company.aliases && company.aliases.length > 0 ? company.aliases : [],
       createdAt: getCurrentTime(),
       updatedAt: getCurrentTime(),
-      newsId
+      newsId,
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -180,7 +187,7 @@ export class EntityService {
       nationality: person.nationality || '',
       createdAt: getCurrentTime(),
       updatedAt: getCurrentTime(),
-      newsId
+      newsId,
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -209,7 +216,7 @@ export class EntityService {
       country: organization.country || '',
       createdAt: getCurrentTime(),
       updatedAt: getCurrentTime(),
-      newsId
+      newsId,
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -246,14 +253,12 @@ export class EntityService {
       longitude: location.coordinates?.longitude || null,
       createdAt: getCurrentTime(),
       updatedAt: getCurrentTime(),
-      newsId
+      newsId,
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
     logger.debug(`位置节点创建成功: ${location.location_name}`);
   }
-
-
 
   /**
    * 批量创建实体（使用新的 MERGE 模板）
@@ -270,12 +275,13 @@ export class EntityService {
         source: extractionResult.source || '',
         url: extractionResult.url || '',
         level: 0, // 兼容旧字段
-        timestamp: typeof extractionResult.timestamp === 'string' 
-          ? extractionResult.timestamp 
-          : new Date(extractionResult.timestamp).toISOString(),
-        raw_time: extractionResult.timestamp
+        timestamp:
+          typeof extractionResult.timestamp === 'string'
+            ? extractionResult.timestamp
+            : parseTime(extractionResult.timestamp),
+        raw_time: extractionResult.raw_time,
       };
-      
+
       await this.createNews(newsItem, extractionResult.news_level);
 
       // 2. 批量创建实体（使用新的 MERGE 模板）
@@ -336,7 +342,7 @@ export class EntityService {
         toKey: 'event_id',
         toValue: event.event_id,
         relType: SYSTEM_RELATIONSHIP_TYPES.DESCRIBES,
-        properties: { confidence: 0.9 }
+        properties: { confidence: 0.9 },
       });
     }
 
@@ -350,7 +356,7 @@ export class EntityService {
         toKey: 'company_name',
         toValue: company.company_name,
         relType: SYSTEM_RELATIONSHIP_TYPES.INVOLVES,
-        properties: { confidence: 0.8 }
+        properties: { confidence: 0.8 },
       });
     }
 
@@ -364,7 +370,7 @@ export class EntityService {
         toKey: 'person_name',
         toValue: person.person_name,
         relType: SYSTEM_RELATIONSHIP_TYPES.MENTIONS,
-        properties: { confidence: 0.8 }
+        properties: { confidence: 0.8 },
       });
     }
 
@@ -378,7 +384,7 @@ export class EntityService {
         toKey: 'organization_name',
         toValue: organization.organization_name,
         relType: SYSTEM_RELATIONSHIP_TYPES.INVOLVES,
-        properties: { confidence: 0.8 }
+        properties: { confidence: 0.8 },
       });
     }
 
@@ -392,7 +398,7 @@ export class EntityService {
         toKey: 'location_name',
         toValue: location.location_name,
         relType: SYSTEM_RELATIONSHIP_TYPES.LOCATED_AT,
-        properties: { confidence: 0.7 }
+        properties: { confidence: 0.7 },
       });
     }
 
@@ -436,7 +442,9 @@ export class EntityService {
       const processedIds = result.records.map((record: any) => record.get('id'));
       const unprocessedIds = newsIds.filter(id => !processedIds.includes(id));
 
-      logger.info(`总计 ${newsIds.length} 条新闻，已处理 ${processedIds.length} 条，未处理 ${unprocessedIds.length} 条`);
+      logger.info(
+        `总计 ${newsIds.length} 条新闻，已处理 ${processedIds.length} 条，未处理 ${unprocessedIds.length} 条`
+      );
 
       return unprocessedIds;
     } catch (error) {
@@ -452,19 +460,19 @@ export class EntityService {
     try {
       // 检查数据库连接
       const result = await this.neo4j.executeQuery('RETURN 1 as test');
-      
+
       return {
         status: 'healthy',
         service: 'EntityService',
         timestamp: getCurrentTime(),
-        neo4j_connection: result ? 'connected' : 'disconnected'
+        neo4j_connection: result ? 'connected' : 'disconnected',
       };
     } catch (error: any) {
       return {
         status: 'unhealthy',
         service: 'EntityService',
         timestamp: getCurrentTime(),
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -477,4 +485,4 @@ export class EntityService {
   }
 }
 
-export default new EntityService(); 
+export default new EntityService();

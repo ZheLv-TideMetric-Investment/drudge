@@ -18,7 +18,13 @@ import {
   LocationType,
   RelationshipType,
   EVENT_TYPE_DESCRIPTIONS,
-  ORGANIZATION_TYPE_DESCRIPTIONS
+  ORGANIZATION_TYPE_DESCRIPTIONS,
+  DEFAULT_EVENT_TYPE,
+  DEFAULT_SENTIMENT,
+  DEFAULT_EVENT_LEVEL,
+  DEFAULT_ORGANIZATION_TYPE,
+  DEFAULT_LOCATION_TYPE,
+  DEFAULT_RELATIONSHIP_TYPE,
 } from '../constants/enums';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -493,17 +499,17 @@ export class EntityExtractionService {
 
           // 修复 event_type 枚举
           if (!EVENT_TYPE_VALUES.includes(event.event_type)) {
-            event.event_type = 'other';
+            event.event_type = DEFAULT_EVENT_TYPE;
           }
 
           // 修复 sentiment 枚举
           if (!SENTIMENT_VALUES.includes(event.sentiment)) {
-            event.sentiment = 'neutral';
+            event.sentiment = DEFAULT_SENTIMENT;
           }
 
           // 修复 event_level 枚举
           if (!EVENT_LEVEL_VALUES.includes(event.event_level)) {
-            event.event_level = 'Level 5';
+            event.event_level = DEFAULT_EVENT_LEVEL;
           }
 
           // 确保数值字段有效
@@ -528,16 +534,8 @@ export class EntityExtractionService {
       fixed.organizations = fixed.organizations
         .filter((org: any) => org && typeof org === 'object' && org.organization_name)
         .map((org: any) => {
-          const validOrgTypes = [
-            'government',
-            'regulator',
-            'intl_org',
-            'fin_inst',
-            'industry_assoc',
-            'other',
-          ];
-          if (!validOrgTypes.includes(org.type)) {
-            org.type = 'other';
+          if (!ORGANIZATION_TYPE_VALUES.includes(org.type)) {
+            org.type = DEFAULT_ORGANIZATION_TYPE;
           }
           return org;
         });
@@ -550,9 +548,8 @@ export class EntityExtractionService {
           (location: any) => location && typeof location === 'object' && location.location_name
         )
         .map((location: any) => {
-          const validLocationTypes = ['country', 'region', 'city', 'facility', 'other'];
-          if (!validLocationTypes.includes(location.type)) {
-            location.type = 'other';
+          if (!LOCATION_TYPE_VALUES.includes(location.type)) {
+            location.type = DEFAULT_LOCATION_TYPE;
           }
           return location;
         });
@@ -564,7 +561,7 @@ export class EntityExtractionService {
         .filter((rel: any) => rel && typeof rel === 'object' && rel.from && rel.to)
         .map((rel: any) => {
           if (!RELATIONSHIP_TYPE_VALUES.includes(rel.type)) {
-            rel.type = 'OTHER';
+            rel.type = DEFAULT_RELATIONSHIP_TYPE;
           }
           return rel;
         });
@@ -712,9 +709,10 @@ export class EntityExtractionService {
       title: newsItem.title,
       content: newsItem.content,
       timestamp: newsItem.timestamp,
+      raw_time: newsItem.raw_time,
       source: newsItem.source,
       url: newsItem.url,
-      news_level: 'Level 5', // 默认最低级别
+      news_level: DEFAULT_EVENT_LEVEL, // 默认最低级别
       confidence: 0.8,
       events: [],
       companies: [],
@@ -737,11 +735,11 @@ export class EntityExtractionService {
             event_id: `${newsItem.id}_event_${index}`,
             event_name: event.event_name || '',
             event_description: event.event_description || '',
-            event_type: event.event_type || 'other',
+            event_type: event.event_type || DEFAULT_EVENT_TYPE,
             significance: event.significance || 1,
-            sentiment: event.sentiment || 'neutral',
+            sentiment: event.sentiment || DEFAULT_SENTIMENT,
             magnitude: event.magnitude || 0,
-            event_level: event.event_level || 'Level 5',
+            event_level: event.event_level || DEFAULT_EVENT_LEVEL,
             timestamp: event.timestamp || newsItem.timestamp,
             raw_time: newsItem.raw_time,
             created_at: getCurrentTime(),
@@ -785,7 +783,7 @@ export class EntityExtractionService {
           .filter((org: any) => org && typeof org === 'object' && org.organization_name)
           .map((org: any) => ({
             organization_name: org.organization_name || '',
-            type: org.type || 'other',
+            type: org.type || DEFAULT_ORGANIZATION_TYPE,
             country: org.country || '',
             created_at: getCurrentTime(),
             updated_at: getCurrentTime(),
@@ -800,7 +798,7 @@ export class EntityExtractionService {
           )
           .map((location: any) => ({
             location_name: location.location_name || '',
-            type: location.type || 'other',
+            type: location.type || DEFAULT_LOCATION_TYPE,
             country: location.country || '',
             region: location.region || '',
             coordinates: location.coordinates || undefined,
@@ -814,7 +812,7 @@ export class EntityExtractionService {
         result.relationships = extractionData.relationships
           .filter((rel: any) => rel && typeof rel === 'object' && rel.from && rel.to)
           .map((rel: any) => ({
-            type: rel.type || 'OTHER',
+            type: rel.type || DEFAULT_RELATIONSHIP_TYPE,
             from: rel.from || '',
             to: rel.to || '',
             description: rel.description || '',
@@ -883,10 +881,10 @@ export class EntityExtractionService {
     const entityCount =
       result.events.length + result.companies.length + (result.persons?.length || 0);
 
-    if (entityCount >= 5) return 'Level 3';
-    if (entityCount >= 3) return 'Level 4';
+    if (entityCount >= 5) return EventLevel.LEVEL_3;
+    if (entityCount >= 3) return EventLevel.LEVEL_4;
 
-    return 'Level 5';
+    return EventLevel.LEVEL_5;
   }
 
   /**
@@ -898,10 +896,10 @@ export class EntityExtractionService {
     const eventTypeList = EVENT_TYPE_VALUES.join(' | ');
     const sentimentList = SENTIMENT_VALUES.join(' / ');
     const organizationTypeList = ORGANIZATION_TYPE_VALUES.join('/');
-    
+
     // 生成机构类型的详细描述，包含中文说明
-    const organizationTypeDescriptions = ORGANIZATION_TYPE_VALUES.map(type => 
-      `${type}(${ORGANIZATION_TYPE_DESCRIPTIONS[type as OrganizationType]})`
+    const organizationTypeDescriptions = ORGANIZATION_TYPE_VALUES.map(
+      type => `${type}(${ORGANIZATION_TYPE_DESCRIPTIONS[type as OrganizationType]})`
     ).join('、');
 
     return `
@@ -932,11 +930,32 @@ export class EntityExtractionService {
   - 提供 \`country\`（ISO Alpha-2 或中文官方）。  
 
 ═════════════ ⏰ 事件级别定义（event_level） ⏰ ═════════════
-- **Level 1**  全球系统性风险、战争、2008 级金融危机  
-- **Level 2**  中央银行/主权级政策、主要指数单日崩跌 >10%  
-- **Level 3**  行业或龙头公司重大并购、破产、财报爆雷  
-- **Level 4**  一般产品发布、融资、地方性政策  
-- **Level 5**  信息性报道、背景资料、例行统计  
+- **Level 1**  超级事件：对全球经济、市场、政治局势产生 **重大影响** 的突发性事件。通常会引发 **全球性的恐慌或波动**，具有 **系统性风险**，是资本市场的 **极端事件**。
+  - **突发战争** 或 **战争的重要进展**（如战争爆发、重要的战役进展等）应评为 **Level 1**。
+  - **全球重要人物的发言**（例如：美联储主席、欧盟委员会主席、世界主要领导人的重大讲话）或 **中、美、欧央行的主权政策变动**。
+  - **全球主要指数的异常涨幅或跌幅**（例如：美股标普500、纳斯达克等指数单日跌幅超过 10%）。
+  - **注意**：请谨慎评定为 **Level 1**，仅当事件具有 **全球性影响** 或 **对资本市场产生深远影响** 时，才应标记为 **Level 1**。
+
+- **Level 2**  重要国家事件：对某个国家、地区或全球市场产生 **重大影响** 的事件，通常局限于 **特定国家** 或 **重要企业**。不会导致全球性恐慌，但影响力较大。
+  - **持续发生的战争冲突进展** 或 **其他重要的政治动荡**（如：某国的政治危机、长时间的战争局势等）。
+  - **中、美、欧** 以外的 **央行/主权级政策变动**，如日本央行的货币政策调整或新兴市场国家的重大金融政策。
+  - **中美全球型大型企业的重大事件**（例如：财报暴雷、并购收购、企业破产等）。
+
+- **Level 3**  行业内重大事件：对某个行业或公司产生 **重要影响** 的事件，通常影响 **行业内的其他公司**，但不会产生较大范围的资本市场波动。
+  - **行业龙头公司** 的 **并购、破产、财报发布等重大事件**（例如：知名企业发布的财报结果不及预期，导致股价暴跌）。
+  - **其他地区或行业内的公司** 发生的 **重大并购、破产、融资等事件**。
+
+- **Level 4**  一般产品发布、地方性政策和金融新闻：这类事件通常不会引起 **重大市场波动**，对企业或特定行业产生较小影响。
+  - **一般产品发布、技术发布**、**地方性政策变化**（如地方政府的税收优惠或经济发展政策等）。
+  - **金融新闻**（如：季度财报、股东大会决议、公司战略公告等）。
+
+- **Level 5**  信息性报道和背景资料：对市场 **影响微乎其微** 的常规信息，通常用于 **补充背景或提供数据**。
+  - **日常信息性报道**（如：宏观经济数据、行业趋势报告、消费者信心指数等）。
+  - **例行统计数据**（例如：失业率、GDP增速等指标）。
+
+- **非金融相关新闻**：若新闻内容与 **金融市场无关**（如：娱乐、体育、科技、文化等），应根据事件的影响范围和重要性 **下调一级**（如：**Level 2** -> **Level 3**，**Level 3** -> **Level 4**）。这些新闻通常对资本市场没有直接影响。
+
+
 
 ═════════════ 🎯 事件 & 情感 指南 🎯 ═════════════
 - \`event_type\`（枚举）：${eventTypeList}  

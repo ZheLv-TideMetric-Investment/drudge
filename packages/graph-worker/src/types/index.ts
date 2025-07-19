@@ -28,6 +28,7 @@ export interface NewsExtractionResult {
   title: string;
   content?: string;
   timestamp: Date | string;
+  raw_time?: any; // 保存原始时间数据（任意格式）
   source?: string;
   url?: string;
   news_level?: string;
