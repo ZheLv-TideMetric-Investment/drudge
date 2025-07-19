@@ -172,7 +172,7 @@ class NotificationService {
    * @param highLevelNews Level 1 新闻
    * @param source 调用来源
    */
-  async sendHourlySummaryNotification(
+  async sendNormalSummaryNotification(
     summary: any, 
     hourStart: string, 
     hourEnd: string, 
@@ -203,49 +203,6 @@ ${highLevelNews.slice(0, 3).map((item: any, index: number) =>
       return true;
     } catch (error: any) {
       console.error('发送小时总结通知失败:', error);
-      return false;
-    }
-  }
-
-  /**
-   * 发送每日总结通知
-   * @param summary 总结数据（现在是markdown字符串）
-   * @param start 开始时间
-   * @param end 结束时间
-   * @param dailyData 每日数据
-   * @param source 调用来源
-   */
-  async sendDailySummaryNotification(
-    summary: any, 
-    start: string, 
-    end: string, 
-    dailyData: any, 
-    source: CallSource = CallSource.API
-  ): Promise<boolean> {
-    // 只有定时任务调用时才发送通知
-    if (source !== CallSource.SCHEDULER) {
-      console.log(`每日总结通知跳过发送 (来源: ${source})`);
-      return false;
-    }
-
-    try {
-      const date = moment(end).tz('Asia/Shanghai').format('YYYY年MM月DD日');
-
-      // 提取markdown总结内容
-      const summaryContent = typeof summary === 'string' ? summary : summary.summary;
-
-      const message = `🌅 **每日新闻总结** ${date} 晨报
-
-📅 **时间段**: ${moment(start).tz('Asia/Shanghai').format('MM-DD HH:00')} - ${moment(end).tz('Asia/Shanghai').format('MM-DD HH:00')}
-📊 **数据概览**: ${dailyData.news_count}条新闻 | ${dailyData.high_level_count || 0}条 Level 1
-
-${summaryContent}`;
-
-      await this.webhook.sendMessage(message);
-      console.log(`每日总结通知已发送: ${date}`);
-      return true;
-    } catch (error: any) {
-      console.error('发送每日总结通知失败:', error);
       return false;
     }
   }

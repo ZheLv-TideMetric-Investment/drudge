@@ -10,7 +10,6 @@ import { EventLevel } from '../../../constants/enums';
  * 提供通用的时间区间新闻总结功能（不落库）
  */
 class SummaryService {
-
   /**
    * 生成新闻总结
    * @param startTime 开始时间（ISO字符串或moment对象）
@@ -28,7 +27,7 @@ class SummaryService {
       // 转换时间格式
       const start = moment(startTime);
       const end = moment(endTime);
-      
+
       if (!start.isValid() || !end.isValid()) {
         throw new Error('无效的时间格式');
       }
@@ -49,13 +48,13 @@ class SummaryService {
           message: `${timeRangeDesc} 时段没有新闻`,
           period: timeRangeDesc,
           timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
-          data: { 
-            empty: true, 
+          data: {
+            empty: true,
             time_range: {
               start: start.toISOString(),
-              end: end.toISOString()
-            }
-          }
+              end: end.toISOString(),
+            },
+          },
         };
       }
 
@@ -180,7 +179,7 @@ class SummaryService {
 
       const userPrompt = `新闻内容：\n\n${newsContent}`;
       const messages = createMessages(systemPrompt, userPrompt);
-      
+
       const result = await aiService.callLLM(messages, {
         temperature: 0.7,
       });
@@ -207,11 +206,10 @@ class SummaryService {
           summary: summaryContent,
           time_range: {
             start: start.toISOString(),
-            end: end.toISOString()
-          }
-        }
+            end: end.toISOString(),
+          },
+        },
       };
-
     } catch (error: any) {
       console.error('生成总结失败:', error);
       const timeRangeDesc = this.formatPeriod(moment(startTime), moment(endTime));
@@ -220,7 +218,7 @@ class SummaryService {
         message: `生成新闻总结失败`,
         period: timeRangeDesc,
         error: error.message,
-        timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
+        timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
       };
     }
   }
@@ -238,25 +236,24 @@ class SummaryService {
    */
   private groupNewsByLevel(newsItems: any[]): Record<string, any[]> {
     const grouped: Record<string, any[]> = {};
-    
+
     newsItems.forEach(item => {
       const level = item.level || 'Unknown';
       if (!grouped[level]) {
         grouped[level] = [];
       }
-      
+
       // 转换时间戳格式
-      const timeValue = typeof item.timestamp === 'number' ? 
-        item.timestamp : 
-        moment(item.timestamp).unix();
-      
+      const timeValue =
+        typeof item.timestamp === 'number' ? item.timestamp : moment(item.timestamp).unix();
+
       grouped[level].push({
         title: item.title,
         content: item.content || '',
-        time: timeValue
+        time: timeValue,
       });
     });
-    
+
     return grouped;
   }
 
@@ -272,17 +269,16 @@ class SummaryService {
   ): Promise<void> {
     try {
       // 检查是否有高级别新闻（仅 Level 1）
-      const highLevelNews = newsData.news_items?.filter((item: any) => 
-        item.level === EventLevel.LEVEL_1
-      ) || [];
+      const highLevelNews =
+        newsData.news_items?.filter((item: any) => item.level === EventLevel.LEVEL_1) || [];
 
       if (highLevelNews.length > 0) {
         // 有高级别新闻时发送通知
-        await notificationService.sendHourlySummaryNotification(
-          { summary: summaryData }, 
-          start.toISOString(), 
-          end.toISOString(), 
-          highLevelNews, 
+        await notificationService.sendNormalSummaryNotification(
+          { summary: summaryData },
+          start.toISOString(),
+          end.toISOString(),
+          highLevelNews,
           source
         );
       }
@@ -296,9 +292,9 @@ class SummaryService {
    * 获取高级别新闻数量
    */
   private getHighLevelCount(newsData: any): number {
-    return newsData.news_items?.filter((item: any) => 
-      item.level === EventLevel.LEVEL_1
-    ).length || 0;
+    return (
+      newsData.news_items?.filter((item: any) => item.level === EventLevel.LEVEL_1).length || 0
+    );
   }
 
   /**
@@ -308,7 +304,7 @@ class SummaryService {
     // 转换为北京时间显示
     const beijingStart = start.clone().tz('Asia/Shanghai');
     const beijingEnd = end.clone().tz('Asia/Shanghai');
-    
+
     if (beijingStart.isSame(beijingEnd, 'day')) {
       return `${beijingStart.format('MM-DD HH:mm')}-${beijingEnd.format('HH:mm')}`;
     } else {
@@ -318,4 +314,4 @@ class SummaryService {
 }
 
 export const summaryService = new SummaryService();
-export { SummaryService }; 
+export { SummaryService };
