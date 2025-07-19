@@ -1,7 +1,7 @@
 import { neo4jService } from './neo4j';
 import { GraphData, Entity, Relationship, GraphQueryResult, EntitySearchResult } from '@/types';
 import moment from 'moment-timezone';
-import { NodeType } from '../../../constants/enums';
+import { NodeType, EventLevel, SystemRelationshipType } from '../../../constants/enums';
 
 /**
  * 图谱查询服务
@@ -199,13 +199,13 @@ class GraphService {
   async getNewsKnowledgeGraph(newsId: string): Promise<GraphData> {
     try {
       const cypher = `
-        MATCH (n:News {id: $newsId})-[:DESCRIBES]->(e:Event)
+        MATCH (n:${NodeType.NEWS} {id: $newsId})-[:${SystemRelationshipType.DESCRIBES}]->(e:${NodeType.EVENT})
         OPTIONAL MATCH (e)-[r1]-(entity1)
         OPTIONAL MATCH (entity1)-[r2]-(entity2)
         WHERE entity2 <> e AND entity2 <> n
         RETURN n, e, entity1, entity2, r1, r2
         UNION
-        MATCH (n:News {id: $newsId})-[:DESCRIBES]->(e:Event)
+        MATCH (n:${NodeType.NEWS} {id: $newsId})-[:${SystemRelationshipType.DESCRIBES}]->(e:${NodeType.EVENT})
         RETURN n, e, null as entity1, null as entity2, null as r1, null as r2
       `;
 
@@ -489,7 +489,7 @@ class GraphService {
       
       if (hour >= 0 && hour <= 23) {
         hourlyData[hour].newsCount += 1;
-        if (newsLevel === 'Level 1' || newsLevel === 'Level 2') {
+        if (newsLevel === EventLevel.LEVEL_1) {
           hourlyData[hour].highLevelCount += 1;
         }
       }
@@ -536,7 +536,7 @@ class GraphService {
       const dayStats = dailyStats.get(dateKey)!;
       dayStats.newsCount += 1;
       
-      if (newsLevel === 'Level 1' || newsLevel === 'Level 2') {
+      if (newsLevel === EventLevel.LEVEL_1) {
         dayStats.highLevelCount += 1;
       }
     });

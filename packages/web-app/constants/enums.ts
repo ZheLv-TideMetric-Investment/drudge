@@ -41,6 +41,16 @@ export enum EventLevel {
   LEVEL_5 = 'Level 5'
 }
 
+/**
+ * 紧急程度枚举
+ */
+export enum UrgencyLevel {
+  CRITICAL = 'critical',
+  HIGH = 'high',
+  MEDIUM = 'medium',
+  LOW = 'low'
+}
+
 // ====================== 机构相关枚举 ======================
 
 /**
@@ -120,6 +130,7 @@ export enum SystemRelationshipType {
 export const EventTypeEnum = $enum(EventType);
 export const SentimentEnum = $enum(Sentiment);
 export const EventLevelEnum = $enum(EventLevel);
+export const UrgencyLevelEnum = $enum(UrgencyLevel);
 export const OrganizationTypeEnum = $enum(OrganizationType);
 export const LocationTypeEnum = $enum(LocationType);
 export const NodeTypeEnum = $enum(NodeType);
@@ -132,6 +143,7 @@ export const SystemRelationshipTypeEnum = $enum(SystemRelationshipType);
 export const EVENT_TYPE_VALUES = EventTypeEnum.getValues();
 export const SENTIMENT_VALUES = SentimentEnum.getValues();
 export const EVENT_LEVEL_VALUES = EventLevelEnum.getValues();
+export const URGENCY_LEVEL_VALUES = UrgencyLevelEnum.getValues();
 export const ORGANIZATION_TYPE_VALUES = OrganizationTypeEnum.getValues();
 export const LOCATION_TYPE_VALUES = LocationTypeEnum.getValues();
 export const NODE_TYPE_VALUES = NodeTypeEnum.getValues();
@@ -144,6 +156,7 @@ export const SYSTEM_RELATIONSHIP_TYPE_VALUES = SystemRelationshipTypeEnum.getVal
 export const EVENT_TYPE_KEYS = EventTypeEnum.getKeys();
 export const SENTIMENT_KEYS = SentimentEnum.getKeys();
 export const EVENT_LEVEL_KEYS = EventLevelEnum.getKeys();
+export const URGENCY_LEVEL_KEYS = UrgencyLevelEnum.getKeys();
 export const ORGANIZATION_TYPE_KEYS = OrganizationTypeEnum.getKeys();
 export const LOCATION_TYPE_KEYS = LocationTypeEnum.getKeys();
 export const NODE_TYPE_KEYS = NodeTypeEnum.getKeys();
@@ -161,6 +174,9 @@ export const isValidSentiment = (value: string | null | undefined): value is Sen
 
 export const isValidEventLevel = (value: string | null | undefined): value is EventLevel => 
   EventLevelEnum.isValue(value);
+
+export const isValidUrgencyLevel = (value: string | null | undefined): value is UrgencyLevel => 
+  UrgencyLevelEnum.isValue(value);
 
 export const isValidOrganizationType = (value: string | null | undefined): value is OrganizationType => 
   OrganizationTypeEnum.isValue(value);
@@ -210,6 +226,13 @@ export const SENTIMENT_DESCRIPTIONS: Record<Sentiment, string> = {
   [Sentiment.POSITIVE]: '积极',
   [Sentiment.NEGATIVE]: '消极',
   [Sentiment.NEUTRAL]: '中性'
+};
+
+export const URGENCY_LEVEL_DESCRIPTIONS: Record<UrgencyLevel, string> = {
+  [UrgencyLevel.CRITICAL]: '紧急',
+  [UrgencyLevel.HIGH]: '高',
+  [UrgencyLevel.MEDIUM]: '中',
+  [UrgencyLevel.LOW]: '低'
 };
 
 export const ORGANIZATION_TYPE_DESCRIPTIONS: Record<OrganizationType, string> = {
@@ -271,6 +294,7 @@ export const getEventLevelByKey = (key: string): EventLevel | undefined =>
 export const DEFAULT_EVENT_TYPE = EventType.OTHER;
 export const DEFAULT_SENTIMENT = Sentiment.NEUTRAL;
 export const DEFAULT_EVENT_LEVEL = EventLevel.LEVEL_5;
+export const DEFAULT_URGENCY_LEVEL = UrgencyLevel.LOW;
 export const DEFAULT_ORGANIZATION_TYPE = OrganizationType.OTHER;
 export const DEFAULT_LOCATION_TYPE = LocationType.OTHER;
 export const DEFAULT_NODE_TYPE = NodeType.NEWS;

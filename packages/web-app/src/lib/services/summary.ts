@@ -3,6 +3,7 @@ import { queryService } from './query';
 import { notificationService } from './notification';
 import { SummaryResult, CallSource } from '../../types/scheduler';
 import { aiService, createMessages } from '../utils/llm';
+import { EventLevel } from '../../../constants/enums';
 
 /**
  * 总结服务
@@ -270,9 +271,9 @@ class SummaryService {
     source: CallSource
   ): Promise<void> {
     try {
-      // 检查是否有高级别新闻
+      // 检查是否有高级别新闻（仅 Level 1）
       const highLevelNews = newsData.news_items?.filter((item: any) => 
-        item.level === 'Level 1' || item.level === 'Level 2'
+        item.level === EventLevel.LEVEL_1
       ) || [];
 
       if (highLevelNews.length > 0) {
@@ -296,7 +297,7 @@ class SummaryService {
    */
   private getHighLevelCount(newsData: any): number {
     return newsData.news_items?.filter((item: any) => 
-      item.level === 'Level 1' || item.level === 'Level 2'
+      item.level === EventLevel.LEVEL_1
     ).length || 0;
   }
 

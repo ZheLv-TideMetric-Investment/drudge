@@ -176,7 +176,7 @@ export default function Home() {
         const typeName = type === 'auto' ? '自动' : '手动';
         notificationApi.success({
           message: '扫描完成',
-          description: `${typeName}扫描已完成 - ${data.period}，发现 ${data.found} 条高级别新闻，发送 ${data.sent} 条通知`,
+          description: `${typeName}扫描已完成 - ${data.period}，发现 ${data.found} 条 Level 1 新闻，${data.found > 0 ? '已聚合发送通知' : '无需发送通知'}`,
           icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
         });
         fetchSystemStatus(); // 刷新状态

@@ -1,6 +1,12 @@
 import { neo4jService } from './neo4j';
 import moment from 'moment-timezone';
-import { NodeType } from '../../../constants/enums';
+import { 
+  EventLevel, 
+  NodeType, 
+  SystemRelationshipType, 
+  RelationshipType,
+  UrgencyLevel 
+} from '../../../constants/enums';
 
 /**
  * 将北京时间转换为UTC时间用于数据库查询
@@ -45,19 +51,19 @@ class QueryService {
       console.log(`[QueryService] 时间查询: 输入时间 ${startTime} - ${endTime} -> 数据库查询 ${utcStartTime} - ${utcEndTime}`);
       
       const cypher = `
-        MATCH (n:News)
+        MATCH (n:${NodeType.NEWS})
         WHERE n.timestamp >= $startTime AND n.timestamp <= $endTime
-        OPTIONAL MATCH (n)-[:DESCRIBES]->(e:Event)
-        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(c:Company)
-        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(p:Person)
-        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(o:Organization)
-        OPTIONAL MATCH (e)-[:LOCATED_AT]->(l:Location)
+        OPTIONAL MATCH (n)-[:${SystemRelationshipType.DESCRIBES}]->(e:${NodeType.EVENT})
+        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(c:${NodeType.COMPANY})
+        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(p:${NodeType.PERSON})
+        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(o:${NodeType.ORGANIZATION})
+        OPTIONAL MATCH (e)-[:${SystemRelationshipType.LOCATED_AT}]->(l:${NodeType.LOCATION})
         
         RETURN 
           count(DISTINCT n) as news_count,
           count(DISTINCT e) as event_count,
-          sum(CASE WHEN n.news_level IN ['Level 1', 'Level 2'] THEN 1 ELSE 0 END) as high_level_count,
-          sum(CASE WHEN n.news_level = 'Level 1' THEN 1 ELSE 0 END) as critical_count,
+          sum(CASE WHEN n.news_level = '${EventLevel.LEVEL_1}' THEN 1 ELSE 0 END) as high_level_count,
+          sum(CASE WHEN n.news_level = '${EventLevel.LEVEL_1}' THEN 1 ELSE 0 END) as critical_count,
           collect(DISTINCT c.company_name) as companies,
           collect(DISTINCT p.person_name) as persons,
           collect(DISTINCT o.organization_name) as organizations,
@@ -116,7 +122,7 @@ class QueryService {
   }
 
   /**
-   * 获取高级别新闻
+   * 获取 Level 1 新闻
    */
   async getHighLevelNews(startTime: string, endTime: string): Promise<any[]> {
     try {
@@ -124,17 +130,17 @@ class QueryService {
       const utcStartTime = convertBeijingToUTC(startTime);
       const utcEndTime = convertBeijingToUTC(endTime);
       
-      console.log(`[QueryService] 高级别新闻查询: 输入时间 ${startTime} - ${endTime} -> 数据库查询 ${utcStartTime} - ${utcEndTime}`);
+      console.log(`[QueryService] Level 1 新闻查询: 输入时间 ${startTime} - ${endTime} -> 数据库查询 ${utcStartTime} - ${utcEndTime}`);
       
       const cypher = `
-        MATCH (n:News)
+        MATCH (n:${NodeType.NEWS})
         WHERE n.timestamp >= $startTime 
           AND n.timestamp <= $endTime
-          AND n.news_level IN ['Level 1', 'Level 2']
-        OPTIONAL MATCH (n)-[:DESCRIBES]->(e:Event)
-        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(c:Company)
-        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(p:Person)
-        OPTIONAL MATCH (e)-[:PARTICIPATES_IN]-(o:Organization)
+          AND n.news_level = '${EventLevel.LEVEL_1}'
+        OPTIONAL MATCH (n)-[:${SystemRelationshipType.DESCRIBES}]->(e:${NodeType.EVENT})
+        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(c:${NodeType.COMPANY})
+        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(p:${NodeType.PERSON})
+        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(o:${NodeType.ORGANIZATION})
         RETURN 
           n.id as newsId,
           n.title as title,
@@ -158,7 +164,7 @@ class QueryService {
 
       return result.records.map((record: any) => {
         const eventLevels = record.get('event_levels').filter(Boolean);
-        const hasUrgentEvent = eventLevels.includes('Level 1');
+        const hasUrgentEvent = eventLevels.includes(EventLevel.LEVEL_1);
         
         return {
           newsId: record.get('newsId'),
@@ -173,11 +179,11 @@ class QueryService {
           organizations: record.get('organizations').filter(Boolean),
           events: record.get('events').filter(Boolean),
           event_levels: eventLevels,
-          urgency: hasUrgentEvent ? 'critical' : record.get('level') === 'Level 1' ? 'high' : 'medium'
+          urgency: hasUrgentEvent ? UrgencyLevel.CRITICAL : record.get('level') === EventLevel.LEVEL_1 ? UrgencyLevel.HIGH : UrgencyLevel.MEDIUM
         };
       });
     } catch (error: any) {
-      console.error('获取高级别新闻失败:', error);
+      console.error('获取 Level 1 新闻失败:', error);
       throw error;
     }
   }

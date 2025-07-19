@@ -128,17 +128,17 @@ class Neo4jService {
     try {
       const cypher = `
         CALL {
-          MATCH (n:News) RETURN count(n) as news_count
+          MATCH (n:${NodeType.NEWS}) RETURN count(n) as news_count
           UNION ALL
-          MATCH (n:Company) RETURN count(n) as company_count
+          MATCH (n:${NodeType.COMPANY}) RETURN count(n) as company_count
           UNION ALL
-          MATCH (n:Person) RETURN count(n) as person_count
+          MATCH (n:${NodeType.PERSON}) RETURN count(n) as person_count
           UNION ALL
-          MATCH (n:Organization) RETURN count(n) as organization_count
+          MATCH (n:${NodeType.ORGANIZATION}) RETURN count(n) as organization_count
           UNION ALL
-          MATCH (n:Location) RETURN count(n) as location_count
+          MATCH (n:${NodeType.LOCATION}) RETURN count(n) as location_count
           UNION ALL
-          MATCH (n:Event) RETURN count(n) as event_count
+          MATCH (n:${NodeType.EVENT}) RETURN count(n) as event_count
           UNION ALL
           MATCH ()-[r]->() RETURN count(r) as relationship_count
           UNION ALL
@@ -184,12 +184,12 @@ class Neo4jService {
   async getSimpleStats(): Promise<any> {
     try {
       const cypher = `
-        MATCH (n:News) WITH count(n) as news_count
-        MATCH (c:Company) WITH news_count, count(c) as company_count
-        MATCH (p:Person) WITH news_count, company_count, count(p) as person_count
-        MATCH (o:Organization) WITH news_count, company_count, person_count, count(o) as organization_count
-        MATCH (l:Location) WITH news_count, company_count, person_count, organization_count, count(l) as location_count
-        MATCH (e:Event) WITH news_count, company_count, person_count, organization_count, location_count, count(e) as event_count
+        MATCH (n:${NodeType.NEWS}) WITH count(n) as news_count
+        MATCH (c:${NodeType.COMPANY}) WITH news_count, count(c) as company_count
+        MATCH (p:${NodeType.PERSON}) WITH news_count, company_count, count(p) as person_count
+        MATCH (o:${NodeType.ORGANIZATION}) WITH news_count, company_count, person_count, count(o) as organization_count
+        MATCH (l:${NodeType.LOCATION}) WITH news_count, company_count, person_count, organization_count, count(l) as location_count
+        MATCH (e:${NodeType.EVENT}) WITH news_count, company_count, person_count, organization_count, location_count, count(e) as event_count
         MATCH ()-[r]->() WITH news_count, company_count, person_count, organization_count, location_count, event_count, count(r) as relationship_count
         RETURN 
           news_count + company_count + person_count + organization_count + location_count + event_count as totalNodes,

@@ -1,6 +1,7 @@
 import { webhookService } from './webhook';
 import { CallSource } from '../../types/scheduler';
 import moment from 'moment-timezone';
+import { UrgencyLevel, EventLevel } from '../../../constants/enums';
 
 /**
  * 通知服务
@@ -28,7 +29,79 @@ class NotificationService {
   }
 
   /**
-   * 发送高级别新闻通知
+   * 发送批量高级别新闻通知
+   * @param newsItems 新闻数据数组
+   * @param source 调用来源
+   */
+  async sendBatchHighLevelNewsNotification(newsItems: any[], source: CallSource = CallSource.API): Promise<boolean> {
+    // 只有定时任务调用时才发送通知
+    if (source !== CallSource.SCHEDULER) {
+      console.log(`批量高级别新闻通知跳过发送 (来源: ${source})`);
+      return false;
+    }
+
+    if (newsItems.length === 0) {
+      return false;
+    }
+
+    try {
+      const currentTime = moment().tz('Asia/Shanghai').format('HH:mm:ss');
+      
+      let message = `🚨 **${EventLevel.LEVEL_1} 新闻批量提醒** (${newsItems.length}条) - ${currentTime}
+
+`;
+
+      // 聚合所有相关实体
+      const allCompanies = new Set<string>();
+      const allPersons = new Set<string>();
+      const allEvents = new Set<string>();
+
+      newsItems.forEach((news, index) => {
+        const timestamp = moment(news.timestamp).tz('Asia/Shanghai').format('HH:mm');
+        message += `📰 **${index + 1}. ${news.title}** *(${timestamp})*\n`;
+        
+        // 收集实体信息
+        news.companies?.forEach((company: string) => allCompanies.add(company));
+        news.persons?.forEach((person: string) => allPersons.add(person));
+        news.events?.forEach((event: string) => allEvents.add(event));
+      });
+
+      // 添加聚合的实体信息
+      if (allCompanies.size > 0) {
+        const companies = Array.from(allCompanies).slice(0, 5);
+        message += `\n🏢 **涉及公司**: ${companies.join(', ')}${allCompanies.size > 5 ? ` 等${allCompanies.size}家` : ''}`;
+      }
+
+      if (allPersons.size > 0) {
+        const persons = Array.from(allPersons).slice(0, 5);
+        message += `\n👤 **涉及人物**: ${persons.join(', ')}${allPersons.size > 5 ? ` 等${allPersons.size}人` : ''}`;
+      }
+
+      if (allEvents.size > 0) {
+        const events = Array.from(allEvents).slice(0, 3);
+        message += `\n📋 **相关事件**: ${events.join(', ')}${allEvents.size > 3 ? ` 等${allEvents.size}个` : ''}`;
+      }
+
+      // 添加时间范围信息
+      const timestamps = newsItems.map(news => moment(news.timestamp));
+      const earliestTime = moment.min(timestamps).tz('Asia/Shanghai').format('HH:mm');
+      const latestTime = moment.max(timestamps).tz('Asia/Shanghai').format('HH:mm');
+      
+      if (earliestTime !== latestTime) {
+        message += `\n⏰ **时间范围**: ${earliestTime} - ${latestTime}`;
+      }
+
+      await this.webhook.sendMessage(message);
+      console.log(`批量高级别新闻通知已发送: ${newsItems.length} 条新闻`);
+      return true;
+    } catch (error: any) {
+      console.error(`发送批量高级别新闻通知失败:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * 发送高级别新闻通知 (保留兼容性，但建议使用批量方法)
    * @param news 新闻数据
    * @param source 调用来源
    */
@@ -41,9 +114,9 @@ class NotificationService {
 
     try {
       const urgencyEmoji: { [key: string]: string } = {
-        'critical': '🚨',
-        'high': '🔴',
-        'medium': '🟡'
+        [UrgencyLevel.CRITICAL]: '🚨',
+        [UrgencyLevel.HIGH]: '🔴',
+        [UrgencyLevel.MEDIUM]: '🟡'
       };
 
       const emoji = urgencyEmoji[news.urgency] || '⚠️';
@@ -96,7 +169,7 @@ class NotificationService {
    * @param summary 总结数据（现在是markdown字符串）
    * @param hourStart 开始时间
    * @param hourEnd 结束时间
-   * @param highLevelNews 高级别新闻
+   * @param highLevelNews Level 1 新闻
    * @param source 调用来源
    */
   async sendHourlySummaryNotification(
@@ -120,7 +193,7 @@ class NotificationService {
 
 ${summaryContent}
 
-🚨 **高级别新闻** (${highLevelNews.length}条)
+🚨 **Level 1 新闻** (${highLevelNews.length}条)
 ${highLevelNews.slice(0, 3).map((item: any, index: number) => 
   `${index + 1}. [${item.level}] ${item.title}`
 ).join('\n')}`;
@@ -164,7 +237,7 @@ ${highLevelNews.slice(0, 3).map((item: any, index: number) =>
       const message = `🌅 **每日新闻总结** ${date} 晨报
 
 📅 **时间段**: ${moment(start).tz('Asia/Shanghai').format('MM-DD HH:00')} - ${moment(end).tz('Asia/Shanghai').format('MM-DD HH:00')}
-📊 **数据概览**: ${dailyData.news_count}条新闻 | ${dailyData.high_level_count || 0}条高级别
+📊 **数据概览**: ${dailyData.news_count}条新闻 | ${dailyData.high_level_count || 0}条 Level 1
 
 ${summaryContent}`;
 
