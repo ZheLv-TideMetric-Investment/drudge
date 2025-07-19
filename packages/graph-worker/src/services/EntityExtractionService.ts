@@ -3,7 +3,7 @@ import aiService from './AiService';
 import notificationService from './NotificationService';
 import { z } from 'zod';
 import * as chrono from 'chrono-node';
-import { parseTime } from '../utils/timeUtils';
+import { parseTime, getCurrentTime } from '../utils/timeUtils';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -14,7 +14,6 @@ import {
   Person,
   Organization,
   Location,
-  Time,
   Relationship,
   LLMMessage,
 } from '../types/index';
@@ -43,7 +42,7 @@ const newsExtractionSchema = z.object({
       sentiment: z.enum(['positive', 'negative', 'neutral']),
       magnitude: z.number().min(-1).max(1),
       event_level: z.enum(['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5']),
-      event_date: z.string().regex(iso8601).optional().or(z.literal('')),
+      timestamp: z.string().regex(iso8601).optional().or(z.literal('')),
     })
   ),
 
@@ -84,18 +83,6 @@ const newsExtractionSchema = z.object({
       type: z.enum(['country', 'region', 'city', 'facility', 'other']).optional().or(z.literal('')),
       country: z.string().optional().or(z.literal('')),
       region: z.string().optional().or(z.literal('')),
-    })
-  ),
-
-  times: z.array(
-    z.object({
-      time_value: z.string().min(1),
-      type: z.enum(['DATETIME', 'DATE', 'TIME', 'PERIOD', 'OTHER']).optional().or(z.literal('')),
-      precision: z
-        .enum(['YEAR', 'MONTH', 'DAY', 'HOUR', 'MINUTE', 'SECOND'])
-        .optional()
-        .or(z.literal('')),
-      timezone: z.string().optional().or(z.literal('')),
     })
   ),
 
@@ -157,18 +144,13 @@ export class EntityExtractionService {
       // 判断新闻级别（使用新的冲突处理逻辑）
       result.news_level = this.determineNewsLevelWithConflictHandling(newsItem, result);
 
-      // 标准化时间字段
-      result.times = this.standardizeTimeFields(result.times);
-      result.events = this.standardizeEventDates(result.events);
-
       // 计算处理时间
       result.processing_time = Date.now() - startTime;
 
       logger.info(
         `✅ 新闻 ${newsItem.id} 六要素提取完成: 事件${result.events.length}个, 公司${result.companies.length}个, ` +
           `人物${result.persons?.length || 0}个, 机构${result.organizations.length}个, ` +
-          `地点${result.locations.length}个, 时间${result.times.length}个, ` +
-          `关系${result.relationships.length}个, 级别: ${result.news_level}`
+          `地点${result.locations.length}个, 关系${result.relationships.length}个, 级别: ${result.news_level}`
       );
 
       return result;
@@ -340,7 +322,7 @@ export class EntityExtractionService {
 
 标题：${newsItem.title}
 内容：${newsItem.content}
-        发布时间：${parseTime(newsItem.time)}
+        发布时间：${newsItem.timestamp}
 来源：${newsItem.source}
         `,
       },
@@ -591,25 +573,6 @@ export class EntityExtractionService {
         });
     }
 
-    // 修复 times 中的枚举值
-    if (fixed.times && Array.isArray(fixed.times)) {
-      fixed.times = fixed.times
-        .filter((time: any) => time && typeof time === 'object' && time.time_value)
-        .map((time: any) => {
-          const validTimeTypes = ['DATETIME', 'DATE', 'TIME', 'PERIOD', 'OTHER'];
-          if (!validTimeTypes.includes(time.type)) {
-            time.type = 'OTHER';
-          }
-
-          const validPrecisions = ['YEAR', 'MONTH', 'DAY', 'HOUR', 'MINUTE', 'SECOND'];
-          if (!validPrecisions.includes(time.precision)) {
-            time.precision = 'DAY';
-          }
-
-          return time;
-        });
-    }
-
     // 修复 relationships 中的 type 枚举
     if (fixed.relationships && Array.isArray(fixed.relationships)) {
       fixed.relationships = fixed.relationships
@@ -649,7 +612,6 @@ export class EntityExtractionService {
       'persons',
       'organizations',
       'locations',
-      'times',
       'relationships',
     ];
 
@@ -778,7 +740,7 @@ export class EntityExtractionService {
       newsId: newsItem.id,
       title: newsItem.title,
       content: newsItem.content,
-      timestamp: parseTime(newsItem.time),
+      timestamp: newsItem.timestamp,
       source: newsItem.source,
       url: newsItem.url,
       news_level: 'Level 5', // 默认最低级别
@@ -788,7 +750,6 @@ export class EntityExtractionService {
       persons: [],
       organizations: [],
       locations: [],
-      times: [],
       relationships: [],
     };
 
@@ -810,9 +771,10 @@ export class EntityExtractionService {
             sentiment: event.sentiment || 'neutral',
             magnitude: event.magnitude || 0,
             event_level: event.event_level || 'Level 5',
-            event_date: event.event_date || parseTime(newsItem.time),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            timestamp: event.timestamp || newsItem.timestamp,
+            raw_time: newsItem.raw_time,
+            created_at: getCurrentTime(),
+            updated_at: getCurrentTime(),
           }));
       }
 
@@ -827,8 +789,8 @@ export class EntityExtractionService {
             market: company.market || '',
             country: company.country || '',
             aliases: Array.isArray(company.aliases) ? company.aliases : [],
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            created_at: getCurrentTime(),
+            updated_at: getCurrentTime(),
           }));
       }
 
@@ -841,8 +803,8 @@ export class EntityExtractionService {
             title: person.title || '',
             company: person.company || '',
             nationality: person.nationality || '',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            created_at: getCurrentTime(),
+            updated_at: getCurrentTime(),
           }));
       }
 
@@ -854,8 +816,8 @@ export class EntityExtractionService {
             organization_name: org.organization_name || '',
             type: org.type || 'other',
             country: org.country || '',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            created_at: getCurrentTime(),
+            updated_at: getCurrentTime(),
           }));
       }
 
@@ -871,22 +833,8 @@ export class EntityExtractionService {
             country: location.country || '',
             region: location.region || '',
             coordinates: location.coordinates || undefined,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }));
-      }
-
-      // 解析时间 - 使用标准枚举
-      if (extractionData.times && Array.isArray(extractionData.times)) {
-        result.times = extractionData.times
-          .filter((time: any) => time && typeof time === 'object' && time.time_value)
-          .map((time: any) => ({
-            time_value: time.time_value || '',
-            type: time.type || 'OTHER',
-            precision: time.precision || 'DAY',
-            timezone: time.timezone || '',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            created_at: getCurrentTime(),
+            updated_at: getCurrentTime(),
           }));
       }
 
@@ -909,8 +857,7 @@ export class EntityExtractionService {
         result.companies.length +
         (result.persons?.length || 0) +
         result.organizations.length +
-        result.locations.length +
-        result.times.length;
+        result.locations.length;
 
       result.confidence = totalEntities > 0 ? Math.min(0.9, 0.6 + totalEntities * 0.05) : 0.3;
     } catch (error) {
@@ -1001,10 +948,6 @@ export class EntityExtractionService {
 ◆ Location  
   - 提供 \`country\`（ISO Alpha-2 或中文官方）。  
 
-◆ Time  
-  - \`time_value\` 尽量 ISO-8601；若"Q1""上半年" → 写模糊值并设置 \`precision\`。  
-  - \`timezone\` 用 IANA，如 Asia/Shanghai。  
-
 ═════════════ ⏰ 事件级别定义（event_level） ⏰ ═════════════
 - **Level 1**  全球系统性风险、战争、2008 级金融危机  
 - **Level 2**  中央银行/主权级政策、主要指数单日崩跌 >10%  
@@ -1035,7 +978,7 @@ export class EntityExtractionService {
     "sentiment":"positive",
     "magnitude":0.6,
     "event_level":"Level 3",
-    "event_date":"2025-07-06"
+    "timestamp":"2025-07-06T00:00:00.000Z"
   }],
   "companies":[
     {
@@ -1065,14 +1008,6 @@ export class EntityExtractionService {
       "region":"北京市"
     }
   ],
-  "times":[
-    {
-      "time_value":"2025-07-06",
-      "type":"DATE",
-      "precision":"DAY",
-      "timezone":"Asia/Shanghai"
-    }
-  ],
   "relationships":[
     {
       "type":"ACQUIRES",
@@ -1091,72 +1026,11 @@ export class EntityExtractionService {
   "persons":[{/* see 上例 */}],
   "organizations":[{/* see 上例 */}],
   "locations":[{/* see 上例 */}],
-  "times":[{/* see 上例 */}],
   "relationships":[{/* see 上例 */}]
 }
 
 ―― 充分理解后，请等待新闻输入并仅输出符合格式的 JSON ――
     `;
-  }
-
-  /**
-   * 时间字段标准化
-   */
-  private standardizeTimeFields(times: Time[]): Time[] {
-    return times.map(time => {
-      const standardized = { ...time };
-
-      try {
-        // 使用 chrono-node 解析时间
-        const parsed = chrono.parseDate(time.time_value);
-
-        if (parsed) {
-          standardized.raw_value = time.time_value;
-          standardized.parsed_iso = parsed.toISOString();
-          standardized.time_value = parsed.toISOString();
-        } else {
-          // 如果解析失败，保留原始值
-          standardized.raw_value = time.time_value;
-          standardized.parsed_iso = '';
-        }
-      } catch (error) {
-        logger.warn(`时间解析失败: ${time.time_value}`, error);
-        standardized.raw_value = time.time_value;
-        standardized.parsed_iso = '';
-      }
-
-      return standardized;
-    });
-  }
-
-  /**
-   * 事件日期标准化
-   */
-  private standardizeEventDates(events: Event[]): Event[] {
-    return events.map(event => {
-      const standardized = { ...event };
-
-      try {
-        // 使用 chrono-node 解析事件日期
-        const parsed = chrono.parseDate(event.event_date);
-
-        if (parsed) {
-          standardized.raw_event_date = event.event_date;
-          standardized.parsed_event_date = parsed.toISOString();
-          standardized.event_date = parsed.toISOString();
-        } else {
-          // 如果解析失败，保留原始值
-          standardized.raw_event_date = event.event_date;
-          standardized.parsed_event_date = '';
-        }
-      } catch (error) {
-        logger.warn(`事件日期解析失败: ${event.event_date}`, error);
-        standardized.raw_event_date = event.event_date;
-        standardized.parsed_event_date = '';
-      }
-
-      return standardized;
-    });
   }
 
   /**
@@ -1182,11 +1056,11 @@ export class EntityExtractionService {
         error: {
           message: error.message || 'Unknown error',
           stack: error.stack || '',
-          timestamp: new Date().toISOString(),
+          timestamp: getCurrentTime(),
           service: 'EntityExtractionService',
         },
         metadata: {
-          failedAt: new Date().toISOString(),
+          failedAt: getCurrentTime(),
           originalId: newsItem.id,
           source: newsItem.source,
           title: newsItem.title,
@@ -1194,7 +1068,7 @@ export class EntityExtractionService {
       };
 
       // 生成文件名：使用新闻ID和时间戳
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const timestamp = getCurrentTime().replace(/[:.]/g, '-');
       const filename = `failed_${newsItem.id}_${timestamp}.json`;
       const filepath = path.join(this.failedNewsDir, filename);
 

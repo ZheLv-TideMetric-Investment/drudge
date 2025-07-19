@@ -11,7 +11,7 @@
 - **编码**: UTF-8
 
 ### 系统特性
-- **时间处理**: 所有时间数据统一使用北京时间 (Asia/Shanghai 时区)
+- **时间处理**: 所有时间数据统一使用 UTC 时区的 ISO 8601 格式存储 (YYYY-MM-DDTHH:mm:ss.sssZ)
 - **数据质量**: 严格的数据验证，不允许兜底数据，确保数据准确性
 - **失败处理**: 处理失败的新闻数据会保存到 `data/news/failed` 目录便于后续分析
 
@@ -32,12 +32,13 @@
 | `content` | String | ✓ | 新闻内容 |
 | `source` | String | ✓ | 数据源 (如 "futu_live") |
 | `url` | String | ✗ | 新闻链接 |
-| `timestamp` | DateTime | ✓ | 新闻时间戳 |
+| `timestamp` | String | ✓ | 新闻时间戳 (UTC ISO 8601 字符串) |
+| `raw_time` | Any | ✗ | 原始时间数据（保存未转换的原始值） |
 | `news_level` | String | ✓ | 新闻级别 (Level 1-5) |
 | `level` | Integer | ✓ | 数值级别 (0-4) |
 | `processed` | Boolean | ✓ | 是否已处理 |
-| `created_at` | DateTime | ✓ | 创建时间 |
-| `updated_at` | DateTime | ✓ | 更新时间 |
+| `created_at` | DateTime | ✓ | 创建时间 (UTC) |
+| `updated_at` | DateTime | ✓ | 更新时间 (UTC) |
 
 **示例**:
 ```json
@@ -49,7 +50,8 @@
   "news_level": "Level 3",
   "level": 0,
   "processed": true,
-  "timestamp": "2025-01-01T00:00:00.000Z"
+  "timestamp": "2025-01-01T00:00:00.000Z",
+  "raw_time": 1735689600
 }
 ```
 
@@ -69,11 +71,10 @@
 | `sentiment` | String | ✓ | 情感倾向 (positive/negative/neutral) |
 | `magnitude` | Float | ✓ | 影响程度 (-1.0 到 1.0) |
 | `event_level` | String | ✓ | 事件级别 (Level 1-5) |
-| `event_date` | DateTime | ✓ | 事件发生日期 |
-| `raw_event_date` | String | ✗ | 原始日期字符串 |
-| `parsed_event_date` | DateTime | ✗ | 解析后的日期 |
-| `created_at` | DateTime | ✓ | 创建时间 |
-| `updated_at` | DateTime | ✓ | 更新时间 |
+| `timestamp` | String | ✓ | 事件发生时间 (UTC ISO 8601 字符串) |
+| `raw_time` | Any | ✗ | 原始时间数据（保存未转换的原始值） |
+| `created_at` | DateTime | ✓ | 创建时间 (UTC) |
+| `updated_at` | DateTime | ✓ | 更新时间 (UTC) |
 
 **事件类型枚举**:
 - `macro`: 宏观经济事件
@@ -95,7 +96,9 @@
   "significance": 3,
   "sentiment": "negative",
   "magnitude": -0.7,
-  "event_level": "Level 3"
+  "event_level": "Level 3",
+  "timestamp": "2025-01-01T00:00:00.000Z",
+  "raw_time": "2025-01-01"
 }
 ```
 
@@ -113,8 +116,8 @@
 | `market` | String | ✗ | 交易市场 |
 | `country` | String | ✗ | 注册国家 |
 | `aliases` | String[] | ✗ | 别名列表 |
-| `created_at` | DateTime | ✓ | 创建时间 |
-| `updated_at` | DateTime | ✓ | 更新时间 |
+| `created_at` | DateTime | ✓ | 创建时间 (UTC) |
+| `updated_at` | DateTime | ✓ | 更新时间 (UTC) |
 
 ### 4. Person (人物节点)
 表示个人实体。
@@ -128,8 +131,8 @@
 | `title` | String | ✗ | 职位 |
 | `company` | String | ✗ | 所属公司 |
 | `nationality` | String | ✗ | 国籍 |
-| `created_at` | DateTime | ✓ | 创建时间 |
-| `updated_at` | DateTime | ✓ | 更新时间 |
+| `created_at` | DateTime | ✓ | 创建时间 (UTC) |
+| `updated_at` | DateTime | ✓ | 更新时间 (UTC) |
 
 ### 5. Organization (机构节点)
 表示组织机构实体。
@@ -142,8 +145,8 @@
 | `organization_name` | String | ✓ | 机构名称 (唯一约束) |
 | `type` | String | ✗ | 机构类型 (见枚举值) |
 | `country` | String | ✗ | 所在国家 |
-| `created_at` | DateTime | ✓ | 创建时间 |
-| `updated_at` | DateTime | ✓ | 更新时间 |
+| `created_at` | DateTime | ✓ | 创建时间 (UTC) |
+| `updated_at` | DateTime | ✓ | 更新时间 (UTC) |
 
 **机构类型枚举**:
 - `government`: 政府机构
@@ -165,8 +168,8 @@
 | `type` | String | ✗ | 地点类型 (见枚举值) |
 | `country` | String | ✗ | 国家代码 |
 | `region` | String | ✗ | 地区 |
-| `created_at` | DateTime | ✓ | 创建时间 |
-| `updated_at` | DateTime | ✓ | 更新时间 |
+| `created_at` | DateTime | ✓ | 创建时间 (UTC) |
+| `updated_at` | DateTime | ✓ | 更新时间 (UTC) |
 
 **地点类型枚举**:
 - `country`: 国家
@@ -176,40 +179,6 @@
 - `other`: 其他
 
 > **注意**: 坐标信息(coordinates)字段已移除，后续将通过专门的地理定位服务来处理坐标数据。
-
-### 7. Time (时间节点)
-表示时间实体。
-
-**标签**: `Time`
-
-**属性**:
-| 属性名 | 类型 | 必填 | 说明 |
-|--------|------|------|------|
-| `time_value` | String | ✓ | 时间值 (ISO 8601格式，北京时间) |
-| `type` | String | ✗ | 时间类型 (见枚举值) |
-| `precision` | String | ✗ | 时间精度 (见枚举值) |
-| `timezone` | String | ✗ | 时区 (统一为 Asia/Shanghai) |
-| `raw_value` | String | ✗ | 原始时间字符串 |
-| `parsed_iso` | String | ✗ | 解析后的ISO时间 |
-| `created_at` | DateTime | ✓ | 创建时间 |
-| `updated_at` | DateTime | ✓ | 更新时间 |
-
-> **时间处理说明**: 系统使用智能时间解析器，支持多种时间格式输入（秒级/毫秒级时间戳、ISO字符串、自然语言时间等），统一转换为北京时间存储。
-
-**时间类型枚举**:
-- `DATETIME`: 日期时间
-- `DATE`: 日期
-- `TIME`: 时间
-- `PERIOD`: 时间段
-- `OTHER`: 其他
-
-**时间精度枚举**:
-- `YEAR`: 年
-- `MONTH`: 月
-- `DAY`: 日
-- `HOUR`: 小时
-- `MINUTE`: 分钟
-- `SECOND`: 秒
 
 ---
 
@@ -238,7 +207,6 @@
 |----------|------|------|
 | `DESCRIBES` | 描述 | 新闻描述事件 |
 | `LOCATED_AT` | 位于 | 事件发生地点 |
-| `OCCURRED_AT` | 发生于 | 事件发生时间 |
 
 ### 关系属性
 
@@ -251,35 +219,36 @@
 | `inferred` | Boolean | 是否为推断关系 |
 | `newsId` | String | 来源新闻ID |
 | `source_news` | String | 源新闻ID (推断关系) |
-| `created_at` | DateTime | 创建时间 |
-| `updated_at` | DateTime | 更新时间 |
+| `created_at` | DateTime | 创建时间 (UTC) |
+| `updated_at` | DateTime | 更新时间 (UTC) |
 
 ---
 
 ## 数据处理机制
 
-### 智能时间处理
+### 优化的时间处理
 
-系统内置智能时间解析器 (`TimeParser`)，具备以下特性：
+系统采用简化且统一的时间处理策略：
 
-- **多格式支持**: 自动识别并处理秒级时间戳、毫秒级时间戳、ISO字符串、自然语言时间等
-- **时区统一**: 所有时间数据统一转换为北京时间 (Asia/Shanghai)
-- **兜底机制**: 无效时间输入自动使用当前北京时间
-- **智能识别**: 自动判断时间戳的精度级别
+- **UTC 标准**: 所有时间数据统一存储为 UTC 时区的 ISO 8601 字符串格式
+- **原始数据保留**: `raw_time` 字段保存未转换的原始时间数据，便于追踪和调试
+- **多格式支持**: 自动识别秒级时间戳、毫秒级时间戳、ISO字符串、自然语言时间等
+- **统一格式**: `timestamp` 字段统一为 `YYYY-MM-DDTHH:mm:ss.sssZ` 字符串格式
+- **无兜底机制**: 时间解析失败时抛出错误，确保数据质量
 
 **支持的时间格式示例**:
 ```javascript
 // 秒级时间戳
-1703175600 → "2023-12-22T00:20:00.000+08:00"
+1703175600 → "2023-12-21T16:20:00.000Z"
 
 // 毫秒级时间戳  
-1703175600000 → "2023-12-22T00:20:00.000+08:00"
+1703175600000 → "2023-12-21T16:20:00.000Z"
 
 // ISO字符串
-"2023-12-21T13:00:00Z" → "2023-12-21T21:00:00.000+08:00"
+"2023-12-21T13:00:00Z" → "2023-12-21T13:00:00.000Z"
 
-// 自然语言
-"今天下午3点" → 当前日期下午15:00北京时间
+// 自然语言 (转换为UTC)
+"今天下午3点" → 当前日期下午15:00的UTC时间
 ```
 
 ### 严格数据验证
@@ -379,15 +348,14 @@ FOR (l:Location) REQUIRE l.location_name IS UNIQUE;
 ```cypher
 -- 新闻相关索引
 CREATE INDEX news_id_idx IF NOT EXISTS FOR (n:News) ON (n.id);
-CREATE INDEX news_timestamp_idx IF NOT EXISTS FOR (n:News) ON (n.timestamp);
+CREATE RANGE INDEX news_timestamp_range_index IF NOT EXISTS FOR (n:News) ON (n.timestamp);
 
 -- 事件相关索引
 CREATE INDEX event_id_idx IF NOT EXISTS FOR (e:Event) ON (e.event_id);
-CREATE INDEX event_date_idx IF NOT EXISTS FOR (e:Event) ON (e.event_date);
-
--- 时间相关索引
-CREATE INDEX time_value_idx IF NOT EXISTS FOR (t:Time) ON (t.time_value);
+CREATE RANGE INDEX event_timestamp_range_index IF NOT EXISTS FOR (e:Event) ON (e.timestamp);
 ```
+
+> **索引优化**: 使用范围索引 (RANGE INDEX) 优化时间范围查询性能，特别适用于日期时间范围过滤。
 
 ---
 
@@ -413,7 +381,7 @@ RETURN c;
 ```cypher
 MATCH (e:Event) 
 RETURN e 
-ORDER BY e.event_date DESC 
+ORDER BY e.timestamp DESC 
 LIMIT 5;
 ```
 
@@ -459,13 +427,13 @@ ORDER BY newsCount DESC
 LIMIT 10;
 ```
 
-#### 查找某时间段内的事件
+#### 查找某时间段内的事件 (UTC时间)
 ```cypher
 MATCH (e:Event)
-WHERE e.event_date >= "2024-01-01T00:00:00.000Z" 
-  AND e.event_date <= "2024-12-31T23:59:59.999Z"
+WHERE e.timestamp >= "2024-01-01T00:00:00.000Z" 
+  AND e.timestamp <= "2024-12-31T23:59:59.999Z"
 RETURN e
-ORDER BY e.event_date DESC;
+ORDER BY e.timestamp DESC;
 ```
 
 ### 4. 情感分析查询
@@ -515,36 +483,31 @@ RETURN l.country as country,
 ORDER BY companyCount DESC;
 ```
 
-### 6. 时间序列分析
+### 6. 时间序列分析 (UTC时间)
 
 #### 事件时间线
 ```cypher
 MATCH (e:Event)
-WHERE e.event_date >= "2024-01-01"
-RETURN e.event_date as date,
+WHERE e.timestamp >= "2024-01-01T00:00:00.000Z"
+RETURN e.timestamp as date,
        e.event_name as event,
        e.significance as importance
-ORDER BY e.event_date;
+ORDER BY e.timestamp;
 ```
 
-#### 新闻发布频率（北京时间）
+#### 新闻发布频率 (UTC时间)
 ```cypher
-MATCH (n:News)
-RETURN date(datetime({epochMillis: apoc.date.parse(n.timestamp, 'ms'), timezone: 'Asia/Shanghai'})) as beijingDate,
-       count(n) as newsCount
-ORDER BY beijingDate;
-
-// 简化版本
 MATCH (n:News)
 RETURN date(n.timestamp) as date,
        count(n) as newsCount
 ORDER BY date;
+```
 
-// 按小时统计（北京时间）
+#### 按小时统计新闻分布 (UTC时间)
+```cypher
 MATCH (n:News)
-WITH datetime({epochMillis: apoc.date.parse(n.timestamp, 'ms'), timezone: 'Asia/Shanghai'}) as beijingTime
-RETURN date(beijingTime) as date,
-       beijingTime.hour as hour,
+RETURN date(n.timestamp) as date,
+       n.timestamp.hour as hour,
        count(*) as newsCount
 ORDER BY date, hour;
 ```
@@ -588,11 +551,11 @@ LIMIT 10;
 MATCH (e:Event)
 WHERE e.event_name CONTAINS "抹茶价格"
 MATCH (e)<-[:DESCRIBES]-(n:News)
-RETURN e.event_date as eventDate,
+RETURN e.timestamp as eventDate,
        n.timestamp as newsTime,
        n.title as newsTitle,
        e.significance as importance
-ORDER BY e.event_date, n.timestamp;
+ORDER BY e.timestamp, n.timestamp;
 ```
 
 #### 查找事件影响链
@@ -618,10 +581,10 @@ LIMIT 20;
 
 ### 5. 异常检测查询
 
-#### 查找异常活跃的实体
+#### 查找异常活跃的实体 (最近7天)
 ```cypher
 MATCH (entity)-[:PARTICIPATES_IN]-(e:Event)<-[:DESCRIBES]-(n:News)
-WHERE n.timestamp >= date() - duration('P7D')  // 最近7天
+WHERE n.timestamp >= datetime() - duration('P7D')  // 最近7天 (UTC)
 WITH entity, count(DISTINCT n) as recentNewsCount
 WHERE recentNewsCount > 5  // 超过5条新闻
 RETURN entity, recentNewsCount
@@ -651,9 +614,10 @@ RETURN count(c) as companiesWithoutName;
 ### 性能优化建议
 
 1. **索引优化**: 为经常查询的属性创建索引
-2. **查询优化**: 使用 `LIMIT` 限制结果集大小
-3. **批量操作**: 大数据量操作时使用批量处理
-4. **定期维护**: 定期清理孤立节点和重复数据
+2. **范围索引**: 使用 RANGE INDEX 优化时间范围查询
+3. **查询优化**: 使用 `LIMIT` 限制结果集大小
+4. **批量操作**: 大数据量操作时使用批量处理
+5. **定期维护**: 定期清理孤立节点和重复数据
 
 ---
 
@@ -693,7 +657,7 @@ CALL db.stats.retrieve('GRAPH COUNTS');
 
 #### 快速浏览数据
 ```cypher
-// 查看最新的 10 条新闻
+// 查看最新的 10 条新闻 (UTC时间)
 MATCH (n:News) 
 RETURN n.title, n.timestamp, n.news_level 
 ORDER BY n.timestamp DESC 
@@ -728,17 +692,17 @@ MATCH (c:Company {company_name: '公司名'})-[r]-(related)
 RETURN c, r, related;
 ```
 
-#### 时间范围查询
+#### 时间范围查询 (UTC时间)
 ```cypher
-// 查找指定时间范围内的新闻和事件（北京时间）
+// 查找指定时间范围内的新闻和事件
 MATCH (n:News)-[:DESCRIBES]->(e:Event)
-WHERE n.timestamp >= '2024-01-01T00:00:00+08:00' AND n.timestamp <= '2024-12-31T23:59:59+08:00'
+WHERE n.timestamp >= "2024-01-01T00:00:00.000Z" AND n.timestamp <= "2024-12-31T23:59:59.999Z"
 RETURN n.title, e.event_name, e.sentiment, n.timestamp
 ORDER BY n.timestamp DESC;
 
-// 查找今天的新闻（北京时间）
+// 查找今天的新闻 (UTC时间)
 MATCH (n:News)
-WHERE date(n.timestamp) = date(datetime({timezone: 'Asia/Shanghai'}))
+WHERE date(n.timestamp) = date(datetime())
 RETURN n.title, n.timestamp
 ORDER BY n.timestamp DESC;
 ```
@@ -880,6 +844,7 @@ A:
 1. 检查是否创建了必要的索引
 2. 在查询中使用 `LIMIT` 限制结果集大小
 3. 避免使用 `MATCH (n)--(m)` 这种无条件的全图查询
+4. 使用范围索引优化时间查询
 
 ### Q: 如何处理中文搜索？
 A: 使用 `CONTAINS` 或 `STARTS WITH` 进行模糊匹配：
@@ -919,15 +884,41 @@ A:
 
 ### Q: 时间数据显示不正确怎么办？
 A: 
-1. 确认所有时间数据都已转换为北京时间
+1. 确认所有时间数据都已转换为UTC时间
 2. 检查原始数据的时间格式是否正确
 3. 系统支持多种时间格式，通常能自动识别和转换
 4. 如有问题，查看 TimeParser 的处理日志
+
+### Q: 如何进行时区转换？
+A: 
+所有时间都以UTC存储，如需本地时间可在查询时转换：
+```cypher
+// 转换为北京时间显示
+MATCH (n:News)
+RETURN n.title, 
+       datetime(n.timestamp + duration('PT8H')) as beijing_time
+ORDER BY n.timestamp DESC;
+```
 
 ---
 
 ## 更新日志
 
+- **v4.2.0**: 全面时间字段统一
+  - Event 节点也使用 `timestamp` 字段，取消 `event_date`
+  - 所有实体节点时间字段完全统一
+  - 优化事件时间索引，提升查询性能
+  - 简化时间处理逻辑，降低系统复杂度
+- **v4.1.0**: 时间字段优化
+  - 合并 `timestamp` 和 `time` 字段，简化数据结构
+  - 新增 `raw_time` 字段保存原始时间数据
+  - `timestamp` 字段统一为 UTC ISO 8601 字符串格式
+  - 提升数据可追溯性和调试能力
+- **v4.0.0**: 时间处理优化
+  - 移除冗余的Time节点，简化数据结构
+  - 统一使用UTC时区存储所有时间数据
+  - 优化时间索引，使用范围索引提升查询性能
+  - 简化时间解析逻辑，提高系统稳定性
 - **v3.0.0**: 重大系统升级
   - 新增智能时间解析器，统一北京时区处理
   - 移除兜底数据机制，实施严格数据验证

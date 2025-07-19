@@ -1,5 +1,6 @@
 import * as cron from 'node-cron';
 import { logger } from '../utils/logger';
+import { getCurrentTime } from '../utils/timeUtils';
 
 /**
  * 调度器服务
@@ -146,7 +147,7 @@ export class SchedulerService {
       return {
         status: 'healthy',
         service: 'SchedulerService',
-        timestamp: new Date().toISOString(),
+        timestamp: getCurrentTime(),
         initialized: this.initialized,
         activeTasks: this.tasks.size
       };
@@ -154,7 +155,7 @@ export class SchedulerService {
       return {
         status: 'unhealthy',
         service: 'SchedulerService',
-        timestamp: new Date().toISOString(),
+        timestamp: getCurrentTime(),
         error: error.message
       };
     }

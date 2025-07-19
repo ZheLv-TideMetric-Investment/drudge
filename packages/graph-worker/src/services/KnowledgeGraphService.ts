@@ -3,6 +3,7 @@ import { EntityExtractionService } from './EntityExtractionService';
 import { EntityService } from './EntityService';
 import relationshipService from './RelationshipService';
 import config from '../config/config';
+import { getCurrentTime } from '../utils/timeUtils';
 import { 
   NewsItem, 
   NewsExtractionResult, 
@@ -60,7 +61,7 @@ export class KnowledgeGraphService {
         return {
           success: true,
           newsId: newsItem.id,
-          processed_at: new Date().toISOString()
+          processed_at: getCurrentTime()
         };
       }
 
@@ -90,7 +91,6 @@ export class KnowledgeGraphService {
         persons: extractionResult.persons?.length || 0,
         organizations: extractionResult.organizations.length,
         locations: extractionResult.locations.length,
-        times: extractionResult.times.length,
         relationships: extractionResult.relationships.length
       };
 
@@ -99,7 +99,7 @@ export class KnowledgeGraphService {
       return {
         success: true,
         newsId: newsItem.id,
-        processed_at: new Date().toISOString(),
+        processed_at: getCurrentTime(),
         stats
       };
 
@@ -109,7 +109,7 @@ export class KnowledgeGraphService {
       return {
         success: false,
         newsId: newsItem.id,
-        processed_at: new Date().toISOString(),
+        processed_at: getCurrentTime(),
         error: error.message
       };
     }
@@ -133,7 +133,7 @@ export class KnowledgeGraphService {
       return newsItems.map(item => ({
         success: true,
         newsId: item.id,
-        processed_at: new Date().toISOString()
+        processed_at: getCurrentTime()
       }));
     }
 
@@ -189,7 +189,7 @@ export class KnowledgeGraphService {
         const failedResults = newsChunk.map(newsItem => ({
           success: false,
           newsId: newsItem.id,
-          processed_at: new Date().toISOString(),
+          processed_at: getCurrentTime(),
           error: `分块处理失败: ${error.message}`
         }));
         allResults.push(...failedResults);
@@ -238,14 +238,13 @@ export class KnowledgeGraphService {
           persons: extractionResult.persons?.length || 0,
           organizations: extractionResult.organizations.length,
           locations: extractionResult.locations.length,
-          times: extractionResult.times.length,
           relationships: extractionResult.relationships.length
         };
 
         results.push({
           success: true,
           newsId: extractionResult.newsId || '',
-          processed_at: new Date().toISOString(),
+          processed_at: getCurrentTime(),
           stats
         });
 
@@ -254,7 +253,7 @@ export class KnowledgeGraphService {
         results.push({
           success: false,
           newsId: extractionResult.newsId || '',
-          processed_at: new Date().toISOString(),
+          processed_at: getCurrentTime(),
           error: error.message
         });
       }
@@ -280,7 +279,7 @@ export class KnowledgeGraphService {
       
       return {
         success: true,
-        timestamp: new Date().toISOString(),
+        timestamp: getCurrentTime(),
         version: '2.0.0', // 图谱服务版本
         initialized: this.initialized,
         services: {
@@ -303,7 +302,7 @@ export class KnowledgeGraphService {
       return {
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString(),
+        timestamp: getCurrentTime(),
         version: '2.0.0',
         initialized: false,
         services: {

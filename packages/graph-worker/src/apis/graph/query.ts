@@ -1,6 +1,7 @@
 import { logger } from '../../utils/logger';
 import knowledgeGraphService from '../../services/KnowledgeGraphService';
 import neo4jService from '../../services/Neo4jService';
+import { getCurrentTime } from '../../utils/timeUtils';
 
 /**
  * 获取图谱统计信息
@@ -14,7 +15,7 @@ export async function getGraphStats(): Promise<any> {
     return {
       success: true,
       stats,
-      timestamp: new Date().toISOString()
+      timestamp: getCurrentTime()
     };
 
   } catch (error: any) {

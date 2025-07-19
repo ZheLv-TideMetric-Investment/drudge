@@ -1,6 +1,7 @@
 import express, { Request, Response, Application } from 'express';
 import { logger } from '../utils/logger';
 import config from '../config/config';
+import { getCurrentTime } from '../utils/timeUtils';
 
 // 导入API业务逻辑函数
 import * as newsApi from '../apis/news/process';
@@ -27,7 +28,7 @@ export function createHttpServer(): Application {
       service: 'graph-worker',
       version: '2.0',
       status: 'running',
-      timestamp: new Date().toISOString()
+      timestamp: getCurrentTime()
     });
   });
 
@@ -39,14 +40,14 @@ export function createHttpServer(): Application {
         version: '2.0',
         status: 'healthy',
         port: config.server.port,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     } catch (error: any) {
       res.status(500).json({
         service: 'graph-worker',
         status: 'unhealthy',
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -63,7 +64,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -78,7 +79,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -93,7 +94,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -108,7 +109,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -120,7 +121,7 @@ export function createHttpServer(): Application {
         res.status(400).json({
           success: false,
           error: '缺少查询参数 q',
-          timestamp: new Date().toISOString()
+          timestamp: getCurrentTime()
         });
         return;
       }
@@ -131,7 +132,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -144,7 +145,7 @@ export function createHttpServer(): Application {
         res.status(400).json({
           success: false,
           error: '缺少实体名称参数',
-          timestamp: new Date().toISOString()
+          timestamp: getCurrentTime()
         });
         return;
       }
@@ -155,7 +156,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -170,7 +171,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -182,7 +183,7 @@ export function createHttpServer(): Application {
         res.status(400).json({
           success: false,
           error: '缺少新闻ID参数',
-          timestamp: new Date().toISOString()
+          timestamp: getCurrentTime()
         });
         return;
       }
@@ -193,7 +194,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -208,7 +209,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -221,7 +222,7 @@ export function createHttpServer(): Application {
         res.status(400).json({
           success: false,
           error: '缺少实体名称参数',
-          timestamp: new Date().toISOString()
+          timestamp: getCurrentTime()
         });
         return;
       }
@@ -232,7 +233,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -246,7 +247,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });
@@ -261,7 +262,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       });
     }
   });

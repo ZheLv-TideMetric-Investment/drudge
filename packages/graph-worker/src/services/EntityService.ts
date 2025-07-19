@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
-import { parseTime } from '../utils/timeUtils';
+import { parseTime, getCurrentTime } from '../utils/timeUtils';
 
 import { 
   NewsExtractionResult, 
@@ -9,7 +9,6 @@ import {
   Person, 
   Organization, 
   Location, 
-  Time, 
   Relationship,
   NewsItem 
 } from '../types/index';
@@ -49,6 +48,7 @@ export class EntityService {
       SET n.title = $title,
           n.content = $content,
           n.timestamp = $timestamp,
+          n.raw_time = $rawTime,
           n.source = $source,
           n.url = $url,
           n.level = $level,
@@ -63,13 +63,14 @@ export class EntityService {
       id: newsItem.id,
       title: newsItem.title,
       content: newsItem.content,
-      timestamp: parseTime(newsItem.time),
+      timestamp: newsItem.timestamp,
+      rawTime: newsItem.raw_time || null,
       source: newsItem.source || '',
       url: newsItem.url || '',
       level: newsItem.level || 0,
       newsLevel,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime()
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -85,13 +86,12 @@ export class EntityService {
       SET e.event_name = $eventName,
           e.event_description = $eventDescription,
           e.event_type = $eventType,
-          e.event_date = $eventDate,
+          e.timestamp = $timestamp,
+          e.raw_time = $rawTime,
           e.sentiment = $sentiment,
           e.magnitude = $magnitude,
           e.event_level = $eventLevel,
           e.significance = $significance,
-          e.raw_event_date = $rawEventDate,
-          e.parsed_event_date = $parsedEventDate,
           e.created_at = $createdAt,
           e.updated_at = $updatedAt
       WITH e
@@ -105,15 +105,14 @@ export class EntityService {
       eventName: event.event_name,
       eventDescription: event.event_description || '',
       eventType: event.event_type || 'other',
-      eventDate: event.event_date || new Date().toISOString(),
+      timestamp: event.timestamp || getCurrentTime(),
+      rawTime: event.raw_time || null,
       sentiment: event.sentiment || 'neutral',
       magnitude: event.magnitude || 0,
       eventLevel: event.event_level || 'Level 5',
       significance: event.significance || 1,
-      rawEventDate: event.raw_event_date || '',
-      parsedEventDate: event.parsed_event_date || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime(),
       newsId
     };
 
@@ -147,8 +146,8 @@ export class EntityService {
       market: company.market || '',
       country: company.country || '',
       aliases: company.aliases && company.aliases.length > 0 ? company.aliases : [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime(),
       newsId
     };
 
@@ -178,8 +177,8 @@ export class EntityService {
       title: person.title || '',
       company: person.company || '',
       nationality: person.nationality || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime(),
       newsId
     };
 
@@ -207,8 +206,8 @@ export class EntityService {
       organizationName: organization.organization_name,
       type: organization.type || 'other',
       country: organization.country || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime(),
       newsId
     };
 
@@ -244,8 +243,8 @@ export class EntityService {
       coordinates: location.coordinates ? JSON.stringify(location.coordinates) : null,
       latitude: location.coordinates?.latitude || null,
       longitude: location.coordinates?.longitude || null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime(),
       newsId
     };
 
@@ -253,40 +252,7 @@ export class EntityService {
     logger.debug(`位置节点创建成功: ${location.location_name}`);
   }
 
-  /**
-   * 创建时间节点 - 使用标准枚举和时间标准化字段
-   */
-  async createTime(time: Time, newsId: string): Promise<void> {
-    const cypher = `
-      MERGE (t:Time {time_value: $timeValue})
-      SET t.type = $type,
-          t.precision = $precision,
-          t.timezone = $timezone,
-          t.raw_value = $rawValue,
-          t.parsed_iso = $parsedIso,
-          t.created_at = $createdAt,
-          t.updated_at = $updatedAt
-      WITH t
-      MATCH (n:News {id: $newsId})
-      MERGE (n)-[:OCCURRED_AT]->(t)
-      RETURN t
-    `;
 
-    const parameters = {
-      timeValue: time.time_value,
-      type: time.type || 'OTHER',
-      precision: time.precision || 'DAY',
-      timezone: time.timezone || '',
-      rawValue: time.raw_value || '',
-      parsedIso: time.parsed_iso || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      newsId
-    };
-
-    await this.neo4j.executeQuery(cypher, parameters);
-    logger.debug(`时间节点创建成功: ${time.time_value}`);
-  }
 
   /**
    * 批量创建实体（使用新的 MERGE 模板）
@@ -300,11 +266,13 @@ export class EntityService {
         id: extractionResult.newsId || '',
         title: extractionResult.title || '',
         content: extractionResult.content || '',
-        time: new Date(extractionResult.timestamp).getTime() / 1000,
         source: extractionResult.source || '',
         url: extractionResult.url || '',
         level: 0, // 兼容旧字段
-        timestamp: new Date(extractionResult.timestamp)
+        timestamp: typeof extractionResult.timestamp === 'string' 
+          ? extractionResult.timestamp 
+          : new Date(extractionResult.timestamp).toISOString(),
+        raw_time: extractionResult.timestamp
       };
       
       await this.createNews(newsItem, extractionResult.news_level);
@@ -328,10 +296,6 @@ export class EntityService {
 
       if (extractionResult.locations.length > 0) {
         await this.neo4j.batchMergeEntities('Location', extractionResult.locations);
-      }
-
-      if (extractionResult.times.length > 0) {
-        await this.neo4j.batchMergeEntities('Time', extractionResult.times);
       }
 
       // 3. 批量创建关系
@@ -431,20 +395,6 @@ export class EntityService {
       });
     }
 
-    // 新闻 -> 时间
-    for (const time of extractionResult.times) {
-      relationships.push({
-        fromType: 'News',
-        fromKey: 'id',
-        fromValue: newsId,
-        toType: 'Time',
-        toKey: 'time_value',
-        toValue: time.time_value,
-        relType: 'OCCURRED_AT',
-        properties: { confidence: 0.7 }
-      });
-    }
-
     // 执行批量关系创建
     if (relationships.length > 0) {
       await this.neo4j.batchMergeRelationships(relationships);
@@ -505,14 +455,14 @@ export class EntityService {
       return {
         status: 'healthy',
         service: 'EntityService',
-        timestamp: new Date().toISOString(),
+        timestamp: getCurrentTime(),
         neo4j_connection: result ? 'connected' : 'disconnected'
       };
     } catch (error: any) {
       return {
         status: 'unhealthy',
         service: 'EntityService',
-        timestamp: new Date().toISOString(),
+        timestamp: getCurrentTime(),
         error: error.message
       };
     }

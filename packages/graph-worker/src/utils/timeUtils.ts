@@ -6,9 +6,9 @@ import utc from 'dayjs/plugin/utc';
 dayjs.extend(utc);
 
 /**
- * 核心时间解析函数 - 将任意时间输入转换为Date对象
+ * 核心时间解析函数 - 将任意时间输入转换为UTC Date对象
  * @param timeInput 时间输入（数字、字符串、Date对象）
- * @returns Date对象
+ * @returns UTC Date对象
  */
 function parseTimeToDate(timeInput: any): Date {
   if (!timeInput) {
@@ -25,11 +25,11 @@ function parseTimeToDate(timeInput: any): Date {
     if (typeof timeInput === 'number') {
       const timestamp = timeInput;
       if (timestamp < 10000000000) {
-        // 秒级时间戳
-        return dayjs.unix(timestamp).toDate();
+        // 秒级时间戳 - 转换为UTC
+        return dayjs.unix(timestamp).utc().toDate();
       } else {
-        // 毫秒级时间戳
-        return dayjs(timestamp).toDate();
+        // 毫秒级时间戳 - 转换为UTC
+        return dayjs(timestamp).utc().toDate();
       }
     }
 
@@ -44,22 +44,21 @@ function parseTimeToDate(timeInput: any): Date {
         }
       }
 
-      // 尝试使用 dayjs 解析标准日期格式
+      // 尝试使用 dayjs 解析标准日期格式，转换为UTC
       let parsed = dayjs(timeInput);
       if (parsed.isValid()) {
-        return parsed.toDate();
+        return parsed.utc().toDate();
       }
 
       // 尝试使用 chrono-node 解析自然语言时间
       const chronoResult = chrono.parseDate(timeInput);
       if (chronoResult) {
-        return chronoResult;
+        return dayjs(chronoResult).utc().toDate();
       }
     }
 
-    // 如果所有解析都失败，返回当前时间
-    console.warn(`时间解析失败，使用当前时间: ${timeInput}`);
-    throw new Error('时间解析失败');
+    // 如果所有解析都失败，抛出错误
+    throw new Error(`时间解析失败: ${timeInput}`);
   } catch (error) {
     console.error(`时间解析错误: ${timeInput}`, error);
     throw new Error('时间解析错误');
@@ -67,20 +66,19 @@ function parseTimeToDate(timeInput: any): Date {
 }
 
 /**
- * 解析时间并返回ISO字符串
+ * 解析时间并返回UTC ISO字符串
  * @param timeInput 时间输入
- * @returns ISO时间字符串
+ * @returns UTC ISO时间字符串 (YYYY-MM-DDTHH:mm:ss.sssZ)
  */
 export function parseTime(timeInput: any): string {
   const date = parseTimeToDate(timeInput);
-  return dayjs(date).toISOString();
+  return dayjs(date).utc().toISOString();
 }
 
 /**
- * 解析时间戳并返回Date对象（兼容性保留函数）
- * @param timestampValue 时间戳输入
- * @returns Date对象
+ * 获取当前UTC时间的ISO字符串
+ * @returns 当前UTC时间的ISO字符串
  */
-export function parseTimestamp(timestampValue: any): Date {
-  return parseTimeToDate(timestampValue);
+export function getCurrentTime(): string {
+  return dayjs().utc().toISOString();
 }

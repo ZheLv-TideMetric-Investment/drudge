@@ -1,5 +1,6 @@
 import { logger } from '../../utils/logger';
 import knowledgeGraphService from '../../services/KnowledgeGraphService';
+import { getCurrentTime } from '../../utils/timeUtils';
 import schedulerService from '../../scheduler/index';
 
 /**
@@ -16,7 +17,7 @@ export async function getSystemStatus(): Promise<any> {
     const systemStatus = {
       service: 'graph-worker',
       version: '2.0',
-      timestamp: new Date().toISOString(),
+      timestamp: getCurrentTime(),
       status: 'healthy',
       services: {
         knowledgeGraph: knowledgeGraphHealth,
@@ -34,7 +35,7 @@ export async function getSystemStatus(): Promise<any> {
     return {
       success: true,
       data: systemStatus,
-      timestamp: new Date().toISOString()
+      timestamp: getCurrentTime()
     };
 
   } catch (error: any) {
@@ -42,7 +43,7 @@ export async function getSystemStatus(): Promise<any> {
     return {
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: getCurrentTime()
     };
   }
 } 

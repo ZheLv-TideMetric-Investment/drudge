@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
+import { getCurrentTime } from '../utils/timeUtils';
 import { 
   NewsExtractionResult, 
   Relationship,
@@ -76,8 +77,8 @@ export class RelationshipService {
       description: relationship.description || '',
       confidence: relationship.confidence || 0.8,
       newsId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime()
     };
 
     try {
@@ -132,8 +133,8 @@ export class RelationshipService {
           description: relationship.description || '',
           confidence: relationship.confidence || 0.8,
           newsId: result.newsId || '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          createdAt: getCurrentTime(),
+          updatedAt: getCurrentTime()
         };
 
         paramIndex++;
@@ -204,8 +205,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${new Date().toISOString()}",
-                  r.updated_at = "${new Date().toISOString()}"
+                  r.created_at = "${getCurrentTime()}",
+                  r.updated_at = "${getCurrentTime()}"
             `);
           }
         }
@@ -224,8 +225,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${new Date().toISOString()}",
-                  r.updated_at = "${new Date().toISOString()}"
+                  r.created_at = "${getCurrentTime()}",
+                  r.updated_at = "${getCurrentTime()}"
             `);
           }
         }
@@ -244,8 +245,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${new Date().toISOString()}",
-                  r.updated_at = "${new Date().toISOString()}"
+                  r.created_at = "${getCurrentTime()}",
+                  r.updated_at = "${getCurrentTime()}"
             `);
           }
         }
@@ -264,8 +265,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${new Date().toISOString()}",
-                  r.updated_at = "${new Date().toISOString()}"
+                  r.created_at = "${getCurrentTime()}",
+                  r.updated_at = "${getCurrentTime()}"
             `);
           }
         }

@@ -2,6 +2,7 @@ import { logger } from '../utils/logger';
 import knowledgeGraphService from '../services/KnowledgeGraphService';
 import neo4jService from '../services/Neo4jService';
 import config from '../config/config';
+import { getCurrentTime } from '../utils/timeUtils';
 import fs from 'fs';
 import path from 'path';
 import { exec } from 'child_process';
@@ -220,7 +221,7 @@ async function checkStatus(): Promise<void> {
     console.log('='.repeat(50));
     console.log(`🏥 状态: ${health ? '✅ 健康' : '❌ 异常'}`);
     console.log(`🔧 初始化: ${knowledgeGraphService['initialized'] ? '✅' : '❌'}`);
-    console.log(`⏰ 时间: ${new Date().toISOString()}`);
+    console.log(`⏰ 时间: ${getCurrentTime()}`);
     console.log(`📋 版本: 2.0`);
     
     if (!health) {
@@ -301,7 +302,7 @@ async function dbRebuildIndexes(): Promise<void> {
         'CREATE INDEX IF NOT EXISTS FOR (n:News) ON (n.id)',
         'CREATE INDEX IF NOT EXISTS FOR (n:News) ON (n.timestamp)',
         'CREATE INDEX IF NOT EXISTS FOR (e:Event) ON (e.id)',
-        'CREATE INDEX IF NOT EXISTS FOR (e:Event) ON (e.event_date)',
+        'CREATE INDEX IF NOT EXISTS FOR (e:Event) ON (e.timestamp)',
         'CREATE INDEX IF NOT EXISTS FOR (c:Company) ON (c.company_name)',
         'CREATE INDEX IF NOT EXISTS FOR (p:Person) ON (p.person_name)',
         'CREATE INDEX IF NOT EXISTS FOR (o:Organization) ON (o.organization_name)',
@@ -375,7 +376,7 @@ async function dbExportConfig(): Promise<void> {
     
     const dbConfig = {
       neo4j: config.neo4j,
-      timestamp: new Date().toISOString(),
+      timestamp: getCurrentTime(),
       environment: process.env.NODE_ENV || 'development'
     };
     
@@ -386,7 +387,7 @@ async function dbExportConfig(): Promise<void> {
     }
     
     // 生成配置文件
-    const configFile = path.join(backupDir, `db-config-${new Date().toISOString().split('T')[0]}.json`);
+    const configFile = path.join(backupDir, `db-config-${getCurrentTime().split('T')[0]}.json`);
     fs.writeFileSync(configFile, JSON.stringify(dbConfig, null, 2));
     
     console.log(`✅ 数据库配置已导出到: ${configFile}`);
@@ -493,7 +494,7 @@ async function dbCleanBeforeDate(beforeDate: string): Promise<void> {
       console.log('清理旧的事件节点...');
       const deleteEventResult = await session.run(`
         MATCH (e:Event)
-        WHERE e.event_date < date('${beforeDate}')
+        WHERE e.timestamp < '${beforeDate}T00:00:00.000Z'
         DETACH DELETE e
       `);
       console.log(`✅ 删除了 ${deleteEventResult.summary.counters.updates().nodesDeleted} 个事件节点`);
@@ -627,13 +628,13 @@ async function dbBackup(): Promise<void> {
     }
     
     // 生成备份文件
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T');
+    const timestamp = getCurrentTime().replace(/[:.]/g, '-').split('T');
     const datePart = timestamp[0] || 'unknown';
     const timePart = timestamp[1]?.split('.')[0] || '000000';
     const backupFile = path.join(backupDir, `db-stats-${datePart}_${timePart}.json`);
     
     const backupData = {
-      timestamp: new Date().toISOString(),
+      timestamp: getCurrentTime(),
       environment: process.env.NODE_ENV || 'development',
       config: {
         neo4j: {
