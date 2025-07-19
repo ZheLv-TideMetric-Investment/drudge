@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
-import { parseTime, getCurrentTime, getCurrentTimestamp } from '../utils/timeUtils';
+import { parseTime, getCurrentTime } from '../utils/timeUtils';
 import {
   EVENT_LEVELS,
   EVENT_TYPES,
@@ -62,8 +62,8 @@ export class EntityService {
           n.level = $level,
           n.news_level = $newsLevel,
           n.processed = true,
-          n.created_at = $createdAt,
-          n.updated_at = $updatedAt
+          n.created_at = CASE WHEN n.created_at IS NULL THEN timestamp() ELSE n.created_at END,
+          n.updated_at = timestamp()
       RETURN n
     `;
 
@@ -77,8 +77,6 @@ export class EntityService {
       url: newsItem.url || '',
       level: newsItem.level || 0,
       newsLevel,
-      createdAt: getCurrentTimestamp(),
-      updatedAt: getCurrentTimestamp(),
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -100,8 +98,8 @@ export class EntityService {
           e.magnitude = $magnitude,
           e.event_level = $eventLevel,
           e.significance = $significance,
-          e.created_at = $createdAt,
-          e.updated_at = $updatedAt
+          e.created_at = CASE WHEN e.created_at IS NULL THEN timestamp() ELSE e.created_at END,
+          e.updated_at = timestamp()
       WITH e
       MATCH (n:News {id: $newsId})
       MERGE (n)-[:DESCRIBES]->(e)
@@ -119,8 +117,6 @@ export class EntityService {
       magnitude: event.magnitude || 0,
       eventLevel: event.event_level || EVENT_LEVELS.LEVEL_5,
       significance: event.significance || 1,
-      createdAt: getCurrentTimestamp(),
-      updatedAt: getCurrentTimestamp(),
       newsId,
     };
 
@@ -139,8 +135,8 @@ export class EntityService {
           c.market = $market,
           c.country = $country,
           c.aliases = $aliases,
-          c.created_at = $createdAt,
-          c.updated_at = $updatedAt
+          c.created_at = CASE WHEN c.created_at IS NULL THEN timestamp() ELSE c.created_at END,
+          c.updated_at = timestamp()
       WITH c
       MATCH (n:News {id: $newsId})
       MERGE (n)-[:INVOLVES]->(c)
@@ -154,8 +150,6 @@ export class EntityService {
       market: company.market || '',
       country: company.country || '',
       aliases: company.aliases && company.aliases.length > 0 ? company.aliases : [],
-      createdAt: getCurrentTimestamp(),
-      updatedAt: getCurrentTimestamp(),
       newsId,
     };
 
@@ -172,8 +166,8 @@ export class EntityService {
       SET p.title = $title,
           p.company = $company,
           p.nationality = $nationality,
-          p.created_at = $createdAt,
-          p.updated_at = $updatedAt
+          p.created_at = CASE WHEN p.created_at IS NULL THEN timestamp() ELSE p.created_at END,
+          p.updated_at = timestamp()
       WITH p
       MATCH (n:News {id: $newsId})
       MERGE (n)-[:MENTIONS]->(p)
@@ -185,8 +179,6 @@ export class EntityService {
       title: person.title || '',
       company: person.company || '',
       nationality: person.nationality || '',
-      createdAt: getCurrentTimestamp(),
-      updatedAt: getCurrentTimestamp(),
       newsId,
     };
 
@@ -202,8 +194,8 @@ export class EntityService {
       MERGE (o:Organization {organization_name: $organizationName})
       SET o.type = $type,
           o.country = $country,
-          o.created_at = $createdAt,
-          o.updated_at = $updatedAt
+          o.created_at = CASE WHEN o.created_at IS NULL THEN timestamp() ELSE o.created_at END,
+          o.updated_at = timestamp()
       WITH o
       MATCH (n:News {id: $newsId})
       MERGE (n)-[:INVOLVES]->(o)
@@ -214,8 +206,6 @@ export class EntityService {
       organizationName: organization.organization_name,
       type: organization.type || ORGANIZATION_TYPES.OTHER,
       country: organization.country || '',
-      createdAt: getCurrentTimestamp(),
-      updatedAt: getCurrentTimestamp(),
       newsId,
     };
 
@@ -235,8 +225,8 @@ export class EntityService {
           l.coordinates = $coordinates,
           l.latitude = $latitude,
           l.longitude = $longitude,
-          l.created_at = $createdAt,
-          l.updated_at = $updatedAt
+          l.created_at = CASE WHEN l.created_at IS NULL THEN timestamp() ELSE l.created_at END,
+          l.updated_at = timestamp()
       WITH l
       MATCH (n:News {id: $newsId})
       MERGE (n)-[:LOCATED_AT]->(l)
@@ -251,8 +241,6 @@ export class EntityService {
       coordinates: location.coordinates ? JSON.stringify(location.coordinates) : null,
       latitude: location.coordinates?.latitude || null,
       longitude: location.coordinates?.longitude || null,
-      createdAt: getCurrentTimestamp(),
-      updatedAt: getCurrentTimestamp(),
       newsId,
     };
 

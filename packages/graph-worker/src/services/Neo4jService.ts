@@ -353,7 +353,7 @@ export class Neo4jService {
           cypher = `
             UNWIND $entities AS c
             MERGE (co:Company {company_name: c.company_name})
-              ON CREATE SET co += c, co.created_at = timestamp()
+              ON CREATE SET co += c, co.created_at = timestamp(), co.updated_at = timestamp()
               ON MATCH SET co += c, co.updated_at = timestamp()
             RETURN co
           `;
@@ -363,7 +363,7 @@ export class Neo4jService {
           cypher = `
             UNWIND $entities AS p
             MERGE (pe:Person {person_name: p.person_name})
-              ON CREATE SET pe += p, pe.created_at = timestamp()
+              ON CREATE SET pe += p, pe.created_at = timestamp(), pe.updated_at = timestamp()
               ON MATCH SET pe += p, pe.updated_at = timestamp()
             RETURN pe
           `;
@@ -373,7 +373,7 @@ export class Neo4jService {
           cypher = `
             UNWIND $entities AS o
             MERGE (org:Organization {organization_name: o.organization_name})
-              ON CREATE SET org += o, org.created_at = timestamp()
+              ON CREATE SET org += o, org.created_at = timestamp(), org.updated_at = timestamp()
               ON MATCH SET org += o, org.updated_at = timestamp()
             RETURN org
           `;
@@ -384,16 +384,13 @@ export class Neo4jService {
             UNWIND $entities AS l
             MERGE (loc:Location {location_name: l.location_name})
               ON CREATE SET 
-                loc.type = l.type,
-                loc.country = l.country,
-                loc.region = l.region,
+                loc += l,
                 loc.latitude = CASE WHEN l.coordinates IS NOT NULL THEN l.coordinates.latitude ELSE null END,
                 loc.longitude = CASE WHEN l.coordinates IS NOT NULL THEN l.coordinates.longitude ELSE null END,
-                loc.created_at = timestamp()
+                loc.created_at = timestamp(),
+                loc.updated_at = timestamp()
               ON MATCH SET 
-                loc.type = l.type,
-                loc.country = l.country,
-                loc.region = l.region,
+                loc += l,
                 loc.latitude = CASE WHEN l.coordinates IS NOT NULL THEN l.coordinates.latitude ELSE null END,
                 loc.longitude = CASE WHEN l.coordinates IS NOT NULL THEN l.coordinates.longitude ELSE null END,
                 loc.updated_at = timestamp()
@@ -405,7 +402,7 @@ export class Neo4jService {
           cypher = `
             UNWIND $entities AS e
             MERGE (ev:Event {event_id: e.event_id})
-              ON CREATE SET ev += e, ev.created_at = timestamp()
+              ON CREATE SET ev += e, ev.created_at = timestamp(), ev.updated_at = timestamp()
               ON MATCH SET ev += e, ev.updated_at = timestamp()
             RETURN ev
           `;
@@ -415,7 +412,7 @@ export class Neo4jService {
           cypher = `
             UNWIND $entities AS n
             MERGE (news:News {id: n.id})
-              ON CREATE SET news += n, news.created_at = timestamp()
+              ON CREATE SET news += n, news.created_at = timestamp(), news.updated_at = timestamp()
               ON MATCH SET news += n, news.updated_at = timestamp()
             RETURN news
           `;

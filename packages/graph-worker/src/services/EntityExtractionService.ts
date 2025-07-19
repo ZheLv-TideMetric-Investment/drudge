@@ -2,7 +2,7 @@ import { logger } from '../utils/logger';
 import aiService from './AiService';
 import notificationService from './NotificationService';
 import { z } from 'zod';
-import { getCurrentTimestamp, getCurrentTime } from '../utils/timeUtils';
+import { getCurrentTime } from '../utils/timeUtils';
 import {
   EVENT_TYPE_VALUES,
   SENTIMENT_VALUES,
@@ -741,8 +741,6 @@ export class EntityExtractionService {
             event_level: event.event_level || DEFAULT_EVENT_LEVEL,
             timestamp: event.timestamp || newsItem.timestamp,
             raw_time: newsItem.raw_time,
-            created_at: getCurrentTimestamp(),
-            updated_at: getCurrentTimestamp(),
           }));
       }
 
@@ -757,8 +755,6 @@ export class EntityExtractionService {
             market: company.market || '',
             country: company.country || '',
             aliases: Array.isArray(company.aliases) ? company.aliases : [],
-            created_at: getCurrentTimestamp(),
-            updated_at: getCurrentTimestamp(),
           }));
       }
 
@@ -771,8 +767,6 @@ export class EntityExtractionService {
             title: person.title || '',
             company: person.company || '',
             nationality: person.nationality || '',
-            created_at: getCurrentTimestamp(),
-            updated_at: getCurrentTimestamp(),
           }));
       }
 
@@ -784,8 +778,6 @@ export class EntityExtractionService {
             organization_name: org.organization_name || '',
             type: org.type || DEFAULT_ORGANIZATION_TYPE,
             country: org.country || '',
-            created_at: getCurrentTimestamp(),
-            updated_at: getCurrentTimestamp(),
           }));
       }
 
@@ -801,8 +793,6 @@ export class EntityExtractionService {
             country: location.country || '',
             region: location.region || '',
             coordinates: location.coordinates || undefined,
-            created_at: getCurrentTimestamp(),
-            updated_at: getCurrentTimestamp(),
           }));
       }
 
