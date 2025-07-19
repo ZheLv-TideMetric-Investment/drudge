@@ -1,5 +1,6 @@
 import neo4j, { Driver, Session } from 'neo4j-driver';
 import { config } from '../config';
+import { NodeType } from '../../../constants/enums';
 
 /**
  * Neo4j 数据库服务
@@ -57,6 +58,11 @@ class Neo4jService {
    * 执行查询
    */
   async executeQuery(cypher: string, parameters: any = {}): Promise<any> {
+    // 确保连接已建立
+    if (!this.driver) {
+      await this.connect();
+    }
+    
     const session = this.getSession();
     try {
       const result = await session.run(cypher, parameters);
@@ -73,6 +79,11 @@ class Neo4jService {
    * 执行事务
    */
   async executeTransaction(work: (tx: any) => Promise<any>): Promise<any> {
+    // 确保连接已建立
+    if (!this.driver) {
+      await this.connect();
+    }
+    
     const session = this.getSession();
     try {
       return await session.executeWrite(work);
@@ -90,8 +101,18 @@ class Neo4jService {
   async healthCheck(): Promise<boolean> {
     try {
       if (!this.driver) {
+        try {
+          await this.connect();
+        } catch (error) {
+          console.error('Neo4j 自动连接失败:', error);
+          return false;
+        }
+      }
+      
+      if (!this.driver) {
         return false;
       }
+      
       await this.driver.verifyConnectivity();
       return true;
     } catch (error) {
@@ -119,15 +140,13 @@ class Neo4jService {
           UNION ALL
           MATCH (n:Event) RETURN count(n) as event_count
           UNION ALL
-          MATCH (n:Time) RETURN count(n) as time_count
-          UNION ALL
           MATCH ()-[r]->() RETURN count(r) as relationship_count
           UNION ALL
           MATCH (n) RETURN count(n) as total_nodes
         }
         RETURN collect({news: news_count, companies: company_count, persons: person_count, 
                        organizations: organization_count, locations: location_count, 
-                       events: event_count, times: time_count, relationships: relationship_count, 
+                       events: event_count, relationships: relationship_count, 
                        totalNodes: total_nodes}) as stats
       `;
       
@@ -143,7 +162,6 @@ class Neo4jService {
           organizations: 0,
           locations: 0,
           events: 0,
-          times: 0,
           connected: this.connected 
         };
       }
@@ -172,18 +190,16 @@ class Neo4jService {
         MATCH (o:Organization) WITH news_count, company_count, person_count, count(o) as organization_count
         MATCH (l:Location) WITH news_count, company_count, person_count, organization_count, count(l) as location_count
         MATCH (e:Event) WITH news_count, company_count, person_count, organization_count, location_count, count(e) as event_count
-        MATCH (t:Time) WITH news_count, company_count, person_count, organization_count, location_count, event_count, count(t) as time_count
-        MATCH ()-[r]->() WITH news_count, company_count, person_count, organization_count, location_count, event_count, time_count, count(r) as relationship_count
+        MATCH ()-[r]->() WITH news_count, company_count, person_count, organization_count, location_count, event_count, count(r) as relationship_count
         RETURN 
-          news_count + company_count + person_count + organization_count + location_count + event_count + time_count as totalNodes,
+          news_count + company_count + person_count + organization_count + location_count + event_count as totalNodes,
           relationship_count as relationships,
           news_count as news,
           company_count as companies,
           person_count as persons,
           organization_count as organizations,
           location_count as locations,
-          event_count as events,
-          time_count as times
+          event_count as events
       `;
 
       const result = await this.executeQuery(cypher);
@@ -197,8 +213,7 @@ class Neo4jService {
           persons: 0,
           organizations: 0,
           locations: 0,
-          events: 0,
-          times: 0
+          events: 0
         };
       }
 
@@ -211,8 +226,7 @@ class Neo4jService {
         persons: record.get('persons').toNumber(),
         organizations: record.get('organizations').toNumber(),
         locations: record.get('locations').toNumber(),
-        events: record.get('events').toNumber(),
-        times: record.get('times').toNumber()
+        events: record.get('events').toNumber()
       };
     } catch (error: any) {
       console.error('获取简化统计信息失败:', error);
@@ -224,8 +238,7 @@ class Neo4jService {
         persons: 0,
         organizations: 0,
         locations: 0,
-        events: 0,
-        times: 0
+        events: 0
       };
     }
   }
@@ -288,25 +301,30 @@ class Neo4jService {
     try {
       const cypher = `
         CALL {
-          MATCH (n:News) RETURN 'News' as label, count(n) as count
+          MATCH (n:News) RETURN $newsType as label, count(n) as count
           UNION ALL
-          MATCH (n:Company) RETURN 'Company' as label, count(n) as count
+          MATCH (n:Company) RETURN $companyType as label, count(n) as count
           UNION ALL
-          MATCH (n:Person) RETURN 'Person' as label, count(n) as count
+          MATCH (n:Person) RETURN $personType as label, count(n) as count
           UNION ALL
-          MATCH (n:Organization) RETURN 'Organization' as label, count(n) as count
+          MATCH (n:Organization) RETURN $organizationType as label, count(n) as count
           UNION ALL
-          MATCH (n:Location) RETURN 'Location' as label, count(n) as count
+          MATCH (n:Location) RETURN $locationType as label, count(n) as count
           UNION ALL
-          MATCH (n:Event) RETURN 'Event' as label, count(n) as count
-          UNION ALL
-          MATCH (n:Time) RETURN 'Time' as label, count(n) as count
+          MATCH (n:Event) RETURN $eventType as label, count(n) as count
         }
         RETURN label, count
         ORDER BY count DESC
       `;
 
-      const result = await this.executeQuery(cypher);
+      const result = await this.executeQuery(cypher, {
+        newsType: NodeType.NEWS,
+        companyType: NodeType.COMPANY,
+        personType: NodeType.PERSON,
+        organizationType: NodeType.ORGANIZATION,
+        locationType: NodeType.LOCATION,
+        eventType: NodeType.EVENT
+      });
       
       const stats: Record<string, number> = {};
       result.records.forEach((record: any) => {

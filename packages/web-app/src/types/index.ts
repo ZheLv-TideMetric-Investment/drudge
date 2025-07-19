@@ -1,3 +1,11 @@
+import { 
+  EventType, 
+  Sentiment, 
+  NodeType, 
+  RelationshipType, 
+  SystemRelationshipType 
+} from '../../constants/enums';
+
 // 新闻相关类型
 export interface NewsItem {
   id: string;
@@ -17,13 +25,13 @@ export interface NewsItem {
 export interface Entity {
   id: string;
   name: string;
-  type: 'Company' | 'Person' | 'Location' | 'Event' | 'Time' | 'Organization';
+  type: NodeType;
   properties: Record<string, string | number | boolean>;
 }
 
 // 公司节点
 export interface Company extends Entity {
-  type: 'Company';
+  type: NodeType.COMPANY;
   company_name: string;
   ticker?: string;
   industry?: string;
@@ -36,7 +44,7 @@ export interface Company extends Entity {
 
 // 人物节点
 export interface Person extends Entity {
-  type: 'Person';
+  type: NodeType.PERSON;
   person_name: string;
   title?: string;
   company?: string;
@@ -47,7 +55,7 @@ export interface Person extends Entity {
 
 // 机构节点
 export interface Organization extends Entity {
-  type: 'Organization';
+  type: NodeType.ORGANIZATION;
   organization_name: string;
   type_detail?: 'government' | 'regulator' | 'intl_org' | 'fin_inst' | 'industry_assoc' | 'other';
   country?: string;
@@ -57,7 +65,7 @@ export interface Organization extends Entity {
 
 // 地点节点
 export interface Location extends Entity {
-  type: 'Location';
+  type: NodeType.LOCATION;
   location_name: string;
   location_type?: 'country' | 'region' | 'city' | 'facility' | 'other';
   country?: string;
@@ -68,41 +76,29 @@ export interface Location extends Entity {
 
 // 事件节点
 export interface Event extends Entity {
-  type: 'Event';
+  type: NodeType.EVENT;
   event_id: string;
   event_name: string;
   event_description: string;
-  event_type: 'macro' | 'policy' | 'market' | 'corporate' | 'industry' | 'tech' | 'geopolitics' | 'other';
+  event_type: EventType;
   significance: number;
-  sentiment: 'positive' | 'negative' | 'neutral';
+  sentiment: Sentiment;
   magnitude: number;
   event_level: string;
-  event_date: string;
-  raw_event_date?: string;
-  parsed_event_date?: string;
+  timestamp: string;
+  raw_time?: any;
   created_at: string;
   updated_at: string;
 }
 
-// 时间节点
-export interface Time extends Entity {
-  type: 'Time';
-  time_value: string;
-  time_type?: 'DATETIME' | 'DATE' | 'TIME' | 'PERIOD' | 'OTHER';
-  precision?: 'YEAR' | 'MONTH' | 'DAY' | 'HOUR' | 'MINUTE' | 'SECOND';
-  timezone?: string;
-  raw_value?: string;
-  parsed_iso?: string;
-  created_at: string;
-  updated_at: string;
-}
+// 时间节点已移除 - Time节点已从数据库schema中删除，时间数据直接存储在各节点的timestamp字段中
 
 // 关系类型
 export interface Relationship {
   id: string;
   source: string;
   target: string;
-  type: 'LOCATED_IN' | 'WORKS_FOR' | 'OWNS' | 'PARTICIPATES_IN' | 'MERGES_WITH' | 'ACQUIRES' | 'SUPPLIES' | 'PARTNERS_WITH' | 'SUED_BY' | 'REGULATED_BY' | 'INVESTS_IN' | 'DESCRIBES' | 'LOCATED_AT' | 'OCCURRED_AT' | 'OTHER';
+  type: RelationshipType | SystemRelationshipType;
   description?: string;
   confidence?: number;
   inferred?: boolean;

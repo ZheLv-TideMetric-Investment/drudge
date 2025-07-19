@@ -47,7 +47,7 @@ class NotificationService {
       };
 
       const emoji = urgencyEmoji[news.urgency] || '⚠️';
-      const timestamp = moment(news.timestamp).format('HH:mm:ss');
+      const timestamp = moment(news.timestamp).tz('Asia/Shanghai').format('HH:mm:ss');
 
       let message = `${emoji} **高级别新闻提醒** [${news.level}]
 
@@ -116,7 +116,7 @@ class NotificationService {
       // 提取markdown总结内容
       const summaryContent = typeof summary === 'string' ? summary : summary.summary;
       
-      const message = `📊 **小时新闻总结** (${moment(hourStart).format('HH:00')}-${moment(hourEnd).format('HH:00')})
+      const message = `📊 **小时总结** (${moment(hourStart).tz('Asia/Shanghai').format('HH:00')}-${moment(hourEnd).tz('Asia/Shanghai').format('HH:00')})
 
 ${summaryContent}
 
@@ -126,7 +126,7 @@ ${highLevelNews.slice(0, 3).map((item: any, index: number) =>
 ).join('\n')}`;
 
       await this.webhook.sendMessage(message);
-      console.log(`小时总结通知已发送: ${moment(hourStart).format('HH:00')}-${moment(hourEnd).format('HH:00')}`);
+      console.log(`小时总结通知已发送: ${moment(hourStart).tz('Asia/Shanghai').format('HH:00')}-${moment(hourEnd).tz('Asia/Shanghai').format('HH:00')}`);
       return true;
     } catch (error: any) {
       console.error('发送小时总结通知失败:', error);
@@ -156,14 +156,14 @@ ${highLevelNews.slice(0, 3).map((item: any, index: number) =>
     }
 
     try {
-      const date = moment(end).format('YYYY年MM月DD日');
+      const date = moment(end).tz('Asia/Shanghai').format('YYYY年MM月DD日');
 
       // 提取markdown总结内容
       const summaryContent = typeof summary === 'string' ? summary : summary.summary;
 
       const message = `🌅 **每日新闻总结** ${date} 晨报
 
-📅 **时间段**: ${moment(start).format('MM-DD HH:00')} - ${moment(end).format('MM-DD HH:00')}
+📅 **时间段**: ${moment(start).tz('Asia/Shanghai').format('MM-DD HH:00')} - ${moment(end).tz('Asia/Shanghai').format('MM-DD HH:00')}
 📊 **数据概览**: ${dailyData.news_count}条新闻 | ${dailyData.high_level_count || 0}条高级别
 
 ${summaryContent}`;
@@ -187,7 +187,7 @@ ${summaryContent}`;
     try {
       const alertMessage = `🚨 **系统警报** - ${title}
 
-📅 **时间**: ${moment().format('YYYY-MM-DD HH:mm:ss')}
+📅 **时间**: ${moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')}
 📋 **详情**: ${message}
 🔧 **来源**: ${source}`;
 

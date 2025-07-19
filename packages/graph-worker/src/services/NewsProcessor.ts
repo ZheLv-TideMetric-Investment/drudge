@@ -5,6 +5,8 @@ import knowledgeGraphService from './KnowledgeGraphService';
 import notificationService from './NotificationService';
 import { FileInfo, markFileAsProcessed } from './FileScanner';
 import { NewsItem, ProcessResult } from '../types/index';
+import { parseTime } from '../utils/timeUtils';
+import { getCurrentTime } from '../utils/timeUtils';
 
 /**
  * 新闻处理服务
@@ -219,15 +221,21 @@ function convertSingleNewsItem(item: any, fileInfo: FileInfo): NewsItem | null {
     const description = item.description || item.summary || '';
     
     // 处理时间戳
-    let timestamp: Date;
+    let timestamp: string;
+    let rawTime: any;
+    
     if (item.timestamp) {
-      timestamp = new Date(typeof item.timestamp === 'number' ? item.timestamp * 1000 : item.timestamp);
+      rawTime = item.timestamp;
+      timestamp = parseTime(item.timestamp);
     } else if (item.time) {
-      timestamp = new Date(typeof item.time === 'number' ? item.time * 1000 : item.time);
+      rawTime = item.time;
+      timestamp = parseTime(item.time);
     } else if (item.publishTime || item.publish_time) {
-      timestamp = new Date(item.publishTime || item.publish_time);
+      rawTime = item.publishTime || item.publish_time;
+      timestamp = parseTime(item.publishTime || item.publish_time);
     } else {
-      timestamp = fileInfo.modifiedTime; // 使用文件修改时间作为默认值
+      rawTime = fileInfo.modifiedTime;
+      timestamp = parseTime(fileInfo.modifiedTime);
     }
 
     // 验证必要字段
@@ -241,9 +249,10 @@ function convertSingleNewsItem(item: any, fileInfo: FileInfo): NewsItem | null {
       description,
       content,
       source: item.source || 'futu_live',
-      url: item.url || item.link || '',
+      url: item.url || item.link || item.detailUrl || '',
       timestamp,
-      level: item.level || item.news_level || 5,
+      raw_time: rawTime,
+      level: 5,
       processed: false
     };
 
@@ -294,7 +303,7 @@ export async function getProcessorStats(): Promise<any> {
         '包含list字段的对象',
         '包含news字段的对象'
       ],
-      timestamp: new Date().toISOString()
+      timestamp: getCurrentTime()
     };
   } catch (error) {
     logger.error('获取处理器状态失败:', error);

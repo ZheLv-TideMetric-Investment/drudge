@@ -1,16 +1,24 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
-import { parseTimeToUTC } from '../utils/timeUtils';
-import { 
-  NewsExtractionResult, 
-  Event, 
-  Company, 
-  Person, 
-  Organization, 
-  Location, 
-  Time, 
+import { parseTime, getCurrentTime } from '../utils/timeUtils';
+import {
+  EVENT_LEVELS,
+  EVENT_TYPES,
+  SENTIMENTS,
+  ORGANIZATION_TYPES,
+  LOCATION_TYPES,
+  SYSTEM_RELATIONSHIP_TYPES,
+} from '../constants/enums';
+
+import {
+  NewsExtractionResult,
+  Event,
+  Company,
+  Person,
+  Organization,
+  Location,
   Relationship,
-  NewsItem 
+  NewsItem,
 } from '../types/index';
 
 /**
@@ -42,12 +50,13 @@ export class EntityService {
   /**
    * 创建新闻节点
    */
-  async createNews(newsItem: NewsItem, newsLevel: string = 'Level 5'): Promise<void> {
+  async createNews(newsItem: NewsItem, newsLevel: string = EVENT_LEVELS.LEVEL_5): Promise<void> {
     const cypher = `
       MERGE (n:News {id: $id})
       SET n.title = $title,
           n.content = $content,
           n.timestamp = $timestamp,
+          n.raw_time = $rawTime,
           n.source = $source,
           n.url = $url,
           n.level = $level,
@@ -62,13 +71,14 @@ export class EntityService {
       id: newsItem.id,
       title: newsItem.title,
       content: newsItem.content,
-      timestamp: parseTimeToUTC(newsItem.time),
+      timestamp: newsItem.timestamp,
+      rawTime: newsItem.raw_time || null,
       source: newsItem.source || '',
       url: newsItem.url || '',
       level: newsItem.level || 0,
       newsLevel,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime(),
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -84,13 +94,12 @@ export class EntityService {
       SET e.event_name = $eventName,
           e.event_description = $eventDescription,
           e.event_type = $eventType,
-          e.event_date = $eventDate,
+          e.timestamp = $timestamp,
+          e.raw_time = $rawTime,
           e.sentiment = $sentiment,
           e.magnitude = $magnitude,
           e.event_level = $eventLevel,
           e.significance = $significance,
-          e.raw_event_date = $rawEventDate,
-          e.parsed_event_date = $parsedEventDate,
           e.created_at = $createdAt,
           e.updated_at = $updatedAt
       WITH e
@@ -103,17 +112,16 @@ export class EntityService {
       eventId: event.event_id,
       eventName: event.event_name,
       eventDescription: event.event_description || '',
-      eventType: event.event_type || 'other',
-      eventDate: event.event_date || new Date().toISOString(),
-      sentiment: event.sentiment || 'neutral',
+      eventType: event.event_type || EVENT_TYPES.OTHER,
+      timestamp: event.timestamp || getCurrentTime(),
+      rawTime: event.raw_time || null,
+      sentiment: event.sentiment || SENTIMENTS.NEUTRAL,
       magnitude: event.magnitude || 0,
-      eventLevel: event.event_level || 'Level 5',
+      eventLevel: event.event_level || EVENT_LEVELS.LEVEL_5,
       significance: event.significance || 1,
-      rawEventDate: event.raw_event_date || '',
-      parsedEventDate: event.parsed_event_date || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      newsId
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime(),
+      newsId,
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -146,9 +154,9 @@ export class EntityService {
       market: company.market || '',
       country: company.country || '',
       aliases: company.aliases && company.aliases.length > 0 ? company.aliases : [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      newsId
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime(),
+      newsId,
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -177,9 +185,9 @@ export class EntityService {
       title: person.title || '',
       company: person.company || '',
       nationality: person.nationality || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      newsId
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime(),
+      newsId,
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -204,11 +212,11 @@ export class EntityService {
 
     const parameters = {
       organizationName: organization.organization_name,
-      type: organization.type || 'other',
+      type: organization.type || ORGANIZATION_TYPES.OTHER,
       country: organization.country || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      newsId
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime(),
+      newsId,
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -237,54 +245,19 @@ export class EntityService {
 
     const parameters = {
       locationName: location.location_name,
-      type: location.type || 'other',
+      type: location.type || LOCATION_TYPES.OTHER,
       country: location.country || '',
       region: location.region || '',
       coordinates: location.coordinates ? JSON.stringify(location.coordinates) : null,
       latitude: location.coordinates?.latitude || null,
       longitude: location.coordinates?.longitude || null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      newsId
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime(),
+      newsId,
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
     logger.debug(`位置节点创建成功: ${location.location_name}`);
-  }
-
-  /**
-   * 创建时间节点 - 使用标准枚举和时间标准化字段
-   */
-  async createTime(time: Time, newsId: string): Promise<void> {
-    const cypher = `
-      MERGE (t:Time {time_value: $timeValue})
-      SET t.type = $type,
-          t.precision = $precision,
-          t.timezone = $timezone,
-          t.raw_value = $rawValue,
-          t.parsed_iso = $parsedIso,
-          t.created_at = $createdAt,
-          t.updated_at = $updatedAt
-      WITH t
-      MATCH (n:News {id: $newsId})
-      MERGE (n)-[:OCCURRED_AT]->(t)
-      RETURN t
-    `;
-
-    const parameters = {
-      timeValue: time.time_value,
-      type: time.type || 'OTHER',
-      precision: time.precision || 'DAY',
-      timezone: time.timezone || '',
-      rawValue: time.raw_value || '',
-      parsedIso: time.parsed_iso || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      newsId
-    };
-
-    await this.neo4j.executeQuery(cypher, parameters);
-    logger.debug(`时间节点创建成功: ${time.time_value}`);
   }
 
   /**
@@ -299,13 +272,16 @@ export class EntityService {
         id: extractionResult.newsId || '',
         title: extractionResult.title || '',
         content: extractionResult.content || '',
-        time: new Date(extractionResult.timestamp).getTime() / 1000,
         source: extractionResult.source || '',
         url: extractionResult.url || '',
         level: 0, // 兼容旧字段
-        timestamp: new Date(extractionResult.timestamp)
+        timestamp:
+          typeof extractionResult.timestamp === 'string'
+            ? extractionResult.timestamp
+            : parseTime(extractionResult.timestamp),
+        raw_time: extractionResult.raw_time,
       };
-      
+
       await this.createNews(newsItem, extractionResult.news_level);
 
       // 2. 批量创建实体（使用新的 MERGE 模板）
@@ -327,10 +303,6 @@ export class EntityService {
 
       if (extractionResult.locations.length > 0) {
         await this.neo4j.batchMergeEntities('Location', extractionResult.locations);
-      }
-
-      if (extractionResult.times.length > 0) {
-        await this.neo4j.batchMergeEntities('Time', extractionResult.times);
       }
 
       // 3. 批量创建关系
@@ -369,8 +341,8 @@ export class EntityService {
         toType: 'Event',
         toKey: 'event_id',
         toValue: event.event_id,
-        relType: 'DESCRIBES',
-        properties: { confidence: 0.9 }
+        relType: SYSTEM_RELATIONSHIP_TYPES.DESCRIBES,
+        properties: { confidence: 0.9 },
       });
     }
 
@@ -383,8 +355,8 @@ export class EntityService {
         toType: 'Company',
         toKey: 'company_name',
         toValue: company.company_name,
-        relType: 'INVOLVES',
-        properties: { confidence: 0.8 }
+        relType: SYSTEM_RELATIONSHIP_TYPES.INVOLVES,
+        properties: { confidence: 0.8 },
       });
     }
 
@@ -397,8 +369,8 @@ export class EntityService {
         toType: 'Person',
         toKey: 'person_name',
         toValue: person.person_name,
-        relType: 'MENTIONS',
-        properties: { confidence: 0.8 }
+        relType: SYSTEM_RELATIONSHIP_TYPES.MENTIONS,
+        properties: { confidence: 0.8 },
       });
     }
 
@@ -411,8 +383,8 @@ export class EntityService {
         toType: 'Organization',
         toKey: 'organization_name',
         toValue: organization.organization_name,
-        relType: 'INVOLVES',
-        properties: { confidence: 0.8 }
+        relType: SYSTEM_RELATIONSHIP_TYPES.INVOLVES,
+        properties: { confidence: 0.8 },
       });
     }
 
@@ -425,22 +397,8 @@ export class EntityService {
         toType: 'Location',
         toKey: 'location_name',
         toValue: location.location_name,
-        relType: 'LOCATED_AT',
-        properties: { confidence: 0.7 }
-      });
-    }
-
-    // 新闻 -> 时间
-    for (const time of extractionResult.times) {
-      relationships.push({
-        fromType: 'News',
-        fromKey: 'id',
-        fromValue: newsId,
-        toType: 'Time',
-        toKey: 'time_value',
-        toValue: time.time_value,
-        relType: 'OCCURRED_AT',
-        properties: { confidence: 0.7 }
+        relType: SYSTEM_RELATIONSHIP_TYPES.LOCATED_AT,
+        properties: { confidence: 0.7 },
       });
     }
 
@@ -484,7 +442,9 @@ export class EntityService {
       const processedIds = result.records.map((record: any) => record.get('id'));
       const unprocessedIds = newsIds.filter(id => !processedIds.includes(id));
 
-      logger.info(`总计 ${newsIds.length} 条新闻，已处理 ${processedIds.length} 条，未处理 ${unprocessedIds.length} 条`);
+      logger.info(
+        `总计 ${newsIds.length} 条新闻，已处理 ${processedIds.length} 条，未处理 ${unprocessedIds.length} 条`
+      );
 
       return unprocessedIds;
     } catch (error) {
@@ -500,19 +460,19 @@ export class EntityService {
     try {
       // 检查数据库连接
       const result = await this.neo4j.executeQuery('RETURN 1 as test');
-      
+
       return {
         status: 'healthy',
         service: 'EntityService',
-        timestamp: new Date().toISOString(),
-        neo4j_connection: result ? 'connected' : 'disconnected'
+        timestamp: getCurrentTime(),
+        neo4j_connection: result ? 'connected' : 'disconnected',
       };
     } catch (error: any) {
       return {
         status: 'unhealthy',
         service: 'EntityService',
-        timestamp: new Date().toISOString(),
-        error: error.message
+        timestamp: getCurrentTime(),
+        error: error.message,
       };
     }
   }
@@ -525,4 +485,4 @@ export class EntityService {
   }
 }
 
-export default new EntityService(); 
+export default new EntityService();

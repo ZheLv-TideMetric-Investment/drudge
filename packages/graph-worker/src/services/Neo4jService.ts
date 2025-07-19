@@ -108,7 +108,7 @@ export class Neo4jService {
       );
       
       await session.run(
-        'CREATE INDEX news_timestamp_index IF NOT EXISTS FOR (n:News) ON (n.timestamp)'
+        'CREATE RANGE INDEX news_timestamp_range_index IF NOT EXISTS FOR (n:News) ON (n.timestamp)'
       );
       
       await session.run(
@@ -132,9 +132,7 @@ export class Neo4jService {
         'CREATE INDEX location_name_index IF NOT EXISTS FOR (l:Location) ON (l.location_name)'
       );
       
-      await session.run(
-        'CREATE INDEX time_value_index IF NOT EXISTS FOR (t:Time) ON (t.time_value)'
-      );
+
       
       // 事件节点索引
       await session.run(
@@ -146,7 +144,7 @@ export class Neo4jService {
       );
       
       await session.run(
-        'CREATE INDEX event_date_index IF NOT EXISTS FOR (e:Event) ON (e.event_date)'
+        'CREATE RANGE INDEX event_timestamp_range_index IF NOT EXISTS FOR (e:Event) ON (e.timestamp)'
       );
       
       await session.run(
@@ -420,16 +418,6 @@ export class Neo4jService {
               ON CREATE SET news += n, news.created_at = timestamp()
               ON MATCH SET news += n, news.updated_at = timestamp()
             RETURN news
-          `;
-          break;
-          
-        case 'Time':
-          cypher = `
-            UNWIND $entities AS t
-            MERGE (time:Time {time_value: t.time_value})
-              ON CREATE SET time += t, time.created_at = timestamp()
-              ON MATCH SET time += t, time.updated_at = timestamp()
-            RETURN time
           `;
           break;
           

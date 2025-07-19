@@ -4,6 +4,7 @@ import { startHttpServer } from './http/index';
 import aiService from './services/AiService';
 import knowledgeGraphService from './services/KnowledgeGraphService';
 import config from './config/config';
+import { memoryMonitor } from './utils/memoryMonitor';
 
 /**
  * 初始化所有服务
@@ -11,6 +12,13 @@ import config from './config/config';
 async function initialize(): Promise<void> {
   try {
     logger.info('🚀 正在初始化graph-worker服务...');
+    
+    // 启动内存监控
+    logger.info('🔍 启动内存监控器...');
+    memoryMonitor.startMonitoring(); // 使用配置文件中的默认间隔
+    
+    // 显示初始内存状态
+    logger.info(memoryMonitor.getMemoryReport());
     
     // 初始化各个服务
     await aiService.initialize();
@@ -40,6 +48,7 @@ async function startMainService(): Promise<void> {
     logger.info('🎉 graph-worker服务启动完成');
     logger.info('📅 定时任务: 每1分钟扫描新闻文件进行图谱化');
     logger.info(`🌐 HTTP API: 端口 ${config.server.port}`);
+    logger.info('🔍 内存监控: 每30秒检查一次，自动垃圾回收');
     
   } catch (error: any) {
     logger.error('❌ 启动主服务失败:', error);
@@ -53,6 +62,14 @@ async function startMainService(): Promise<void> {
 function setupGracefulShutdown(): void {
   const shutdown = (signal: string) => {
     logger.info(`收到${signal}信号，正在优雅关闭服务...`);
+    
+    // 停止内存监控
+    logger.info('🔍 停止内存监控器...');
+    memoryMonitor.stopMonitoring();
+    
+    // 显示最终内存状态
+    logger.info('📊 最终内存状态:');
+    logger.info(memoryMonitor.getMemoryReport());
     
     // 停止和关闭调度器
     scheduler.stop();
@@ -71,6 +88,19 @@ function setupGracefulShutdown(): void {
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
+  
+  // 添加内存不足处理
+  process.on('uncaughtException', (error) => {
+    if (error.message.includes('heap out of memory') || error.message.includes('allocation failed')) {
+      logger.error('🚨 内存不足，强制垃圾回收...');
+      memoryMonitor.forceGarbageCollection();
+      logger.error('❌ 严重内存错误，服务即将退出:', error.message);
+      process.exit(1);
+    } else {
+      logger.error('❌ 未捕获的异常:', error);
+      process.exit(1);
+    }
+  });
 }
 
 /**

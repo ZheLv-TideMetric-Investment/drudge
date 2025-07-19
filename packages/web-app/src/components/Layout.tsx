@@ -23,7 +23,7 @@ const navigation = [
   { key: '/graph', label: '知识图谱', icon: ShareAltOutlined },
   { key: '/summary', label: '总结报告', icon: SnippetsOutlined },
   { key: '/monitor', label: '实时监控', icon: EyeOutlined },
-  { key: '/analytics', label: '统计分析', icon: BarChartOutlined },
+  { key: '/stats', label: '节点统计', icon: BarChartOutlined },
 ];
 
 interface LayoutProps {

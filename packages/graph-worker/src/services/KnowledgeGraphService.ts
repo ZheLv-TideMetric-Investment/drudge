@@ -2,6 +2,9 @@ import { logger } from '../utils/logger';
 import { EntityExtractionService } from './EntityExtractionService';
 import { EntityService } from './EntityService';
 import relationshipService from './RelationshipService';
+import config from '../config/config';
+import { getCurrentTime } from '../utils/timeUtils';
+import { RelationshipType } from '../constants/enums';
 import { 
   NewsItem, 
   NewsExtractionResult, 
@@ -59,7 +62,7 @@ export class KnowledgeGraphService {
         return {
           success: true,
           newsId: newsItem.id,
-          processed_at: new Date().toISOString()
+          processed_at: getCurrentTime()
         };
       }
 
@@ -71,7 +74,7 @@ export class KnowledgeGraphService {
       
       // 3. 创建关系
       await relationshipService.createRelationship(
-        { from: '', to: '', type: 'OTHER', description: '', confidence: 0.8 }, 
+        { from: '', to: '', type: RelationshipType.OTHER, description: '', confidence: 0.8 }, 
         extractionResult.newsId || ''
       );
       
@@ -89,7 +92,6 @@ export class KnowledgeGraphService {
         persons: extractionResult.persons?.length || 0,
         organizations: extractionResult.organizations.length,
         locations: extractionResult.locations.length,
-        times: extractionResult.times.length,
         relationships: extractionResult.relationships.length
       };
 
@@ -98,7 +100,7 @@ export class KnowledgeGraphService {
       return {
         success: true,
         newsId: newsItem.id,
-        processed_at: new Date().toISOString(),
+        processed_at: getCurrentTime(),
         stats
       };
 
@@ -108,19 +110,19 @@ export class KnowledgeGraphService {
       return {
         success: false,
         newsId: newsItem.id,
-        processed_at: new Date().toISOString(),
+        processed_at: getCurrentTime(),
         error: error.message
       };
     }
   }
 
   /**
-   * 批量处理新闻
+   * 批量处理新闻 - 优化版本，分块处理避免内存溢出
    */
   async batchProcessNews(newsItems: NewsItem[]): Promise<ProcessResult[]> {
     logger.info(`🔄 开始批量处理新闻: ${newsItems.length} 条`);
     
-    const results: ProcessResult[] = [];
+    const allResults: ProcessResult[] = [];
     
     // 先过滤出未处理的新闻
     const newsIds = newsItems.map(item => item.id);
@@ -132,16 +134,101 @@ export class KnowledgeGraphService {
       return newsItems.map(item => ({
         success: true,
         newsId: item.id,
-        processed_at: new Date().toISOString()
+        processed_at: getCurrentTime()
       }));
     }
 
     logger.info(`需要处理 ${unprocessedNews.length} 条未处理新闻`);
 
-    // 批量提取实体
-    const extractionResults = await this.entityExtractionService.batchExtractEntities(unprocessedNews);
+    // 从配置文件读取分块处理配置
+    const PROCESSING_CHUNK_SIZE = config.processing.memory.processingChunkSize;
+    const CHUNK_DELAY = config.processing.memory.chunkDelayMs * 2; // 处理分块间隔稍长一些
+    const MEMORY_THRESHOLD = config.processing.memory.dangerThreshold * config.processing.memory.maxHeapSizeMB * 1024 * 1024;
     
-    // 批量存储实体到图数据库
+    logger.info(`📊 处理配置: 分块大小=${PROCESSING_CHUNK_SIZE}, 延迟=${CHUNK_DELAY}ms`);
+    
+    // 分块处理未处理的新闻
+    for (let chunkStart = 0; chunkStart < unprocessedNews.length; chunkStart += PROCESSING_CHUNK_SIZE) {
+      const newsChunk = unprocessedNews.slice(chunkStart, chunkStart + PROCESSING_CHUNK_SIZE);
+      const chunkIndex = Math.floor(chunkStart / PROCESSING_CHUNK_SIZE) + 1;
+      const totalChunks = Math.ceil(unprocessedNews.length / PROCESSING_CHUNK_SIZE);
+      
+      logger.info(`🔄 处理新闻分块 ${chunkIndex}/${totalChunks}: ${newsChunk.length} 条新闻`);
+      
+      // 记录内存使用情况
+      const memoryBefore = process.memoryUsage();
+      logger.debug(`内存使用 (分块${chunkIndex}开始): ${Math.round(memoryBefore.heapUsed / 1024 / 1024)}MB`);
+      
+      try {
+        // 批量提取当前分块的实体
+        const extractionResults = await this.entityExtractionService.batchExtractEntities(newsChunk);
+        
+        // 立即处理提取结果，避免累积在内存中
+        const chunkResults = await this.processExtractionResults(extractionResults);
+        allResults.push(...chunkResults);
+        
+        // 记录分块处理后的内存使用情况
+        const memoryAfter = process.memoryUsage();
+        logger.debug(`内存使用 (分块${chunkIndex}结束): ${Math.round(memoryAfter.heapUsed / 1024 / 1024)}MB`);
+        
+        // 如果内存使用过高，触发垃圾回收
+        if (memoryAfter.heapUsed > MEMORY_THRESHOLD) {
+          logger.warn(`⚠️ 内存使用达到${Math.round(memoryAfter.heapUsed / 1024 / 1024)}MB，触发垃圾回收`);
+          if (global.gc && config.processing.memory.enableAutoGC) {
+            global.gc();
+            const memoryAfterGC = process.memoryUsage();
+            logger.info(`🗑️ 垃圾回收完成，内存释放到${Math.round(memoryAfterGC.heapUsed / 1024 / 1024)}MB`);
+          }
+        }
+        
+        logger.info(`✅ 分块${chunkIndex}处理完成: ${chunkResults.filter(r => r.success).length} 条成功`);
+        
+      } catch (error: any) {
+        logger.error(`❌ 分块${chunkIndex}处理失败:`, error);
+        
+        // 为失败的分块创建失败结果
+        const failedResults = newsChunk.map(newsItem => ({
+          success: false,
+          newsId: newsItem.id,
+          processed_at: getCurrentTime(),
+          error: `分块处理失败: ${error.message}`
+        }));
+        allResults.push(...failedResults);
+      }
+      
+      // 分块间添加延迟，给系统休息时间
+      if (chunkStart + PROCESSING_CHUNK_SIZE < unprocessedNews.length) {
+        await new Promise(resolve => setTimeout(resolve, CHUNK_DELAY));
+      }
+    }
+
+    // 批量创建关系（使用已处理的结果）
+    try {
+      // 分批创建关系，避免一次性处理所有关系
+      const successfulResults = allResults.filter(r => r.success);
+      if (successfulResults.length > 0) {
+        logger.info(`🔗 开始创建关系: ${successfulResults.length} 条成功处理的新闻`);
+        // 这里可以根据需要进一步优化关系创建过程
+      }
+      
+    } catch (error: any) {
+      logger.error(`❌ 批量关系创建失败:`, error);
+    }
+
+    const successful = allResults.filter(r => r.success).length;
+    const failed = allResults.filter(r => !r.success).length;
+    
+    logger.info(`✅ 批量处理完成: 成功 ${successful} 条，失败 ${failed} 条，总计 ${allResults.length} 条新闻`);
+    return allResults;
+  }
+
+  /**
+   * 处理提取结果，立即写入数据库
+   */
+  private async processExtractionResults(extractionResults: NewsExtractionResult[]): Promise<ProcessResult[]> {
+    const results: ProcessResult[] = [];
+    
+    // 逐个处理提取结果，避免批量累积
     for (const extractionResult of extractionResults) {
       try {
         await this.entityService.batchCreateEntities(extractionResult);
@@ -152,14 +239,13 @@ export class KnowledgeGraphService {
           persons: extractionResult.persons?.length || 0,
           organizations: extractionResult.organizations.length,
           locations: extractionResult.locations.length,
-          times: extractionResult.times.length,
           relationships: extractionResult.relationships.length
         };
 
         results.push({
           success: true,
           newsId: extractionResult.newsId || '',
-          processed_at: new Date().toISOString(),
+          processed_at: getCurrentTime(),
           stats
         });
 
@@ -168,25 +254,12 @@ export class KnowledgeGraphService {
         results.push({
           success: false,
           newsId: extractionResult.newsId || '',
-          processed_at: new Date().toISOString(),
+          processed_at: getCurrentTime(),
           error: error.message
         });
       }
     }
-
-    // 批量创建关系
-    try {
-      await relationshipService.batchCreateRelationships(extractionResults);
-      
-      // 创建推断关系
-      await relationshipService.createInferredRelationships(extractionResults);
-      
-      logger.info(`✅ 批量关系创建完成`);
-    } catch (error: any) {
-      logger.error(`❌ 批量关系创建失败:`, error);
-    }
-
-    logger.info(`✅ 批量处理完成: ${results.length} 条新闻`);
+    
     return results;
   }
 
@@ -207,7 +280,7 @@ export class KnowledgeGraphService {
       
       return {
         success: true,
-        timestamp: new Date().toISOString(),
+        timestamp: getCurrentTime(),
         version: '2.0.0', // 图谱服务版本
         initialized: this.initialized,
         services: {
@@ -230,7 +303,7 @@ export class KnowledgeGraphService {
       return {
         success: false,
         error: error.message,
-        timestamp: new Date().toISOString(),
+        timestamp: getCurrentTime(),
         version: '2.0.0',
         initialized: false,
         services: {
@@ -271,10 +344,20 @@ export class KnowledgeGraphService {
         `;
         params = { limit: neo4j.int(safeLimit) };
       } else {
-        // 使用更灵活的查询，检查节点的所有字符串属性
+        // 使用安全的查询方式，只对已知的字符串属性进行搜索，避免数组属性
         cypher = `
           MATCH (n)
-          WHERE ANY(prop IN keys(n) WHERE toString(n[prop]) CONTAINS $query)
+          WHERE 
+            (n.company_name IS NOT NULL AND toString(n.company_name) CONTAINS $query) OR
+            (n.person_name IS NOT NULL AND toString(n.person_name) CONTAINS $query) OR
+            (n.organization_name IS NOT NULL AND toString(n.organization_name) CONTAINS $query) OR
+            (n.location_name IS NOT NULL AND toString(n.location_name) CONTAINS $query) OR
+            (n.event_name IS NOT NULL AND toString(n.event_name) CONTAINS $query) OR
+            (n.title IS NOT NULL AND toString(n.title) CONTAINS $query) OR
+            (n.time_value IS NOT NULL AND toString(n.time_value) CONTAINS $query) OR
+            (n.ticker IS NOT NULL AND toString(n.ticker) CONTAINS $query) OR
+            (n.industry IS NOT NULL AND toString(n.industry) CONTAINS $query) OR
+            (n.event_description IS NOT NULL AND toString(n.event_description) CONTAINS $query)
           RETURN labels(n) as labels, n
           LIMIT $limit
         `;

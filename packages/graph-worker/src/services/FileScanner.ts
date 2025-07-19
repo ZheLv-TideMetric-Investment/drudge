@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { logger } from '../utils/logger';
 import config from '../config/config';
+import { getCurrentTime } from '../utils/timeUtils';
 
 /**
  * 文件扫描服务
@@ -128,7 +129,7 @@ export async function markFileAsProcessed(filePath: string): Promise<void> {
     // 写入处理记录
     const record = {
       fileName,
-      processedAt: new Date().toISOString(),
+      processedAt: getCurrentTime(),
       fileSize: fs.statSync(filePath).size,
       processedBy: 'graph-worker'
     };
@@ -155,7 +156,7 @@ export async function getFileProcessingStats(): Promise<any> {
         totalFiles: 0,
         processedFiles: 0,
         unprocessedFiles: 0,
-        lastScanTime: new Date().toISOString()
+        lastScanTime: getCurrentTime()
       };
     }
 
@@ -183,7 +184,7 @@ export async function getFileProcessingStats(): Promise<any> {
       totalFiles,
       processedFiles,
       unprocessedFiles: totalFiles - processedFiles,
-      lastScanTime: new Date().toISOString()
+      lastScanTime: getCurrentTime()
     };
 
   } catch (error) {

@@ -1,3 +1,12 @@
+import { 
+  EventType, 
+  Sentiment, 
+  EventLevel, 
+  OrganizationType, 
+  LocationType, 
+  RelationshipType 
+} from '../constants/enums';
+
 // 基础新闻接口
 export interface NewsItem {
   id: string;
@@ -6,8 +15,8 @@ export interface NewsItem {
   content?: string;
   source: string;
   url?: string;
-  timestamp: Date;
-  time?: number; // Unix timestamp in seconds
+  timestamp: string; // UTC ISO 8601 格式时间字符串
+  raw_time?: any; // 保存原始时间数据（任意格式）
   level?: number;
   processed?: boolean;
 }
@@ -19,6 +28,7 @@ export interface NewsExtractionResult {
   title: string;
   content?: string;
   timestamp: Date | string;
+  raw_time?: any; // 保存原始时间数据（任意格式）
   source?: string;
   url?: string;
   news_level?: string;
@@ -29,7 +39,6 @@ export interface NewsExtractionResult {
   persons?: Person[];
   organizations: Organization[];
   locations: Location[];
-  times: Time[];
   relationships: Relationship[];
 }
 
@@ -38,15 +47,13 @@ export interface Event {
   event_id: string;
   event_name: string;
   event_description: string;
-  event_type: 'macro' | 'policy' | 'market' | 'corporate' | 'industry' | 'tech' | 'geopolitics' | 'other';
+  event_type: EventType;
   significance: number; // 1-4
-  sentiment: 'positive' | 'negative' | 'neutral';
+  sentiment: Sentiment;
   magnitude: number; // -1.0 to 1.0
-  event_level: 'Level 1' | 'Level 2' | 'Level 3' | 'Level 4' | 'Level 5';
-  event_date: string;
-  // 时间标准化字段
-  raw_event_date?: string;
-  parsed_event_date?: string;
+  event_level: EventLevel;
+  timestamp: string; // UTC ISO 8601 格式时间字符串
+  raw_time?: any; // 保存原始时间数据（任意格式）
   created_at?: string;
   updated_at?: string;
 }
@@ -76,7 +83,7 @@ export interface Person {
 // 机构实体 - 使用标准枚举
 export interface Organization {
   organization_name: string;
-  type?: 'government' | 'regulator' | 'intl_org' | 'fin_inst' | 'industry_assoc' | 'other';
+  type?: OrganizationType;
   country?: string;
   created_at?: string;
   updated_at?: string;
@@ -85,7 +92,7 @@ export interface Organization {
 // 地点实体 - 使用标准枚举
 export interface Location {
   location_name: string;
-  type?: 'country' | 'region' | 'city' | 'facility' | 'other';
+  type?: LocationType;
   country?: string;
   region?: string;
   coordinates?: {
@@ -96,23 +103,11 @@ export interface Location {
   updated_at?: string;
 }
 
-// 时间实体 - 标准化时间处理
-export interface Time {
-  time_value: string;
-  type?: 'DATETIME' | 'DATE' | 'TIME' | 'PERIOD' | 'OTHER';
-  precision?: 'YEAR' | 'MONTH' | 'DAY' | 'HOUR' | 'MINUTE' | 'SECOND';
-  timezone?: string;
-  // 时间标准化字段
-  raw_value?: string;
-  parsed_iso?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+
 
 // 关系实体 - 使用标准关系类型
 export interface Relationship {
-  type: 'LOCATED_IN' | 'WORKS_FOR' | 'OWNS' | 'PARTICIPATES_IN' | 'MERGES_WITH' | 'ACQUIRES' | 
-        'SUPPLIES' | 'PARTNERS_WITH' | 'SUED_BY' | 'REGULATED_BY' | 'INVESTS_IN' | 'OTHER';
+  type: RelationshipType;
   from: string;
   to: string;
   description?: string;
@@ -155,7 +150,6 @@ export interface ProcessResult {
     persons: number;
     organizations: number;
     locations: number;
-    times: number;
     relationships: number;
   };
   processingTime?: number;

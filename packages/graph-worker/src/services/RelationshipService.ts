@@ -1,5 +1,7 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
+import { getCurrentTime } from '../utils/timeUtils';
+import { RELATIONSHIP_TYPES, SYSTEM_RELATIONSHIP_TYPES } from '../constants/enums';
 import { 
   NewsExtractionResult, 
   Relationship,
@@ -76,8 +78,8 @@ export class RelationshipService {
       description: relationship.description || '',
       confidence: relationship.confidence || 0.8,
       newsId,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      createdAt: getCurrentTime(),
+      updatedAt: getCurrentTime()
     };
 
     try {
@@ -132,8 +134,8 @@ export class RelationshipService {
           description: relationship.description || '',
           confidence: relationship.confidence || 0.8,
           newsId: result.newsId || '',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+          createdAt: getCurrentTime(),
+          updatedAt: getCurrentTime()
         };
 
         paramIndex++;
@@ -204,8 +206,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${new Date().toISOString()}",
-                  r.updated_at = "${new Date().toISOString()}"
+                  r.created_at = "${getCurrentTime()}",
+                  r.updated_at = "${getCurrentTime()}"
             `);
           }
         }
@@ -224,8 +226,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${new Date().toISOString()}",
-                  r.updated_at = "${new Date().toISOString()}"
+                  r.created_at = "${getCurrentTime()}",
+                  r.updated_at = "${getCurrentTime()}"
             `);
           }
         }
@@ -244,8 +246,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${new Date().toISOString()}",
-                  r.updated_at = "${new Date().toISOString()}"
+                  r.created_at = "${getCurrentTime()}",
+                  r.updated_at = "${getCurrentTime()}"
             `);
           }
         }
@@ -264,8 +266,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${new Date().toISOString()}",
-                  r.updated_at = "${new Date().toISOString()}"
+                  r.created_at = "${getCurrentTime()}",
+                  r.updated_at = "${getCurrentTime()}"
             `);
           }
         }
@@ -347,30 +349,27 @@ export class RelationshipService {
    */
   private sanitizeRelationshipType(relType: string): string {
     // 标准关系类型
-    const validRelationships = [
-      'LOCATED_IN', 'WORKS_FOR', 'OWNS', 'PARTICIPATES_IN', 'MERGES_WITH', 'ACQUIRES',
-      'SUPPLIES', 'PARTNERS_WITH', 'SUED_BY', 'REGULATED_BY', 'INVESTS_IN', 'OTHER'
-    ];
+    const validRelationships = Object.values(RELATIONSHIP_TYPES);
     
     // 检查是否是标准关系类型
     const upperRelType = relType.toUpperCase();
-    if (validRelationships.includes(upperRelType)) {
+    if (validRelationships.includes(upperRelType as any)) {
       return upperRelType;
     }
     
     // 尝试映射常见的关系类型
     const typeMapping: { [key: string]: string } = {
-      'DESCRIBES': 'OTHER',
-      'INVOLVES': 'PARTICIPATES_IN',
-      'MENTIONS': 'OTHER',
-      'LOCATED_AT': 'LOCATED_IN',
-      'OCCURRED_AT': 'OTHER',
-      'RELATED': 'OTHER',
-      'ASSOCIATED_WITH': 'OTHER',
-      'MEMBER_OF': 'PARTICIPATES_IN',
-      'SUBSIDIARY_OF': 'OWNS',
-      'PARENT_OF': 'OWNS',
-      'COMPETITOR_OF': 'OTHER'
+      [SYSTEM_RELATIONSHIP_TYPES.DESCRIBES]: RELATIONSHIP_TYPES.OTHER,
+      [SYSTEM_RELATIONSHIP_TYPES.INVOLVES]: RELATIONSHIP_TYPES.PARTICIPATES_IN,
+      [SYSTEM_RELATIONSHIP_TYPES.MENTIONS]: RELATIONSHIP_TYPES.OTHER,
+      [SYSTEM_RELATIONSHIP_TYPES.LOCATED_AT]: RELATIONSHIP_TYPES.LOCATED_IN,
+      'OCCURRED_AT': RELATIONSHIP_TYPES.OTHER,
+      'RELATED': RELATIONSHIP_TYPES.OTHER,
+      'ASSOCIATED_WITH': RELATIONSHIP_TYPES.OTHER,
+      'MEMBER_OF': RELATIONSHIP_TYPES.PARTICIPATES_IN,
+      'SUBSIDIARY_OF': RELATIONSHIP_TYPES.OWNS,
+      'PARENT_OF': RELATIONSHIP_TYPES.OWNS,
+      'COMPETITOR_OF': RELATIONSHIP_TYPES.OTHER
     };
     
     const mapped = typeMapping[upperRelType];
@@ -380,7 +379,7 @@ export class RelationshipService {
     
     // 默认返回 OTHER
     logger.warn(`未知关系类型: ${relType}，使用默认值 OTHER`);
-    return 'OTHER';
+    return RELATIONSHIP_TYPES.OTHER;
   }
 
   /**

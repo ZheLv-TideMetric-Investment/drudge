@@ -1,6 +1,7 @@
 import { logger } from '../../utils/logger';
 import knowledgeGraphService from '../../services/KnowledgeGraphService';
 import { NewsItem } from '../../types/index';
+import { getCurrentTime } from '../../utils/timeUtils';
 
 /**
  * 处理单条新闻
@@ -11,7 +12,7 @@ export async function processNews(newsItem: NewsItem): Promise<any> {
       return {
         success: false,
         error: '缺少必要的新闻数据字段 (id, title, content)',
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       };
     }
 
@@ -22,7 +23,7 @@ export async function processNews(newsItem: NewsItem): Promise<any> {
     return {
       success: true,
       data: result,
-      timestamp: new Date().toISOString()
+      timestamp: getCurrentTime()
     };
 
   } catch (error: any) {
@@ -30,7 +31,7 @@ export async function processNews(newsItem: NewsItem): Promise<any> {
     return {
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: getCurrentTime()
     };
   }
 }
@@ -44,7 +45,7 @@ export async function batchProcessNews(newsItems: NewsItem[]): Promise<any> {
       return {
         success: false,
         error: 'newsItems 必须是非空数组',
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       };
     }
 
@@ -62,7 +63,7 @@ export async function batchProcessNews(newsItems: NewsItem[]): Promise<any> {
       success: true,
       data: results,
       summary,
-      timestamp: new Date().toISOString()
+      timestamp: getCurrentTime()
     };
 
   } catch (error: any) {
@@ -70,7 +71,7 @@ export async function batchProcessNews(newsItems: NewsItem[]): Promise<any> {
     return {
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: getCurrentTime()
     };
   }
 }
@@ -84,7 +85,7 @@ export async function checkNewsStatus(newsIds: string[]): Promise<any> {
       return {
         success: false,
         error: 'newsIds 必须是数组',
-        timestamp: new Date().toISOString()
+        timestamp: getCurrentTime()
       };
     }
 
@@ -100,7 +101,7 @@ export async function checkNewsStatus(newsIds: string[]): Promise<any> {
         processedIds,
         unprocessedIds
       },
-      timestamp: new Date().toISOString()
+      timestamp: getCurrentTime()
     };
 
   } catch (error: any) {
@@ -108,7 +109,7 @@ export async function checkNewsStatus(newsIds: string[]): Promise<any> {
     return {
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: getCurrentTime()
     };
   }
 } 

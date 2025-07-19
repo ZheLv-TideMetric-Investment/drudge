@@ -1,5 +1,7 @@
 import { neo4jService } from './neo4j';
 import { GraphData, Entity, Relationship, GraphQueryResult, EntitySearchResult } from '@/types';
+import moment from 'moment-timezone';
+import { NodeType } from '../../../constants/enums';
 
 /**
  * 图谱查询服务
@@ -184,23 +186,10 @@ class GraphService {
    */
   async getRelationshipDistribution(): Promise<Record<string, number>> {
     try {
-      const cypher = `
-        MATCH ()-[r]->()
-        RETURN type(r) as relationshipType, count(r) as count
-        ORDER BY count DESC
-      `;
-
-      const result = await this.neo4j.executeQuery(cypher);
-      
-      const distribution: Record<string, number> = {};
-      result.records.forEach((record: any) => {
-        distribution[record.get('relationshipType')] = record.get('count').toNumber();
-      });
-
-      return distribution;
+      return await this.neo4j.getRelationshipStats();
     } catch (error: any) {
-      console.error('获取关系类型分布失败:', error);
-      return {};
+      console.error('获取关系分布失败:', error);
+      throw error;
     }
   }
 
@@ -238,7 +227,7 @@ class GraphService {
           nodes.set(newsNode.identity.toString(), {
             id: newsNode.identity.toString(),
             name: newsNode.properties.title || 'News',
-            type: 'News' as any,
+            type: NodeType.NEWS,
             properties: newsNode.properties
           });
         }
@@ -412,7 +401,6 @@ class GraphService {
     if (props.organization_name) return props.organization_name;
     if (props.location_name) return props.location_name;
     if (props.event_name) return props.event_name;
-    if (props.time_value) return props.time_value;
     if (props.title) return props.title;
     if (props.name) return props.name;
     return node.labels?.[0] || 'Unknown';
@@ -428,6 +416,145 @@ class GraphService {
       console.error('获取图谱统计信息失败:', error);
       throw error;
     }
+  }
+
+  /**
+   * 获取时间统计数据
+   * 昨天之前按天统计，今天按小时统计
+   */
+  async getTimeStats(): Promise<any> {
+    try {
+      // 获取北京时间的今天开始时间
+      const today = moment.tz('Asia/Shanghai').startOf('day');
+      const yesterday = today.clone().subtract(1, 'day');
+      const sevenDaysAgo = today.clone().subtract(7, 'days');
+
+      // 查询今天的每小时统计
+      const todayHourlyStats = await this.getTodayHourlyStats(today);
+      
+      // 查询昨天之前的每日统计（最近7天）
+      const dailyStats = await this.getDailyStats(sevenDaysAgo, yesterday);
+
+      return {
+        todayHourly: todayHourlyStats,
+        daily: dailyStats,
+        metadata: {
+          todayStart: today.toISOString(),
+          yesterdayStart: yesterday.toISOString(),
+          sevenDaysAgo: sevenDaysAgo.toISOString()
+        }
+      };
+    } catch (error: any) {
+      console.error('获取时间统计失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取今天的每小时统计
+   */
+  private async getTodayHourlyStats(today: moment.Moment): Promise<any[]> {
+    const todayStart = today.utc().toISOString();
+    const todayEnd = today.clone().endOf('day').utc().toISOString();
+
+    const cypher = `
+      MATCH (n:News)
+      WHERE n.timestamp >= $todayStart AND n.timestamp <= $todayEnd
+      RETURN n.timestamp as timestamp,
+             n.news_level as newsLevel,
+             count(n) as newsCount
+    `;
+
+    const result = await this.neo4j.executeQuery(cypher, {
+      todayStart,
+      todayEnd
+    });
+
+    // 创建0-23小时的完整数组，没有数据的小时显示为0
+    const hourlyData = Array.from({ length: 24 }, (_, hour) => ({
+      hour,
+      newsCount: 0,
+      highLevelCount: 0,
+      time: today.clone().hour(hour).format('HH:mm')
+    }));
+
+    // 处理返回的数据，按小时分组
+    result.records.forEach((record: any) => {
+      const timestamp = record.get('timestamp');
+      const newsLevel = record.get('newsLevel');
+      
+      // 将UTC时间转换为北京时间并获取小时
+      const beijingTime = moment.utc(timestamp).tz('Asia/Shanghai');
+      const hour = beijingTime.hour();
+      
+      if (hour >= 0 && hour <= 23) {
+        hourlyData[hour].newsCount += 1;
+        if (newsLevel === 'Level 1' || newsLevel === 'Level 2') {
+          hourlyData[hour].highLevelCount += 1;
+        }
+      }
+    });
+
+    return hourlyData;
+  }
+
+  /**
+   * 获取每日统计（昨天之前）
+   */
+  private async getDailyStats(startDate: moment.Moment, endDate: moment.Moment): Promise<any[]> {
+    const start = startDate.utc().toISOString();
+    const end = endDate.endOf('day').utc().toISOString();
+
+    const cypher = `
+      MATCH (n:News)
+      WHERE n.timestamp >= $start AND n.timestamp <= $end
+      RETURN n.timestamp as timestamp,
+             n.news_level as newsLevel
+    `;
+
+    const result = await this.neo4j.executeQuery(cypher, {
+      start,
+      end
+    });
+
+    // 创建日期分组映射
+    const dailyStats = new Map<string, { newsCount: number; highLevelCount: number }>();
+    
+    // 处理返回的数据，按日期分组
+    result.records.forEach((record: any) => {
+      const timestamp = record.get('timestamp');
+      const newsLevel = record.get('newsLevel');
+      
+      // 将UTC时间转换为北京时间并获取日期
+      const beijingTime = moment.utc(timestamp).tz('Asia/Shanghai');
+      const dateKey = beijingTime.format('YYYY-MM-DD');
+      
+      if (!dailyStats.has(dateKey)) {
+        dailyStats.set(dateKey, { newsCount: 0, highLevelCount: 0 });
+      }
+      
+      const dayStats = dailyStats.get(dateKey)!;
+      dayStats.newsCount += 1;
+      
+      if (newsLevel === 'Level 1' || newsLevel === 'Level 2') {
+        dayStats.highLevelCount += 1;
+      }
+    });
+
+    // 转换为数组并排序
+    const result_array = Array.from(dailyStats.entries())
+      .map(([dateKey, stats]) => {
+        const date = moment.tz(dateKey, 'Asia/Shanghai');
+        return {
+          date: dateKey,
+          dateDisplay: date.format('MM-DD'),
+          newsCount: stats.newsCount,
+          highLevelCount: stats.highLevelCount
+        };
+      })
+      .sort((a, b) => b.date.localeCompare(a.date)); // 按日期倒序排列
+
+    return result_array;
   }
 
   /**
