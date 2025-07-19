@@ -12,6 +12,7 @@
 
 ### 系统特性
 - **时间处理**: 所有时间数据统一使用 UTC 时区的 ISO 8601 格式存储 (YYYY-MM-DDTHH:mm:ss.sssZ)
+- **时间戳管理**: 所有实体和关系的时间戳由 Neo4j 数据库统一处理，确保一致性和准确性
 - **数据质量**: 严格的数据验证，不允许兜底数据，确保数据准确性
 - **失败处理**: 处理失败的新闻数据会保存到 `data/news/failed` 目录便于后续分析
 - **枚举管理**: 使用 TypeScript 枚举和 `ts-enum-util` 库进行类型安全的枚举操作
@@ -388,6 +389,29 @@ ORGANIZATION_TYPE_DESCRIPTIONS[OrganizationType.GOVERNMENT] // '政府机构'
 - **统一格式**: `timestamp` 字段统一为 `YYYY-MM-DDTHH:mm:ss.sssZ` 字符串格式
 - **无兜底机制**: 时间解析失败时抛出错误，确保数据质量
 
+### 时间戳管理策略
+
+系统采用数据库级别的统一时间戳管理：
+
+- **Neo4j 原生时间戳**: 所有 `created_at` 和 `updated_at` 字段使用 Neo4j 的 `timestamp()` 函数
+- **智能创建时间**: 使用 `CASE WHEN created_at IS NULL THEN timestamp() ELSE created_at END` 确保只在首次创建时设置
+- **自动更新时间**: 每次数据更新时自动设置 `updated_at = timestamp()`
+- **整数精度**: 避免 JavaScript 浮点数时间戳，确保时间戳为整数毫秒值
+- **批量操作优化**: 批量 MERGE 操作中统一处理时间戳，提高性能
+
+**时间戳处理示例**:
+```cypher
+-- 实体创建/更新
+MERGE (entity:EntityType {key: value})
+  ON CREATE SET entity += properties, entity.created_at = timestamp(), entity.updated_at = timestamp()
+  ON MATCH SET entity += properties, entity.updated_at = timestamp()
+
+-- 关系创建/更新  
+MERGE (from)-[r:RELATIONSHIP_TYPE]->(to)
+  ON CREATE SET r += properties, r.created_at = timestamp(), r.updated_at = timestamp()
+  ON MATCH SET r += properties, r.updated_at = timestamp()
+```
+
 **支持的时间格式示例**:
 ```javascript
 // 秒级时间戳
@@ -411,6 +435,7 @@ ORGANIZATION_TYPE_DESCRIPTIONS[OrganizationType.GOVERNMENT] // '政府机构'
 - **必须成功**: 每条新闻数据必须成功解析所有实体和关系
 - **5次重试**: AI提取失败时最多重试5次
 - **智能修复**: 内置JSON格式错误修复机制
+- **时间戳验证**: 确保所有实体和关系都有正确的时间戳字段
 
 ### 失败新闻处理机制
 
@@ -932,6 +957,9 @@ RETURN count(c) as companiesWithoutName;
    - ✅ 推荐: `WHERE e.event_type = $eventType` (使用 EventType.MACRO)
    - ❌ 避免: `WHERE e.event_type = 'macro'` (硬编码字符串)
 7. **类型验证**: 在数据写入前使用枚举验证函数，避免无效数据
+8. **时间戳优化**: 使用 Neo4j 原生 `timestamp()` 函数，避免 JavaScript 浮点数精度问题
+   - ✅ 推荐: `SET entity.updated_at = timestamp()`
+   - ❌ 避免: `SET entity.updated_at = $jsTimestamp` (JavaScript 时间戳)
 
 ---
 
@@ -1138,6 +1166,32 @@ function validateAndNormalizeEvent(rawEvent: any) {
 }
 ```
 
+#### 时间戳处理最佳实践
+```typescript
+// ✅ 推荐: 在 Neo4jService 中使用数据库原生时间戳
+const cypher = `
+  MERGE (entity:EntityType {key: value})
+    ON CREATE SET entity += properties, entity.created_at = timestamp(), entity.updated_at = timestamp()
+    ON MATCH SET entity += properties, entity.updated_at = timestamp()
+`;
+
+// ✅ 推荐: 在 EntityService 中使用智能创建时间逻辑
+const cypher = `
+  MERGE (entity:EntityType {key: value})
+  SET entity.property = value,
+      entity.created_at = CASE WHEN entity.created_at IS NULL THEN timestamp() ELSE entity.created_at END,
+      entity.updated_at = timestamp()
+`;
+
+// ❌ 避免: 在 EntityExtractionService 中声明时间戳字段
+// 不要这样做，让数据库统一处理时间戳
+const entity = {
+  name: 'entity_name',
+  // created_at: getCurrentTimestamp(),  // 不要这样做
+  // updated_at: getCurrentTimestamp(),  // 不要这样做
+};
+```
+
 ### 6. 集成到其他应用
 
 #### Python 集成示例
@@ -1305,6 +1359,7 @@ A:
 2. 检查原始数据的时间格式是否正确
 3. 系统支持多种时间格式，通常能自动识别和转换
 4. 如有问题，查看 TimeParser 的处理日志
+5. 检查时间戳字段是否为整数毫秒值，避免浮点数精度问题
 
 ### Q: 如何进行时区转换？
 A: 
@@ -1316,6 +1371,14 @@ RETURN n.title,
        datetime(n.timestamp + duration('PT8H')) as beijing_time
 ORDER BY n.timestamp DESC;
 ```
+
+### Q: 实体缺少 updated_at 字段怎么办？
+A: 
+1. 检查是否使用了最新的时间戳处理逻辑
+2. 确认 Neo4jService 中的 MERGE 操作正确设置了时间戳
+3. 验证 EntityExtractionService 中没有重复声明时间戳字段
+4. 确保所有实体类型都使用统一的 `ON CREATE` 和 `ON MATCH` 逻辑
+5. 检查数据库中的时间戳字段是否为整数毫秒值
 
 ### Q: 如何正确使用新的枚举系统？
 A: 
@@ -1422,6 +1485,15 @@ A:
 ---
 
 ## 更新日志
+
+- **v5.2.0**: 时间戳管理优化
+  - **统一时间戳处理**: 所有实体和关系的时间戳由 Neo4j 数据库统一处理
+  - **Neo4j 原生时间戳**: 使用 `timestamp()` 函数替代 JavaScript 时间戳，避免浮点数精度问题
+  - **智能创建时间**: 使用 `CASE WHEN created_at IS NULL THEN timestamp() ELSE created_at END` 确保只在首次创建时设置
+  - **批量操作优化**: 优化批量 MERGE 操作的时间戳处理逻辑
+  - **数据一致性**: 确保所有实体类型都有正确的 `created_at` 和 `updated_at` 字段
+  - **性能提升**: 减少数据传输量，提高批量操作性能
+  - **文档更新**: 新增时间戳管理策略章节和常见问题解答
 
 - **v5.1.0**: 事件级别定义优化与文档完善
   - **事件级别体系**: 详细定义了5级事件分类体系，提供清晰的评估标准

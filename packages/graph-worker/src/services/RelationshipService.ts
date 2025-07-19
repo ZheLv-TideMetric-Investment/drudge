@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
-import { getCurrentTime } from '../utils/timeUtils';
+
 import { RELATIONSHIP_TYPES, SYSTEM_RELATIONSHIP_TYPES } from '../constants/enums';
 import { 
   NewsExtractionResult, 
@@ -67,8 +67,8 @@ export class RelationshipService {
       SET r.description = $description,
           r.confidence = $confidence,
           r.newsId = $newsId,
-          r.created_at = $createdAt,
-          r.updated_at = $updatedAt
+          r.created_at = CASE WHEN r.created_at IS NULL THEN timestamp() ELSE r.created_at END,
+          r.updated_at = timestamp()
       RETURN r
     `;
 
@@ -78,8 +78,6 @@ export class RelationshipService {
       description: relationship.description || '',
       confidence: relationship.confidence || 0.8,
       newsId,
-      createdAt: getCurrentTime(),
-      updatedAt: getCurrentTime()
     };
 
     try {
@@ -124,8 +122,8 @@ export class RelationshipService {
           SET r.description = $${paramKey}.description,
               r.confidence = $${paramKey}.confidence,
               r.newsId = $${paramKey}.newsId,
-              r.created_at = $${paramKey}.createdAt,
-              r.updated_at = $${paramKey}.updatedAt
+              r.created_at = CASE WHEN r.created_at IS NULL THEN timestamp() ELSE r.created_at END,
+              r.updated_at = timestamp()
         `);
 
         parameters[paramKey] = {
@@ -134,8 +132,6 @@ export class RelationshipService {
           description: relationship.description || '',
           confidence: relationship.confidence || 0.8,
           newsId: result.newsId || '',
-          createdAt: getCurrentTime(),
-          updatedAt: getCurrentTime()
         };
 
         paramIndex++;
@@ -206,8 +202,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${getCurrentTime()}",
-                  r.updated_at = "${getCurrentTime()}"
+                  r.created_at = timestamp(),
+                  r.updated_at = timestamp()
             `);
           }
         }
@@ -226,8 +222,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${getCurrentTime()}",
-                  r.updated_at = "${getCurrentTime()}"
+                  r.created_at = timestamp(),
+                  r.updated_at = timestamp()
             `);
           }
         }
@@ -246,8 +242,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${getCurrentTime()}",
-                  r.updated_at = "${getCurrentTime()}"
+                  r.created_at = timestamp(),
+                  r.updated_at = timestamp()
             `);
           }
         }
@@ -266,8 +262,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${getCurrentTime()}",
-                  r.updated_at = "${getCurrentTime()}"
+                  r.created_at = timestamp(),
+                  r.updated_at = timestamp()
             `);
           }
         }
