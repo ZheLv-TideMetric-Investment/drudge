@@ -1,20 +1,9 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
-
 export const metadata: Metadata = {
-  title: '新闻知识图谱系统',
-  description: '基于AI的新闻知识图谱分析和可视化平台',
+  title: '大公报纸 • 知识图谱系统',
+  description: '基于AI的新闻知识图谱分析和可视化平台 - 传统报纸风格设计',
 };
 
 export default function RootLayout({
@@ -23,8 +12,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="zh">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>{children}</body>
+    <html lang="zh-CN">
+      <head>
+        {/* 预加载中文字体 */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* 如果需要网络字体，可以在这里添加 */}
+      </head>
+      <body className="newspaper-page antialiased">
+        {children}
+      </body>
     </html>
   );
 }

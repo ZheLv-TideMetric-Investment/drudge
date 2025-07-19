@@ -127,7 +127,7 @@ export default function Home() {
         notificationApi.success({
           message: '总结生成成功',
           description: `${typeName}总结已生成完成 - ${data.period}`,
-          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+          icon: <CheckCircleOutlined style={{ color: 'var(--newspaper-green)' }} />,
         });
       } else {
         messageApi.error(`总结生成失败: ${data.message || data.error}`);
@@ -179,7 +179,7 @@ export default function Home() {
         notificationApi.success({
           message: '扫描完成',
           description: `${typeName}扫描已完成 - ${data.period}，发现 ${data.found} 条 Level 1 新闻，${data.found > 0 ? '已聚合发送通知' : '无需发送通知'}`,
-          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+          icon: <CheckCircleOutlined style={{ color: 'var(--newspaper-green)' }} />,
         });
         fetchSystemStatus(); // 刷新状态
       } else {
@@ -216,7 +216,7 @@ export default function Home() {
         notificationApi.success({
           message: '调度器触发成功',
           description: `${data.message} (${data.trigger})`,
-          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+          icon: <CheckCircleOutlined style={{ color: 'var(--newspaper-green)' }} />,
         });
       } else {
         messageApi.error(`调度器触发失败: ${data.message || data.error}`);
@@ -281,322 +281,487 @@ export default function Home() {
     <Layout>
       {contextHolder}
       {notificationContextHolder}
-      <div style={{ padding: '24px' }}>
-        {/* 页面标题和描述 */}
-        <div style={{ marginBottom: '24px' }}>
-          <Title level={1}>
-            <RobotOutlined style={{ marginRight: '8px', color: '#1890ff' }} />
-            新闻知识图谱系统
-          </Title>
-          <Paragraph style={{ fontSize: '16px', color: '#666' }}>
-            基于AI的新闻知识图谱分析和可视化平台，集成定时任务调度、新闻扫描和AI总结功能
-          </Paragraph>
+      <div className="newspaper-page" style={{ padding: '32px' }}>
+        
+        {/* 传统报纸头版设计 - 优化版 */}
+        <div className="newspaper-header-frame">
+          {/* 报纸标题头部 */}
+          <div style={{ 
+            textAlign: 'center'
+          }}>
+            <div className="newspaper-title newspaper-title-large">
+              📰 大公报纸
+            </div>
+            <div className="newspaper-subtitle" style={{ 
+              fontSize: '16px', 
+              marginBottom: '12px'
+            }}>
+              知识图谱系统 • 基于人工智能的新闻分析平台
+            </div>
+            <div className="newspaper-time">
+              {moment().tz('Asia/Shanghai').format('YYYY年MM月DD日 dddd HH:mm')} • 北京时间
+            </div>
+          </div>
 
-          {/* 快速访问 */}
-          <Row gutter={[16, 16]} style={{ marginBottom: '24px' }}>
-            <Col xs={24} sm={8} md={6}>
-              <Card size="small" hoverable>
-                <Button 
-                  type="primary" 
-                  icon={<FileTextOutlined />} 
-                  href="/news"
-                  style={{ width: '100%' }}
-                >
-                  新闻浏览
-                </Button>
-                <Paragraph style={{ fontSize: '12px', color: '#999', marginTop: '8px', marginBottom: 0 }}>
-                  查看和搜索原始新闻数据
-                </Paragraph>
+          {/* 头条新闻概述 */}
+          <div className="newspaper-section-header">
+            📋 系统概览 • 今日要闻
+          </div>
+          
+          <div className="newspaper-body newspaper-content-left" style={{ 
+            fontSize: '16px', 
+            textAlign: 'center',
+            backgroundColor: 'var(--newspaper-paper)',
+            padding: '20px',
+            border: '1px solid var(--newspaper-fine-border)',
+            marginBottom: '0'
+          }}>
+            集成定时任务调度、新闻扫描和AI总结功能，采用传统中文报纸版面设计。为用户提供专业的新闻知识图谱分析服务。系统运行状态良好，各项功能正常运转。
+          </div>
+        </div>
+
+        {/* 快速导航 - 三栏布局优化 */}
+        <div style={{ marginBottom: '40px' }}>
+          <div className="newspaper-section-header">
+            🚀 快速导航 • 核心功能
+          </div>
+          
+          <Row gutter={[24, 24]}>
+            <Col xs={24} sm={24} md={8}>
+              <Card className="newspaper-card" size="small" hoverable style={{ height: '220px' }}>
+                <div style={{ textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div className="newspaper-icon" style={{ fontSize: '36px', marginBottom: '16px' }}>📋</div>
+                    <div className="newspaper-title newspaper-title-small">
+                      新闻浏览
+                    </div>
+                    <div className="newspaper-body newspaper-body-no-indent" style={{ 
+                      fontSize: '13px', 
+                      color: 'var(--newspaper-gray)', 
+                      lineHeight: '1.7',
+                      marginBottom: '16px'
+                    }}>
+                      查看和搜索原始新闻数据，享受传统报纸式的阅读体验。支持关键词检索和时间筛选功能，助您快速获取所需信息。
+                    </div>
+                  </div>
+                  <Button 
+                    className="newspaper-button"
+                    icon={<FileTextOutlined className="newspaper-icon" />} 
+                    href="/news"
+                    style={{ width: '100%' }}
+                  >
+                    进入新闻浏览
+                  </Button>
+                </div>
               </Card>
             </Col>
-            <Col xs={24} sm={8} md={6}>
-              <Card size="small" hoverable>
-                <Button 
-                  type="default" 
-                  icon={<ShareAltOutlined />} 
-                  href="/graph"
-                  style={{ width: '100%' }}
-                >
-                  知识图谱
-                </Button>
-                <Paragraph style={{ fontSize: '12px', color: '#999', marginTop: '8px', marginBottom: 0 }}>
-                  探索实体关系网络
-                </Paragraph>
+            
+            <Col xs={24} sm={24} md={8}>
+              <Card className="newspaper-card" size="small" hoverable style={{ height: '220px' }}>
+                <div style={{ textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div className="newspaper-icon" style={{ fontSize: '36px', marginBottom: '16px' }}>🕸️</div>
+                    <div className="newspaper-title newspaper-title-small">
+                      知识图谱
+                    </div>
+                    <div className="newspaper-body newspaper-body-no-indent" style={{ 
+                      fontSize: '13px', 
+                      color: 'var(--newspaper-gray)', 
+                      lineHeight: '1.7',
+                      marginBottom: '16px'
+                    }}>
+                      探索实体关系网络，可视化新闻知识结构。深度分析新闻事件间的内在联系，发现数据背后的故事。
+                    </div>
+                  </div>
+                  <Button 
+                    className="newspaper-button"
+                    icon={<ShareAltOutlined className="newspaper-icon" />} 
+                    href="/graph"
+                    style={{ width: '100%' }}
+                  >
+                    探索知识图谱
+                  </Button>
+                </div>
               </Card>
             </Col>
-            <Col xs={24} sm={8} md={6}>
-              <Card size="small" hoverable>
-                <Button 
-                  type="default" 
-                  icon={<BarChartOutlined />} 
-                  href="/stats"
-                  style={{ width: '100%' }}
-                >
-                  数据统计
-                </Button>
-                <Paragraph style={{ fontSize: '12px', color: '#999', marginTop: '8px', marginBottom: 0 }}>
-                  查看系统统计信息
-                </Paragraph>
+            
+            <Col xs={24} sm={24} md={8}>
+              <Card className="newspaper-card" size="small" hoverable style={{ height: '220px' }}>
+                <div style={{ textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div className="newspaper-icon" style={{ fontSize: '36px', marginBottom: '16px' }}>📊</div>
+                    <div className="newspaper-title newspaper-title-small">
+                      数据统计
+                    </div>
+                    <div className="newspaper-body newspaper-body-no-indent" style={{ 
+                      fontSize: '13px', 
+                      color: 'var(--newspaper-gray)', 
+                      lineHeight: '1.7',
+                      marginBottom: '16px'
+                    }}>
+                      查看系统统计信息，掌握数据分析概况。了解新闻处理进度和系统运行状态，监控整体表现。
+                    </div>
+                  </div>
+                  <Button 
+                    className="newspaper-button"
+                    icon={<BarChartOutlined className="newspaper-icon" />} 
+                    href="/stats"
+                    style={{ width: '100%' }}
+                  >
+                    查看数据统计
+                  </Button>
+                </div>
               </Card>
             </Col>
           </Row>
-
-          {error && (
-            <Alert
-              message="系统错误"
-              description={error}
-              type="error"
-              showIcon
-              closable
-              style={{ marginBottom: '16px' }}
-            />
-          )}
         </div>
 
-        {/* 系统状态概览 */}
-        <Title level={2}>
-          <DatabaseOutlined style={{ marginRight: '8px' }} />
-          系统状态概览
-        </Title>
-        <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
-          <Col xs={24} sm={12}>
-            <Card
-              title={
-                <Space>
-                  <ScheduleOutlined />
-                  调度器状态
-                </Space>
-              }
-              size="small"
-            >
-              <Descriptions column={1} size="small">
-                <Descriptions.Item label="运行状态">
-                  <Badge
-                    status={systemStatus?.scheduler?.status === 'active' ? 'processing' : 'error'}
-                    text={systemStatus?.scheduler?.status === 'active' ? '运行中' : '已停止'}
-                  />
-                </Descriptions.Item>
-                <Descriptions.Item label="可用触发器">
-                  <Text strong>{systemStatus?.scheduler?.available_triggers?.length || 0} 个</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="最后更新">
-                  <Text type="secondary">
-                    {systemStatus?.scheduler?.server_time
-                      ? moment(systemStatus.scheduler.server_time)
-                          .tz('Asia/Shanghai')
-                          .format('YYYY-MM-DD HH:mm:ss')
-                      : '未知'}
-                  </Text>
-                </Descriptions.Item>
-              </Descriptions>
-            </Card>
-          </Col>
+        {error && (
+          <Alert
+            message="系统错误"
+            description={error}
+            type="error"
+            showIcon
+            closable
+            style={{ marginBottom: '32px' }}
+          />
+        )}
+      
+        {/* 传统报纸风格分割线 */}
+        <div className="newspaper-divider-decorative"></div>
 
-          <Col xs={24} sm={12}>
-            <Card
-              title={
-                <Space>
-                  <ScanOutlined />
-                  扫描器状态
-                </Space>
-              }
-              size="small"
-            >
-              <Descriptions column={1} size="small">
-                <Descriptions.Item label="运行状态">
-                  <Badge
-                    status={systemStatus?.scanner?.isRunning ? 'processing' : 'default'}
-                    text={systemStatus?.scanner?.isRunning ? '扫描中' : '空闲'}
-                  />
-                </Descriptions.Item>
-                <Descriptions.Item label="已处理新闻">
-                  <Text strong>{systemStatus?.scanner?.processedNewsCount || 0} 条</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label="上次扫描">
-                  <Text type="secondary">{systemStatus?.scanner?.lastScanTime || '从未扫描'}</Text>
-                </Descriptions.Item>
-              </Descriptions>
-            </Card>
-          </Col>
-        </Row>
-
-        <Divider />
-
-        {/* 调度器触发器 */}
-        <Title level={2}>
-          <ScheduleOutlined style={{ marginRight: '8px' }} />
-          调度器触发器
-        </Title>
-        <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
-          {systemStatus?.scheduler?.available_triggers?.map(trigger => (
-            <Col xs={24} sm={12} lg={8} key={trigger}>
+        {/* 系统状态 - 双栏布局优化 */}
+        <div style={{ marginBottom: '40px' }}>
+          <div className="newspaper-section-header">
+            🖥️ 系统状态 • 运行监控
+          </div>
+          
+          <Row gutter={[32, 24]}>
+            <Col xs={24} md={12} className="newspaper-column">
               <Card
-                size="small"
                 title={
                   <Space>
-                    <Tag color={getTriggerColor(trigger)}>
-                      {trigger.replace(/_/g, ' ').toUpperCase()}
-                    </Tag>
+                    <ScheduleOutlined className="newspaper-icon" />
+                    <span className="newspaper-title newspaper-title-small">调度器状态</span>
                   </Space>
                 }
+                className="newspaper-card"
+                size="small"
+              >
+                <div className="newspaper-stats">
+                  <div className="newspaper-paragraph">
+                    <div className="newspaper-body newspaper-body-no-indent" style={{ marginBottom: '8px' }}>
+                      <strong>运行状态：</strong>
+                      <Badge
+                        status={systemStatus?.scheduler?.status === 'active' ? 'processing' : 'error'}
+                        text={systemStatus?.scheduler?.status === 'active' ? '运行中' : '已停止'}
+                        style={{ marginLeft: '8px' }}
+                      />
+                    </div>
+                    <div className="newspaper-body newspaper-body-no-indent" style={{ marginBottom: '8px' }}>
+                      <strong>可用触发器：</strong>
+                      <span className="newspaper-title" style={{ fontSize: '16px', marginLeft: '8px' }}>
+                        {systemStatus?.scheduler?.available_triggers?.length || 0} 个
+                      </span>
+                    </div>
+                    <div className="newspaper-body newspaper-body-no-indent">
+                      <strong>最后更新：</strong>
+                      <span className="newspaper-time" style={{ marginLeft: '8px' }}>
+                        {systemStatus?.scheduler?.server_time
+                          ? moment(systemStatus.scheduler.server_time)
+                              .tz('Asia/Shanghai')
+                              .format('MM-DD HH:mm:ss')
+                          : '未知'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+
+            <Col xs={24} md={12}>
+              <Card
+                title={
+                  <Space>
+                    <ScanOutlined className="newspaper-icon" />
+                    <span className="newspaper-title newspaper-title-small">扫描器状态</span>
+                  </Space>
+                }
+                className="newspaper-card"
+                size="small"
+              >
+                <div className="newspaper-stats">
+                  <div className="newspaper-paragraph">
+                    <div className="newspaper-body newspaper-body-no-indent" style={{ marginBottom: '8px' }}>
+                      <strong>运行状态：</strong>
+                      <Badge
+                        status={systemStatus?.scanner?.isRunning ? 'processing' : 'default'}
+                        text={systemStatus?.scanner?.isRunning ? '扫描中' : '空闲'}
+                        style={{ marginLeft: '8px' }}
+                      />
+                    </div>
+                    <div className="newspaper-body newspaper-body-no-indent" style={{ marginBottom: '8px' }}>
+                      <strong>已处理新闻：</strong>
+                      <span className="newspaper-title" style={{ fontSize: '16px', marginLeft: '8px' }}>
+                        {systemStatus?.scanner?.processedNewsCount || 0} 条
+                      </span>
+                    </div>
+                    <div className="newspaper-body newspaper-body-no-indent">
+                      <strong>上次扫描：</strong>
+                      <span className="newspaper-time" style={{ marginLeft: '8px' }}>
+                        {systemStatus?.scanner?.lastScanTime || '从未扫描'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+          </Row>
+        </div>
+
+        <div className="newspaper-divider-thick"></div>
+
+        {/* 调度器触发器优化 */}
+        <div style={{ marginBottom: '40px' }}>
+          <div className="newspaper-section-header">
+            ⚙️ 调度器触发器 • 任务管理
+          </div>
+          
+          <Row gutter={[20, 20]}>
+            {systemStatus?.scheduler?.available_triggers?.map(trigger => (
+              <Col xs={24} sm={12} lg={8} key={trigger}>
+                <Card
+                  className="newspaper-card"
+                  size="small"
+                  title={
+                    <div className="newspaper-content-left">
+                      <Tag 
+                        className="newspaper-tag"
+                        color={getTriggerColor(trigger)}
+                      >
+                        {trigger.replace(/_/g, ' ').toUpperCase()}
+                      </Tag>
+                    </div>
+                  }
+                  actions={[
+                    <Button
+                      key="trigger"
+                      className="newspaper-button"
+                      icon={<PlayCircleOutlined />}
+                      loading={triggerLoading[`scheduler-${trigger}`]}
+                      onClick={() => triggerScheduler(trigger)}
+                      block
+                    >
+                      {triggerLoading[`scheduler-${trigger}`] ? '触发中...' : '立即触发'}
+                    </Button>,
+                  ]}
+                >
+                  <div className="newspaper-body newspaper-content-left newspaper-body-no-indent" style={{ 
+                    minHeight: '60px',
+                    fontSize: '13px',
+                    marginBottom: '0'
+                  }}>
+                    {getTriggerDescription(trigger)}
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </div>
+
+        <div className="newspaper-divider"></div>
+
+        {/* 新闻扫描优化 */}
+        <div style={{ marginBottom: '40px' }}>
+          <div className="newspaper-section-header">
+            🔍 新闻扫描 • 数据采集
+          </div>
+          
+          <Row gutter={[32, 24]}>
+            <Col xs={24} md={12} className="newspaper-column">
+              <Card
+                title={
+                  <div className="newspaper-title newspaper-title-small newspaper-content-left">
+                    自动扫描
+                  </div>
+                }
+                className="newspaper-card"
+                size="small"
                 actions={[
                   <Button
-                    key="trigger"
-                    type="primary"
-                    icon={<PlayCircleOutlined />}
-                    loading={triggerLoading[`scheduler-${trigger}`]}
-                    onClick={() => triggerScheduler(trigger)}
+                    key="auto-scan"
+                    className="newspaper-button"
+                    icon={<ScanOutlined />}
+                    loading={triggerLoading['scan-auto']}
+                    onClick={() => triggerScan('auto')}
                     block
                   >
-                    {triggerLoading[`scheduler-${trigger}`] ? '触发中...' : '立即触发'}
+                    {triggerLoading['scan-auto'] ? '扫描中...' : '开始自动扫描'}
                   </Button>,
                 ]}
               >
-                <Paragraph style={{ minHeight: '60px', margin: 0 }}>
-                  {getTriggerDescription(trigger)}
-                </Paragraph>
+                <div className="newspaper-body newspaper-content-left" style={{ 
+                  marginBottom: '0',
+                  fontSize: '14px'
+                }}>
+                  使用上次扫描时间到现在的时间范围自动扫描新闻，智能处理增量数据，高效获取最新资讯动态。
+                </div>
               </Card>
             </Col>
-          ))}
-        </Row>
 
-        <Divider />
+            <Col xs={24} md={12}>
+              <Card
+                title={
+                  <div className="newspaper-title newspaper-title-small newspaper-content-left">
+                    手动扫描
+                  </div>
+                }
+                className="newspaper-card"
+                size="small"
+                actions={[
+                  <Button
+                    key="manual-scan"
+                    className="newspaper-button-secondary"
+                    icon={<ReloadOutlined />}
+                    loading={triggerLoading['scan-manual']}
+                    onClick={() => triggerScan('manual')}
+                    block
+                  >
+                    {triggerLoading['scan-manual'] ? '扫描中...' : '开始手动扫描'}
+                  </Button>,
+                ]}
+              >
+                <div className="newspaper-body newspaper-content-left" style={{ 
+                  marginBottom: '0',
+                  fontSize: '14px'
+                }}>
+                  手动扫描最近30分钟的新闻，发送通知且不跳过已处理的内容，适用于紧急新闻获取。
+                </div>
+              </Card>
+            </Col>
+          </Row>
+        </div>
 
-        {/* 新闻扫描 */}
-        <Title level={2}>
-          <ScanOutlined style={{ marginRight: '8px' }} />
-          新闻扫描
-        </Title>
-        <Row gutter={[16, 16]} style={{ marginBottom: '32px' }}>
-          <Col xs={24} sm={12}>
-            <Card
-              title="自动扫描"
-              size="small"
-              actions={[
-                <Button
-                  key="auto-scan"
-                  type="primary"
-                  icon={<ScanOutlined />}
-                  loading={triggerLoading['scan-auto']}
-                  onClick={() => triggerScan('auto')}
-                  block
-                >
-                  {triggerLoading['scan-auto'] ? '扫描中...' : '开始自动扫描'}
-                </Button>,
-              ]}
-            >
-              <Paragraph>使用上次扫描时间到现在的时间范围自动扫描新闻，智能处理增量数据</Paragraph>
-            </Card>
-          </Col>
+        <div className="newspaper-divider"></div>
 
-          <Col xs={24} sm={12}>
-            <Card
-              title="手动扫描"
-              size="small"
-              actions={[
-                <Button
-                  key="manual-scan"
-                  type="primary"
-                  icon={<ReloadOutlined />}
-                  loading={triggerLoading['scan-manual']}
-                  onClick={() => triggerScan('manual')}
-                  block
-                >
-                  {triggerLoading['scan-manual'] ? '扫描中...' : '开始手动扫描'}
-                </Button>,
-              ]}
-            >
-              <Paragraph>手动扫描最近30分钟的新闻，发送通知且不跳过已处理的内容</Paragraph>
-            </Card>
-          </Col>
-        </Row>
+        {/* AI总结生成优化 */}
+        <div style={{ marginBottom: '40px' }}>
+          <div className="newspaper-section-header">
+            🤖 AI总结生成 • 智能分析
+          </div>
+          
+          <Row gutter={[20, 20]}>
+            <Col xs={24} sm={8}>
+              <Card
+                title={
+                  <Space>
+                    <ClockCircleOutlined className="newspaper-icon" />
+                    <span className="newspaper-title newspaper-title-small">小时总结</span>
+                  </Space>
+                }
+                className="newspaper-card"
+                size="small"
+                actions={[
+                  <Button
+                    key="hourly-summary"
+                    className="newspaper-button"
+                    icon={<FileTextOutlined />}
+                    loading={triggerLoading['summary-hourly']}
+                    onClick={() => triggerSummary('hourly')}
+                    block
+                  >
+                    {triggerLoading['summary-hourly'] ? '生成中...' : '生成小时总结'}
+                  </Button>,
+                ]}
+              >
+                <div className="newspaper-body newspaper-content-left newspaper-body-no-indent" style={{ 
+                  fontSize: '13px',
+                  marginBottom: '0'
+                }}>
+                  生成当前小时的新闻总结报告，快速了解最新动态，掌握时事要闻。
+                </div>
+              </Card>
+            </Col>
 
-        <Divider />
+            <Col xs={24} sm={8}>
+              <Card
+                title={
+                  <Space>
+                    <DatabaseOutlined className="newspaper-icon" />
+                    <span className="newspaper-title newspaper-title-small">每日总结</span>
+                  </Space>
+                }
+                className="newspaper-card"
+                size="small"
+                actions={[
+                  <Button
+                    key="daily-summary"
+                    className="newspaper-button"
+                    icon={<FileTextOutlined />}
+                    loading={triggerLoading['summary-daily']}
+                    onClick={() => triggerSummary('daily')}
+                    block
+                  >
+                    {triggerLoading['summary-daily'] ? '生成中...' : '生成每日总结'}
+                  </Button>,
+                ]}
+              >
+                <div className="newspaper-body newspaper-content-left newspaper-body-no-indent" style={{ 
+                  fontSize: '13px',
+                  marginBottom: '0'
+                }}>
+                  生成当日的新闻总结报告，全面回顾一天的重要新闻事件。
+                </div>
+              </Card>
+            </Col>
 
-        {/* AI总结生成 */}
-        <Title level={2}>
-          <FileTextOutlined style={{ marginRight: '8px' }} />
-          AI总结生成
-        </Title>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={8}>
-            <Card
-              title={
-                <Space>
-                  <ClockCircleOutlined />
-                  小时总结
-                </Space>
-              }
-              size="small"
-              actions={[
-                <Button
-                  key="hourly-summary"
-                  type="primary"
-                  icon={<FileTextOutlined />}
-                  loading={triggerLoading['summary-hourly']}
-                  onClick={() => triggerSummary('hourly')}
-                  block
-                >
-                  {triggerLoading['summary-hourly'] ? '生成中...' : '生成小时总结'}
-                </Button>,
-              ]}
-            >
-              <Paragraph>生成当前小时的新闻总结报告，快速了解最新动态</Paragraph>
-            </Card>
-          </Col>
+            <Col xs={24} sm={8}>
+              <Card
+                title={
+                  <Space>
+                    <RobotOutlined className="newspaper-icon" />
+                    <span className="newspaper-title newspaper-title-small">自定义总结</span>
+                  </Space>
+                }
+                className="newspaper-card"
+                size="small"
+                actions={[
+                  <Button
+                    key="custom-summary"
+                    className="newspaper-button"
+                    icon={<FileTextOutlined />}
+                    loading={triggerLoading['summary-custom']}
+                    onClick={() => triggerSummary('custom')}
+                    block
+                  >
+                    {triggerLoading['summary-custom'] ? '生成中...' : '生成自定义总结'}
+                  </Button>,
+                ]}
+              >
+                <div className="newspaper-body newspaper-content-left newspaper-body-no-indent" style={{ 
+                  fontSize: '13px',
+                  marginBottom: '0'
+                }}>
+                  生成最近1小时的自定义新闻总结，灵活控制时间范围。
+                </div>
+              </Card>
+            </Col>
+          </Row>
+        </div>
 
-          <Col xs={24} sm={8}>
-            <Card
-              title={
-                <Space>
-                  <DatabaseOutlined />
-                  每日总结
-                </Space>
-              }
-              size="small"
-              actions={[
-                <Button
-                  key="daily-summary"
-                  type="primary"
-                  icon={<FileTextOutlined />}
-                  loading={triggerLoading['summary-daily']}
-                  onClick={() => triggerSummary('daily')}
-                  block
-                >
-                  {triggerLoading['summary-daily'] ? '生成中...' : '生成每日总结'}
-                </Button>,
-              ]}
-            >
-              <Paragraph>生成当日的新闻总结报告，全面回顾一天的重要新闻</Paragraph>
-            </Card>
-          </Col>
-
-          <Col xs={24} sm={8}>
-            <Card
-              title={
-                <Space>
-                  <RobotOutlined />
-                  自定义总结
-                </Space>
-              }
-              size="small"
-              actions={[
-                <Button
-                  key="custom-summary"
-                  type="primary"
-                  icon={<FileTextOutlined />}
-                  loading={triggerLoading['summary-custom']}
-                  onClick={() => triggerSummary('custom')}
-                  block
-                >
-                  {triggerLoading['summary-custom'] ? '生成中...' : '生成自定义总结'}
-                </Button>,
-              ]}
-            >
-              <Paragraph>生成最近1小时的自定义新闻总结，灵活控制时间范围</Paragraph>
-            </Card>
-          </Col>
-        </Row>
+        {/* 传统报纸底部装饰 */}
+        <div className="newspaper-divider-thick"></div>
+        <div style={{ 
+          textAlign: 'center', 
+          marginTop: '32px',
+          padding: '20px',
+          backgroundColor: 'var(--newspaper-paper)',
+          border: '1px solid var(--newspaper-fine-border)'
+        }}>
+          <div className="newspaper-subtitle-secondary" style={{ fontSize: '12px' }}>
+            大公报纸知识图谱系统 © 2024 • 传承经典，拥抱科技 • 专业新闻分析平台
+          </div>
+        </div>
       </div>
     </Layout>
   );
