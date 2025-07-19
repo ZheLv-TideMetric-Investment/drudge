@@ -90,6 +90,40 @@
 
 > **类型安全**: 使用 TypeScript 枚举 `EventType`，支持编译时类型检查和 IDE 智能提示。
 
+**事件级别详细定义** (EventLevel):
+
+事件级别是评估新闻事件对资本市场影响程度的重要指标，分为5个等级：
+
+- **Level 1 - 超级事件**: 对全球经济、市场、政治局势产生 **重大影响** 的突发性事件。通常会引发 **全球性的恐慌或波动**，具有 **系统性风险**，是资本市场的 **极端事件**。
+  - **突发战争** 或 **战争的重要进展**（如战争爆发、重要的战役进展等）
+  - **全球重要人物的发言**（例如：美联储主席、欧盟委员会主席、世界主要领导人的重大讲话）
+  - **中、美、欧央行的主权政策变动**
+  - **全球主要指数的异常涨幅或跌幅**（例如：美股标普500、纳斯达克等指数单日跌幅超过 10%）
+  - **⚠️ 注意**：请谨慎评定为 Level 1，仅当事件具有 **全球性影响** 或 **对资本市场产生深远影响** 时使用
+
+- **Level 2 - 重要国家事件**: 对某个国家、地区或全球市场产生 **重大影响** 的事件，通常局限于 **特定国家** 或 **重要企业**。不会导致全球性恐慌，但影响力较大。
+  - **持续发生的战争冲突进展** 或 **其他重要的政治动荡**
+  - **中、美、欧** 以外的 **央行/主权级政策变动**（如日本央行的货币政策调整或新兴市场国家的重大金融政策）
+  - **中美全球型大型企业的重大事件**（例如：财报暴雷、并购收购、企业破产等）
+
+- **Level 3 - 行业内重大事件**: 对某个行业或公司产生 **重要影响** 的事件，通常影响 **行业内的其他公司**，但不会产生较大范围的资本市场波动。
+  - **行业龙头公司** 的 **并购、破产、财报发布等重大事件**
+  - **其他地区或行业内的公司** 发生的 **重大并购、破产、融资等事件**
+
+- **Level 4 - 一般商业事件**: 一般产品发布、地方性政策和金融新闻。这类事件通常不会引起 **重大市场波动**，对企业或特定行业产生较小影响。
+  - **一般产品发布、技术发布**
+  - **地方性政策变化**（如地方政府的税收优惠或经济发展政策等）
+  - **金融新闻**（如：季度财报、股东大会决议、公司战略公告等）
+
+- **Level 5 - 信息性报道**: 对市场 **影响微乎其微** 的常规信息，通常用于 **补充背景或提供数据**。
+  - **日常信息性报道**（如：宏观经济数据、行业趋势报告、消费者信心指数等）
+  - **例行统计数据**（例如：失业率、GDP增速等指标）
+
+**特殊规则**:
+- **非金融相关新闻**: 若新闻内容与 **金融市场无关**（如：娱乐、体育、科技、文化等），应根据事件的影响范围和重要性 **下调一级**（如：Level 2 → Level 3，Level 3 → Level 4）
+
+> **重要提示**: 事件级别评估需要综合考虑事件的影响范围、持续时间、市场反应等多个因素，确保评级的准确性和一致性。
+
 **示例**:
 ```json
 {
@@ -437,6 +471,59 @@ data/news/failed/failed_{newsId}_{timestamp}.json
 - **引号修复**: 修复不匹配的引号
 - **尾随逗号**: 清理JSON尾部的多余逗号
 
+### 智能Prompt管理
+
+系统采用动态生成的智能提示词（Prompt）来指导AI进行精准的实体提取：
+
+#### 动态枚举值生成
+- **统一数据源**: 所有提示词中的枚举值都从 `constants/enums.ts` 动态生成
+- **自动同步**: 枚举值修改时，提示词自动更新，确保一致性
+- **类型安全**: 避免硬编码带来的不一致问题
+
+```typescript
+// 动态生成枚举描述，避免硬编码
+const eventTypeList = EVENT_TYPE_VALUES.join(' | ');
+const sentimentList = SENTIMENT_VALUES.join(' / ');
+const organizationTypeList = ORGANIZATION_TYPE_VALUES.join('/');
+
+// 生成机构类型的详细描述，包含中文说明
+const organizationTypeDescriptions = ORGANIZATION_TYPE_VALUES.map(
+  type => `${type}(${ORGANIZATION_TYPE_DESCRIPTIONS[type as OrganizationType]})`
+).join('、');
+```
+
+#### 智能提示词特性
+- **专业化指导**: 针对投资领域优化的5W1H原则提取规范
+- **严格枚举约束**: 确保AI只使用预定义的枚举值
+- **中文描述支持**: 为每种枚举类型提供详细的中文说明
+- **示例驱动**: 包含动态生成的标准示例，使用真实枚举值
+- **质量控制**: 明确禁止兜底数据，确保提取质量
+
+#### 枚举值验证机制
+系统在多个层面确保枚举值的正确性：
+
+1. **Schema验证**: Zod schema使用枚举值数组进行严格验证
+2. **修复逻辑**: 无效枚举值自动替换为默认值
+3. **类型检查**: TypeScript编译时检查枚举使用的正确性
+4. **运行时验证**: 使用 `ts-enum-util` 提供的验证函数
+
+```typescript
+// 严格的枚举验证示例
+if (!EVENT_TYPE_VALUES.includes(event.event_type)) {
+  event.event_type = DEFAULT_EVENT_TYPE;
+}
+
+if (!isValidSentiment(event.sentiment)) {
+  event.sentiment = DEFAULT_SENTIMENT;
+}
+```
+
+#### 维护优势
+- **集中管理**: 所有枚举定义集中在一处，易于维护
+- **版本一致**: 代码、提示词、文档自动保持同步
+- **类型提示**: IDE提供完整的智能提示和错误检查
+- **国际化支持**: 完整的中英文描述映射系统
+
 ---
 
 ## 数据库索引和约束
@@ -554,7 +641,112 @@ RETURN e
 ORDER BY e.timestamp DESC;
 ```
 
-### 4. 情感分析查询
+### 4. 枚举查询示例
+
+这些查询展示了如何正确使用系统定义的枚举值进行查询：
+
+#### 按特定事件类型查询
+```cypher
+// 查询宏观经济事件 (使用 EventType.MACRO)
+MATCH (e:Event)
+WHERE e.event_type = "macro"
+RETURN e.event_name, e.significance, e.timestamp
+ORDER BY e.significance DESC;
+
+// 查询企业相关事件 (使用 EventType.CORPORATE)
+MATCH (e:Event)
+WHERE e.event_type = "corporate"
+RETURN e.event_name, e.sentiment, e.magnitude
+ORDER BY e.timestamp DESC;
+```
+
+#### 按情感倾向查询
+```cypher
+// 查询积极情感的事件 (使用 Sentiment.POSITIVE)
+MATCH (e:Event)
+WHERE e.sentiment = "positive"
+RETURN e.event_type, count(e) as positiveCount
+ORDER BY positiveCount DESC;
+
+// 查询中性情感的政策事件
+MATCH (e:Event)
+WHERE e.event_type = "policy" AND e.sentiment = "neutral"
+RETURN e.event_name, e.event_description, e.timestamp;
+```
+
+#### 按事件级别查询
+```cypher
+// 查询超级事件 (Level 1)
+MATCH (e:Event)
+WHERE e.event_level = "Level 1"
+RETURN e.event_name, e.event_type, e.significance, e.timestamp
+ORDER BY e.timestamp DESC;
+
+// 查询行业重大事件 (Level 3)
+MATCH (e:Event)
+WHERE e.event_level = "Level 3" AND e.event_type = "industry"
+RETURN e.event_name, e.sentiment, e.magnitude
+ORDER BY e.magnitude ASC;
+```
+
+#### 按机构类型查询
+```cypher
+// 查询政府机构相关事件
+MATCH (o:Organization)-[:PARTICIPATES_IN]-(e:Event)
+WHERE o.type = "government"
+RETURN o.organization_name, e.event_name, e.event_type
+ORDER BY e.timestamp DESC;
+
+// 查询金融机构
+MATCH (o:Organization)
+WHERE o.type = "fin_inst"
+RETURN o.organization_name, o.country
+ORDER BY o.organization_name;
+```
+
+#### 按地点类型查询
+```cypher
+// 查询城市相关的事件
+MATCH (l:Location)-[:LOCATED_AT]-(e:Event)
+WHERE l.type = "city"
+RETURN l.location_name, l.country, count(e) as eventCount
+ORDER BY eventCount DESC;
+
+// 查询国家级事件
+MATCH (l:Location)-[:LOCATED_AT]-(e:Event)
+WHERE l.type = "country"
+RETURN l.location_name, e.event_type, count(e) as eventCount
+ORDER BY eventCount DESC;
+```
+
+#### 组合枚举查询
+```cypher
+// 查询负面的宏观经济超级事件
+MATCH (e:Event)
+WHERE e.event_type = "macro" 
+  AND e.sentiment = "negative" 
+  AND e.event_level = "Level 1"
+RETURN e.event_name, e.magnitude, e.timestamp
+ORDER BY e.magnitude ASC;
+
+// 查询政策相关的Level 2事件，按重要性排序
+MATCH (e:Event)
+WHERE e.event_type = "policy" 
+  AND e.event_level = "Level 2"
+RETURN e.event_name, e.significance, e.sentiment
+ORDER BY e.significance DESC;
+```
+
+> **最佳实践**: 在查询中使用枚举值时，建议使用参数化查询来避免硬编码：
+> ```cypher
+> // 推荐: 使用参数
+> MATCH (e:Event) WHERE e.event_type = $eventType RETURN e;
+> 
+> // 在应用代码中传递枚举值
+> session.run(query, { eventType: EventType.MACRO });
+> ```
+
+### 5. 情感分析查询
 
 #### 负面事件统计
 ```cypher
@@ -577,7 +769,7 @@ RETURN c.company_name as company,
 ORDER BY sentiment;
 ```
 
-### 5. 网络分析查询
+### 6. 网络分析查询
 
 #### 查找公司合作网络
 ```cypher
@@ -601,7 +793,7 @@ RETURN l.country as country,
 ORDER BY companyCount DESC;
 ```
 
-### 6. 时间序列分析 (UTC时间)
+### 7. 时间序列分析 (UTC时间)
 
 #### 事件时间线
 ```cypher
@@ -1179,10 +1371,68 @@ EVENT_TYPE_VALUES.forEach(type => console.log(type));
 const descriptions = mapEventType(type => EVENT_TYPE_DESCRIPTIONS[type]);
 ```
 
+### Q: 如何正确评估事件级别？
+A: 
+事件级别评估需要综合考虑多个维度：
+
+1. **影响范围**: 
+   - Level 1: 全球性影响
+   - Level 2: 国家/地区级影响
+   - Level 3: 行业级影响
+   - Level 4: 企业/地方级影响
+   - Level 5: 信息性影响
+
+2. **市场反应强度**:
+   - 是否引发恐慌或大幅波动
+   - 是否具有系统性风险
+   - 对投资决策的影响程度
+
+3. **特殊规则**:
+   - 战争相关事件通常为 Level 1
+   - 中美欧央行政策为 Level 1，其他央行为 Level 2
+   - 非金融新闻需要下调一级
+   - 谨慎使用 Level 1，仅限全球重大事件
+
+4. **实例参考**:
+```typescript
+// Level 1 示例
+"美联储意外加息100基点" → Level 1 (全球央行政策)
+"俄乌战争爆发" → Level 1 (突发战争)
+
+// Level 2 示例  
+"日本央行调整货币政策" → Level 2 (非中美欧央行)
+"苹果公司财报暴雷" → Level 2 (全球大企业重大事件)
+
+// Level 3 示例
+"行业龙头并购案" → Level 3 (行业重大事件)
+"某公司破产" → Level 3 (行业影响)
+```
+
+### Q: 智能Prompt如何确保提取质量？
+A: 
+系统通过多层机制确保数据质量：
+
+1. **动态枚举同步**: 提示词中的枚举值从代码自动生成，避免不一致
+2. **严格Schema验证**: 使用Zod严格验证AI返回的数据格式
+3. **多重修复机制**: 自动修复常见JSON格式错误
+4. **5次重试策略**: 失败时最多重试5次，提高成功率
+5. **零兜底政策**: 不允许创建空白或默认数据，确保质量
+6. **失败追踪**: 失败的新闻保存到专门目录，便于分析改进
+
 ---
 
 ## 更新日志
 
+- **v5.1.0**: 事件级别定义优化与文档完善
+  - **事件级别体系**: 详细定义了5级事件分类体系，提供清晰的评估标准
+  - **级别划分**: Level 1-5 每级都有具体的适用场景和判断标准
+  - **特殊规则**: 新增非金融相关新闻的特殊处理规则
+  - **影响分类**: 加强了对全球性事件、国家级事件、行业事件的区分
+  - **智能Prompt**: 新增智能提示词管理章节，介绍动态枚举生成机制
+  - **查询示例**: 新增枚举查询示例章节，展示正确的枚举使用方法
+  - **常见问题**: 新增事件级别评估和智能Prompt的详细问答
+  - **最佳实践**: 提供参数化查询和类型安全的开发建议
+  - **文档结构**: 优化文档组织结构，提升可读性和实用性
 - **v5.0.0**: 枚举系统重构
   - 使用 TypeScript 枚举替代常量对象
   - 集成 `ts-enum-util` 库提供强大的枚举操作
