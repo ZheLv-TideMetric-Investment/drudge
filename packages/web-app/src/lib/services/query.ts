@@ -1,5 +1,6 @@
 import { neo4jService } from './neo4j';
 import moment from 'moment-timezone';
+import { NodeType } from '../../../constants/enums';
 
 /**
  * 将北京时间转换为UTC时间用于数据库查询
@@ -204,7 +205,7 @@ class QueryService {
               WHERE c.company_name CONTAINS $searchTerm
               OPTIONAL MATCH (c)-[r]-()
               RETURN c as entity, 
-                     'Company' as type,
+                     $companyType as type,
                      c.company_name as name,
                      count(r) as connections
               ORDER BY connections DESC, c.company_name
@@ -217,7 +218,7 @@ class QueryService {
               WHERE p.person_name CONTAINS $searchTerm
               OPTIONAL MATCH (p)-[r]-()
               RETURN p as entity,
-                     'Person' as type,
+                     $personType as type,
                      p.person_name as name,
                      count(r) as connections
               ORDER BY connections DESC, p.person_name
@@ -230,7 +231,7 @@ class QueryService {
               WHERE o.organization_name CONTAINS $searchTerm
               OPTIONAL MATCH (o)-[r]-()
               RETURN o as entity,
-                     'Organization' as type,
+                     $organizationType as type,
                      o.organization_name as name,
                      count(r) as connections
               ORDER BY connections DESC, o.organization_name
@@ -243,7 +244,7 @@ class QueryService {
               WHERE l.location_name CONTAINS $searchTerm
               OPTIONAL MATCH (l)-[r]-()
               RETURN l as entity,
-                     'Location' as type,
+                     $locationType as type,
                      l.location_name as name,
                      count(r) as connections
               ORDER BY connections DESC, l.location_name
@@ -256,7 +257,7 @@ class QueryService {
               WHERE e.event_name CONTAINS $searchTerm OR e.event_description CONTAINS $searchTerm
               OPTIONAL MATCH (e)-[r]-()
               RETURN e as entity,
-                     'Event' as type,
+                     $eventType as type,
                      e.event_name as name,
                      count(r) as connections
               ORDER BY connections DESC, e.event_name
@@ -273,27 +274,27 @@ class QueryService {
             MATCH (c:Company)
             WHERE c.company_name CONTAINS $searchTerm
             OPTIONAL MATCH (c)-[r]-()
-            RETURN c as entity, 'Company' as type, c.company_name as name, count(r) as connections
+            RETURN c as entity, $companyType as type, c.company_name as name, count(r) as connections
             UNION
             MATCH (p:Person)
             WHERE p.person_name CONTAINS $searchTerm
             OPTIONAL MATCH (p)-[r]-()
-            RETURN p as entity, 'Person' as type, p.person_name as name, count(r) as connections
+            RETURN p as entity, $personType as type, p.person_name as name, count(r) as connections
             UNION
             MATCH (o:Organization)
             WHERE o.organization_name CONTAINS $searchTerm
             OPTIONAL MATCH (o)-[r]-()
-            RETURN o as entity, 'Organization' as type, o.organization_name as name, count(r) as connections
+            RETURN o as entity, $organizationType as type, o.organization_name as name, count(r) as connections
             UNION
             MATCH (l:Location)
             WHERE l.location_name CONTAINS $searchTerm
             OPTIONAL MATCH (l)-[r]-()
-            RETURN l as entity, 'Location' as type, l.location_name as name, count(r) as connections
+            RETURN l as entity, $locationType as type, l.location_name as name, count(r) as connections
             UNION
             MATCH (e:Event)
             WHERE e.event_name CONTAINS $searchTerm OR e.event_description CONTAINS $searchTerm
             OPTIONAL MATCH (e)-[r]-()
-            RETURN e as entity, 'Event' as type, e.event_name as name, count(r) as connections
+            RETURN e as entity, $eventType as type, e.event_name as name, count(r) as connections
           }
           RETURN entity, type, name, connections
           ORDER BY connections DESC, name
@@ -301,10 +302,18 @@ class QueryService {
         `;
       }
 
-      const result = await this.neo4j.executeQuery(cypher, {
+      const queryParams: any = {
         searchTerm,
-        limit
-      });
+        limit,
+        // 添加所有节点类型参数
+        companyType: NodeType.COMPANY,
+        personType: NodeType.PERSON,
+        organizationType: NodeType.ORGANIZATION,
+        locationType: NodeType.LOCATION,
+        eventType: NodeType.EVENT
+      };
+
+      const result = await this.neo4j.executeQuery(cypher, queryParams);
 
       return result.records.map((record: any) => ({
         entity: record.get('entity').properties,
@@ -417,7 +426,6 @@ class QueryService {
     if (props.organization_name) return props.organization_name;
     if (props.location_name) return props.location_name;
     if (props.event_name) return props.event_name;
-    if (props.time_value) return props.time_value;
     if (props.title) return props.title;
     if (props.name) return props.name;
     return node.labels[0] || 'Unknown';

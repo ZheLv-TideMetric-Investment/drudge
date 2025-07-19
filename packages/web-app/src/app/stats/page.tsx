@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { NodeType, NODE_TYPE_DESCRIPTIONS } from '../../../constants/enums';
 import { 
   Card, 
   Row, 
@@ -21,7 +22,6 @@ import {
   TeamOutlined,
   BankOutlined,
   EnvironmentOutlined,
-  CalendarOutlined,
   FlagOutlined,
   NodeIndexOutlined,
   ReloadOutlined,
@@ -34,7 +34,7 @@ const { Title, Text } = Typography;
 
 interface NodeStatsRecord {
   key: string;
-  nodeType: string;
+  nodeType: NodeType;
   count: number;
   name: string;
   percentage: string;
@@ -77,7 +77,6 @@ interface GraphStatsData {
     organizations: number;
     locations: number;
     events: number;
-    times: number;
   };
   relationshipDistribution: Record<string, number>;
   timeStats: TimeStatsData;
@@ -118,28 +117,26 @@ export default function StatsPage() {
     fetchStats();
   }, []);
 
-  const getNodeIcon = (nodeType: string) => {
-    const iconMap: Record<string, React.ReactNode> = {
-      News: <FileTextOutlined style={{ color: '#1890ff' }} />,
-      Event: <FlagOutlined style={{ color: '#f5222d' }} />,
-      Company: <BankOutlined style={{ color: '#52c41a' }} />,
-      Person: <TeamOutlined style={{ color: '#722ed1' }} />,
-      Organization: <NodeIndexOutlined style={{ color: '#fa8c16' }} />,
-      Location: <EnvironmentOutlined style={{ color: '#13c2c2' }} />,
-      Time: <CalendarOutlined style={{ color: '#eb2f96' }} />
+  const getNodeIcon = (nodeType: NodeType) => {
+    const iconMap: Record<NodeType, React.ReactNode> = {
+      [NodeType.NEWS]: <FileTextOutlined style={{ color: '#1890ff' }} />,
+      [NodeType.EVENT]: <FlagOutlined style={{ color: '#f5222d' }} />,
+      [NodeType.COMPANY]: <BankOutlined style={{ color: '#52c41a' }} />,
+      [NodeType.PERSON]: <TeamOutlined style={{ color: '#722ed1' }} />,
+      [NodeType.ORGANIZATION]: <NodeIndexOutlined style={{ color: '#fa8c16' }} />,
+      [NodeType.LOCATION]: <EnvironmentOutlined style={{ color: '#13c2c2' }} />,
     };
     return iconMap[nodeType] || <DatabaseOutlined />;
   };
 
-  const getNodeColor = (nodeType: string) => {
-    const colorMap: Record<string, string> = {
-      News: '#1890ff',
-      Event: '#f5222d',
-      Company: '#52c41a',
-      Person: '#722ed1',
-      Organization: '#fa8c16',
-      Location: '#13c2c2',
-      Time: '#eb2f96'
+  const getNodeColor = (nodeType: NodeType) => {
+    const colorMap: Record<NodeType, string> = {
+      [NodeType.NEWS]: '#1890ff',
+      [NodeType.EVENT]: '#f5222d',
+      [NodeType.COMPANY]: '#52c41a',
+      [NodeType.PERSON]: '#722ed1',
+      [NodeType.ORGANIZATION]: '#fa8c16',
+      [NodeType.LOCATION]: '#13c2c2',
     };
     return colorMap[nodeType] || '#666';
   };
@@ -150,9 +147,9 @@ export default function StatsPage() {
       title: '节点类型',
       dataIndex: 'nodeType',
       key: 'nodeType',
-      render: (type: string, record: NodeStatsRecord) => (
+      render: (type: NodeType, record: NodeStatsRecord) => (
         <Space>
-          {getNodeIcon(type)}
+          {getNodeIcon(record.nodeType)}
           <Text strong>{record.name}</Text>
         </Space>
       ),
@@ -305,13 +302,12 @@ export default function StatsPage() {
 
   // 节点数据
   const nodeStatsData = [
-    { key: 'News', nodeType: 'News', count: data.overview.news, name: '新闻' },
-    { key: 'Event', nodeType: 'Event', count: data.overview.events, name: '事件' },
-    { key: 'Company', nodeType: 'Company', count: data.overview.companies, name: '公司' },
-    { key: 'Person', nodeType: 'Person', count: data.overview.persons, name: '人物' },
-    { key: 'Organization', nodeType: 'Organization', count: data.overview.organizations, name: '机构' },
-    { key: 'Location', nodeType: 'Location', count: data.overview.locations, name: '地点' },
-    { key: 'Time', nodeType: 'Time', count: data.overview.times, name: '时间' },
+    { key: NodeType.NEWS, nodeType: NodeType.NEWS, count: data.overview.news, name: NODE_TYPE_DESCRIPTIONS[NodeType.NEWS] },
+    { key: NodeType.EVENT, nodeType: NodeType.EVENT, count: data.overview.events, name: NODE_TYPE_DESCRIPTIONS[NodeType.EVENT] },
+    { key: NodeType.COMPANY, nodeType: NodeType.COMPANY, count: data.overview.companies, name: NODE_TYPE_DESCRIPTIONS[NodeType.COMPANY] },
+    { key: NodeType.PERSON, nodeType: NodeType.PERSON, count: data.overview.persons, name: NODE_TYPE_DESCRIPTIONS[NodeType.PERSON] },
+    { key: NodeType.ORGANIZATION, nodeType: NodeType.ORGANIZATION, count: data.overview.organizations, name: NODE_TYPE_DESCRIPTIONS[NodeType.ORGANIZATION] },
+    { key: NodeType.LOCATION, nodeType: NodeType.LOCATION, count: data.overview.locations, name: NODE_TYPE_DESCRIPTIONS[NodeType.LOCATION] },
   ].map(item => ({
     ...item,
     percentage: data.overview.totalNodes > 0 ? ((item.count / data.overview.totalNodes) * 100).toFixed(1) : '0'
@@ -513,16 +509,6 @@ export default function StatsPage() {
                   value={data.overview.locations}
                   prefix={<EnvironmentOutlined />}
                   valueStyle={{ color: '#13c2c2' }}
-                />
-              </Card>
-            </Col>
-            <Col xs={24} sm={12} md={8}>
-              <Card>
-                <Statistic
-                  title="时间节点"
-                  value={data.overview.times}
-                  prefix={<CalendarOutlined />}
-                  valueStyle={{ color: '#eb2f96' }}
                 />
               </Card>
             </Col>

@@ -1,6 +1,7 @@
 import { neo4jService } from './neo4j';
 import { GraphData, Entity, Relationship, GraphQueryResult, EntitySearchResult } from '@/types';
 import moment from 'moment-timezone';
+import { NodeType } from '../../../constants/enums';
 
 /**
  * 图谱查询服务
@@ -226,7 +227,7 @@ class GraphService {
           nodes.set(newsNode.identity.toString(), {
             id: newsNode.identity.toString(),
             name: newsNode.properties.title || 'News',
-            type: 'News' as any,
+            type: NodeType.NEWS,
             properties: newsNode.properties
           });
         }
@@ -400,7 +401,6 @@ class GraphService {
     if (props.organization_name) return props.organization_name;
     if (props.location_name) return props.location_name;
     if (props.event_name) return props.event_name;
-    if (props.time_value) return props.time_value;
     if (props.title) return props.title;
     if (props.name) return props.name;
     return node.labels?.[0] || 'Unknown';
