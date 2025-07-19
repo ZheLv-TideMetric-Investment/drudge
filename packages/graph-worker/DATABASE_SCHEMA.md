@@ -14,6 +14,8 @@
 - **时间处理**: 所有时间数据统一使用 UTC 时区的 ISO 8601 格式存储 (YYYY-MM-DDTHH:mm:ss.sssZ)
 - **数据质量**: 严格的数据验证，不允许兜底数据，确保数据准确性
 - **失败处理**: 处理失败的新闻数据会保存到 `data/news/failed` 目录便于后续分析
+- **枚举管理**: 使用 TypeScript 枚举和 `ts-enum-util` 库进行类型安全的枚举操作
+- **类型安全**: 完整的 TypeScript 类型支持，确保编译时类型检查
 
 ---
 
@@ -76,7 +78,7 @@
 | `created_at` | DateTime | ✓ | 创建时间 (UTC) |
 | `updated_at` | DateTime | ✓ | 更新时间 (UTC) |
 
-**事件类型枚举**:
+**事件类型枚举** (EventType):
 - `macro`: 宏观经济事件
 - `policy`: 政策变化
 - `market`: 市场动态
@@ -85,6 +87,8 @@
 - `tech`: 技术事件
 - `geopolitics`: 地缘政治
 - `other`: 其他事件
+
+> **类型安全**: 使用 TypeScript 枚举 `EventType`，支持编译时类型检查和 IDE 智能提示。
 
 **示例**:
 ```json
@@ -148,13 +152,15 @@
 | `created_at` | DateTime | ✓ | 创建时间 (UTC) |
 | `updated_at` | DateTime | ✓ | 更新时间 (UTC) |
 
-**机构类型枚举**:
+**机构类型枚举** (OrganizationType):
 - `government`: 政府机构
 - `regulator`: 监管机构
 - `intl_org`: 国际组织
 - `fin_inst`: 金融机构
 - `industry_assoc`: 行业协会
 - `other`: 其他
+
+> **类型安全**: 使用 TypeScript 枚举 `OrganizationType`，支持编译时类型检查。
 
 ### 6. Location (地点节点)
 表示地理位置实体。
@@ -171,42 +177,154 @@
 | `created_at` | DateTime | ✓ | 创建时间 (UTC) |
 | `updated_at` | DateTime | ✓ | 更新时间 (UTC) |
 
-**地点类型枚举**:
+**地点类型枚举** (LocationType):
 - `country`: 国家
 - `region`: 地区
 - `city`: 城市
 - `facility`: 设施
 - `other`: 其他
 
+> **类型安全**: 使用 TypeScript 枚举 `LocationType`，支持编译时类型检查。
+
 > **注意**: 坐标信息(coordinates)字段已移除，后续将通过专门的地理定位服务来处理坐标数据。
+
+---
+
+## 枚举管理系统
+
+### 概述
+
+系统使用 TypeScript 枚举和 `ts-enum-util` 库进行统一的枚举管理，提供类型安全和强大的枚举操作功能。
+
+### 核心枚举类型
+
+| 枚举类型 | TypeScript 类型 | 用途 |
+|----------|-----------------|------|
+| 事件类型 | `EventType` | 事件分类 |
+| 情感倾向 | `Sentiment` | 情感分析 |
+| 事件级别 | `EventLevel` | 重要性级别 |
+| 机构类型 | `OrganizationType` | 机构分类 |
+| 地点类型 | `LocationType` | 地理位置分类 |
+| 关系类型 | `RelationshipType` | 实体关系分类 |
+| 系统关系 | `SystemRelationshipType` | 系统生成关系 |
+
+### 枚举工具功能
+
+#### 基础验证
+```typescript
+import { isValidEventType, isValidSentiment } from '../constants/enums';
+
+// 类型安全验证
+isValidEventType('macro')    // true
+isValidEventType('invalid')  // false
+isValidSentiment('positive') // true
+```
+
+#### 枚举遍历
+```typescript
+import { EventTypeEnum, EVENT_TYPE_VALUES, EVENT_TYPE_KEYS } from '../constants/enums';
+
+// 获取所有值
+EventTypeEnum.getValues()  // ['macro', 'policy', 'market', ...]
+
+// 获取所有键
+EventTypeEnum.getKeys()    // ['MACRO', 'POLICY', 'MARKET', ...]
+
+// 数组形式 (向后兼容)
+EVENT_TYPE_VALUES         // ['macro', 'policy', 'market', ...]
+EVENT_TYPE_KEYS          // ['MACRO', 'POLICY', 'MARKET', ...]
+```
+
+#### 映射和转换
+```typescript
+import { mapEventType, EVENT_TYPE_DESCRIPTIONS } from '../constants/enums';
+
+// 函数式映射
+const descriptions = mapEventType(type => EVENT_TYPE_DESCRIPTIONS[type]);
+// 输出: ['宏观经济事件', '政策变化', '市场动态', ...]
+
+// 安全转换
+const eventType = getEventTypeByKey('MACRO'); // EventType.MACRO
+```
+
+#### 默认值
+```typescript
+import { 
+  DEFAULT_EVENT_TYPE, 
+  DEFAULT_SENTIMENT, 
+  DEFAULT_EVENT_LEVEL 
+} from '../constants/enums';
+
+// 使用默认值
+const event = {
+  event_type: data.event_type || DEFAULT_EVENT_TYPE,    // 'other'
+  sentiment: data.sentiment || DEFAULT_SENTIMENT,       // 'neutral'
+  event_level: data.event_level || DEFAULT_EVENT_LEVEL  // 'Level 5'
+};
+```
+
+#### 向后兼容
+```typescript
+// 保持与现有代码的兼容性
+import { EVENT_TYPES, SENTIMENTS, EVENT_LEVELS } from '../constants/enums';
+
+EVENT_TYPES.MACRO     // 等同于 EventType.MACRO
+SENTIMENTS.POSITIVE   // 等同于 Sentiment.POSITIVE
+EVENT_LEVELS.LEVEL_1  // 等同于 EventLevel.LEVEL_1
+```
+
+### 描述映射
+
+系统提供完整的中文描述映射：
+
+```typescript
+import { 
+  EVENT_TYPE_DESCRIPTIONS,
+  SENTIMENT_DESCRIPTIONS,
+  ORGANIZATION_TYPE_DESCRIPTIONS,
+  LOCATION_TYPE_DESCRIPTIONS,
+  RELATIONSHIP_TYPE_DESCRIPTIONS
+} from '../constants/enums';
+
+// 使用示例
+EVENT_TYPE_DESCRIPTIONS[EventType.MACRO]           // '宏观经济事件'
+SENTIMENT_DESCRIPTIONS[Sentiment.POSITIVE]         // '积极'
+ORGANIZATION_TYPE_DESCRIPTIONS[OrganizationType.GOVERNMENT] // '政府机构'
+```
 
 ---
 
 ## 关系类型 (Relationship Types)
 
-### 标准关系类型
+### 标准关系类型 (RelationshipType)
 
-| 关系类型 | 含义 | 示例 |
-|----------|------|------|
-| `LOCATED_IN` | 位于 | 公司位于某地 |
-| `WORKS_FOR` | 工作于 | 人物在公司工作 |
-| `OWNS` | 拥有 | 公司拥有子公司 |
-| `PARTICIPATES_IN` | 参与 | 参与某个事件 |
-| `MERGES_WITH` | 合并 | 公司合并 |
-| `ACQUIRES` | 收购 | 公司收购 |
-| `SUPPLIES` | 供应 | 供应商关系 |
-| `PARTNERS_WITH` | 合作 | 合作伙伴关系 |
-| `SUED_BY` | 被起诉 | 法律诉讼 |
-| `REGULATED_BY` | 被监管 | 监管关系 |
-| `INVESTS_IN` | 投资 | 投资关系 |
-| `OTHER` | 其他 | 其他关系类型 |
+| 关系类型 | 中文描述 | 含义 | 示例 |
+|----------|----------|------|------|
+| `LOCATED_IN` | 位于 | 地理位置关系 | 公司位于某地 |
+| `WORKS_FOR` | 供职于 | 工作关系 | 人物在公司工作 |
+| `OWNS` | 拥有 | 所有权关系 | 公司拥有子公司 |
+| `PARTICIPATES_IN` | 参与 | 参与关系 | 参与某个事件 |
+| `MERGES_WITH` | 合并 | 企业合并 | 公司合并 |
+| `ACQUIRES` | 收购 | 企业收购 | 公司收购 |
+| `SUPPLIES` | 供应 | 供应商关系 | 供应商关系 |
+| `PARTNERS_WITH` | 合作 | 合作伙伴关系 | 合作伙伴关系 |
+| `SUED_BY` | 被起诉 | 法律诉讼 | 法律诉讼 |
+| `REGULATED_BY` | 被监管 | 监管关系 | 监管关系 |
+| `INVESTS_IN` | 投资 | 投资关系 | 投资关系 |
+| `OTHER` | 其他 | 其他关系类型 | 其他关系类型 |
 
-### 系统生成的关系类型
+> **类型安全**: 使用 TypeScript 枚举 `RelationshipType`，支持编译时类型检查和完整的中文描述映射。
+
+### 系统生成的关系类型 (SystemRelationshipType)
 
 | 关系类型 | 含义 | 说明 |
 |----------|------|------|
 | `DESCRIBES` | 描述 | 新闻描述事件 |
-| `LOCATED_AT` | 位于 | 事件发生地点 |
+| `INVOLVES` | 涉及 | 新闻涉及公司/机构 |
+| `MENTIONS` | 提及 | 新闻提及人物 |
+| `LOCATED_AT` | 位于 | 新闻/事件发生地点 |
+
+> **说明**: 系统关系类型由系统自动生成，用于连接新闻节点与各种实体节点。
 
 ### 关系属性
 
@@ -618,6 +736,10 @@ RETURN count(c) as companiesWithoutName;
 3. **查询优化**: 使用 `LIMIT` 限制结果集大小
 4. **批量操作**: 大数据量操作时使用批量处理
 5. **定期维护**: 定期清理孤立节点和重复数据
+6. **枚举优化**: 使用枚举常量而非字符串字面量进行查询
+   - ✅ 推荐: `WHERE e.event_type = $eventType` (使用 EventType.MACRO)
+   - ❌ 避免: `WHERE e.event_type = 'macro'` (硬编码字符串)
+7. **类型验证**: 在数据写入前使用枚举验证函数，避免无效数据
 
 ---
 
@@ -726,7 +848,105 @@ ORDER BY event_count DESC
 // 在 Neo4j Browser 中右键结果表格选择 "Export" -> "CSV"
 ```
 
-### 5. 集成到其他应用
+### 5. TypeScript 枚举集成示例
+
+#### 使用枚举进行类型安全开发
+```typescript
+import { 
+  EventType, 
+  Sentiment, 
+  EventLevel,
+  RelationshipType,
+  isValidEventType,
+  EVENT_TYPE_DESCRIPTIONS 
+} from '../constants/enums';
+
+// 类型安全的事件创建
+function createEvent(data: any) {
+  return {
+    event_id: data.id,
+    event_name: data.name,
+    event_type: isValidEventType(data.type) ? data.type : EventType.OTHER,
+    sentiment: data.sentiment || Sentiment.NEUTRAL,
+    event_level: data.level || EventLevel.LEVEL_5,
+    // ... 其他属性
+  };
+}
+
+// 枚举映射和描述
+function getEventTypeDescription(type: EventType): string {
+  return EVENT_TYPE_DESCRIPTIONS[type];
+}
+
+// 验证和过滤
+function filterEventsByType(events: Event[], type: EventType) {
+  return events.filter(event => event.event_type === type);
+}
+```
+
+#### 查询构建器示例
+```typescript
+import { EventType, Sentiment, RelationshipType } from '../constants/enums';
+
+class CypherQueryBuilder {
+  // 类型安全的事件查询
+  static getEventsByType(eventType: EventType): string {
+    return `
+      MATCH (e:Event {event_type: $eventType})
+      RETURN e
+      ORDER BY e.timestamp DESC
+    `;
+  }
+
+  // 情感分析查询
+  static getEventsBySentiment(sentiment: Sentiment): string {
+    return `
+      MATCH (e:Event {sentiment: $sentiment})
+      RETURN e.event_type, count(e) as count
+      ORDER BY count DESC
+    `;
+  }
+
+  // 关系查询
+  static getRelationshipsByType(relType: RelationshipType): string {
+    return `
+      MATCH ()-[r:${relType}]-()
+      RETURN r, count(r) as count
+    `;
+  }
+}
+```
+
+#### 数据验证示例
+```typescript
+import { 
+  isValidEventType, 
+  isValidSentiment, 
+  isValidEventLevel,
+  DEFAULT_EVENT_TYPE,
+  DEFAULT_SENTIMENT 
+} from '../constants/enums';
+
+function validateAndNormalizeEvent(rawEvent: any) {
+  const validated = {
+    event_type: isValidEventType(rawEvent.event_type) 
+      ? rawEvent.event_type 
+      : DEFAULT_EVENT_TYPE,
+    
+    sentiment: isValidSentiment(rawEvent.sentiment) 
+      ? rawEvent.sentiment 
+      : DEFAULT_SENTIMENT,
+      
+    event_level: isValidEventLevel(rawEvent.event_level) 
+      ? rawEvent.event_level 
+      : EventLevel.LEVEL_5,
+  };
+  
+  return validated;
+}
+```
+
+### 6. 集成到其他应用
 
 #### Python 集成示例
 ```python
@@ -815,6 +1035,11 @@ npm run cli query "关键词" 10
 npm run cli db-clean-duplicates  # 清理重复数据
 npm run cli db-clean-orphaned    # 清理孤立节点
 
+# 枚举相关操作
+npm run cli enum-stats           # 查看枚举使用统计
+npm run cli validate-enums       # 验证数据库中的枚举值
+npm run cli fix-invalid-enums    # 修复无效的枚举值
+
 # 失败新闻处理
 ls -la ../../data/news/failed/   # 查看失败新闻文件
 cat ../../data/news/failed/failed_*.json | jq '.error.message'  # 查看失败原因
@@ -900,10 +1125,72 @@ RETURN n.title,
 ORDER BY n.timestamp DESC;
 ```
 
+### Q: 如何正确使用新的枚举系统？
+A: 
+1. **TypeScript 开发**: 直接使用枚举类型，享受完整的类型检查
+```typescript
+import { EventType, Sentiment } from '../constants/enums';
+const event = { event_type: EventType.MACRO, sentiment: Sentiment.POSITIVE };
+```
+
+2. **JavaScript 开发**: 使用枚举值字符串
+```javascript
+const { EventType, Sentiment } = require('../constants/enums');
+const event = { event_type: EventType.MACRO, sentiment: Sentiment.POSITIVE };
+```
+
+3. **验证未知数据**: 使用验证函数
+```typescript
+import { isValidEventType, DEFAULT_EVENT_TYPE } from '../constants/enums';
+const eventType = isValidEventType(data.type) ? data.type : DEFAULT_EVENT_TYPE;
+```
+
+### Q: 如何获取枚举的中文描述？
+A: 
+使用描述映射对象：
+```typescript
+import { EVENT_TYPE_DESCRIPTIONS, EventType } from '../constants/enums';
+const description = EVENT_TYPE_DESCRIPTIONS[EventType.MACRO]; // '宏观经济事件'
+```
+
+### Q: 新枚举系统与旧代码兼容吗？
+A: 
+完全兼容。系统提供向后兼容的常量对象：
+```typescript
+// 旧代码仍然可以正常工作
+import { EVENT_TYPES, SENTIMENTS } from '../constants/enums';
+const type = EVENT_TYPES.MACRO;    // 等同于 EventType.MACRO
+const sentiment = SENTIMENTS.POSITIVE; // 等同于 Sentiment.POSITIVE
+```
+
+### Q: 如何遍历所有枚举值？
+A: 
+使用 ts-enum-util 提供的方法：
+```typescript
+import { EventTypeEnum, EVENT_TYPE_VALUES } from '../constants/enums';
+
+// 方法1: 使用枚举工具
+EventTypeEnum.getValues().forEach(type => console.log(type));
+
+// 方法2: 使用数组常量
+EVENT_TYPE_VALUES.forEach(type => console.log(type));
+
+// 方法3: 函数式映射
+const descriptions = mapEventType(type => EVENT_TYPE_DESCRIPTIONS[type]);
+```
+
 ---
 
 ## 更新日志
 
+- **v5.0.0**: 枚举系统重构
+  - 使用 TypeScript 枚举替代常量对象
+  - 集成 `ts-enum-util` 库提供强大的枚举操作
+  - 新增类型安全的验证和转换函数
+  - 完善的中文描述映射系统
+  - 向后兼容的常量对象支持
+  - 函数式枚举映射和遍历工具
+  - 标准化的默认值常量
 - **v4.2.0**: 全面时间字段统一
   - Event 节点也使用 `timestamp` 字段，取消 `event_date`
   - 所有实体节点时间字段完全统一

@@ -4,14 +4,21 @@ import notificationService from './NotificationService';
 import { z } from 'zod';
 import * as chrono from 'chrono-node';
 import { parseTime, getCurrentTime } from '../utils/timeUtils';
-import { 
-  EVENT_TYPE_VALUES, 
-  SENTIMENT_VALUES, 
+import {
+  EVENT_TYPE_VALUES,
+  SENTIMENT_VALUES,
   EVENT_LEVEL_VALUES,
   ORGANIZATION_TYPE_VALUES,
   LOCATION_TYPE_VALUES,
   RELATIONSHIP_TYPE_VALUES,
-  EventLevel
+  EventLevel,
+  EventType,
+  Sentiment,
+  OrganizationType,
+  LocationType,
+  RelationshipType,
+  EVENT_TYPE_DESCRIPTIONS,
+  ORGANIZATION_TYPE_DESCRIPTIONS
 } from '../constants/enums';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -80,7 +87,10 @@ const newsExtractionSchema = z.object({
   locations: z.array(
     z.object({
       location_name: z.string().min(1),
-      type: z.enum(LOCATION_TYPE_VALUES as [string, ...string[]]).optional().or(z.literal('')),
+      type: z
+        .enum(LOCATION_TYPE_VALUES as [string, ...string[]])
+        .optional()
+        .or(z.literal('')),
       country: z.string().optional().or(z.literal('')),
       region: z.string().optional().or(z.literal('')),
     })
@@ -881,8 +891,19 @@ export class EntityExtractionService {
 
   /**
    * 获取强化版系统提示词 - 针对投资场景全面优化
+   * 使用枚举常量动态生成提示词，确保与代码中的枚举定义保持一致
    */
   private getSystemPrompt(): string {
+    // 动态生成枚举值描述，避免硬编码
+    const eventTypeList = EVENT_TYPE_VALUES.join(' | ');
+    const sentimentList = SENTIMENT_VALUES.join(' / ');
+    const organizationTypeList = ORGANIZATION_TYPE_VALUES.join('/');
+    
+    // 生成机构类型的详细描述，包含中文说明
+    const organizationTypeDescriptions = ORGANIZATION_TYPE_VALUES.map(type => 
+      `${type}(${ORGANIZATION_TYPE_DESCRIPTIONS[type as OrganizationType]})`
+    ).join('、');
+
     return `
 你是一名资深财经新闻结构化专家，必须按照新闻学 5W1H 原则提取要素并以 **唯一合法 JSON** 输出。
 
@@ -890,8 +911,8 @@ export class EntityExtractionService {
 1. **只输出 JSON**：禁止 Markdown、说明文字、注释、空行、反引号。
 2. JSON 须 **完全符合** 「<返回格式>」的键名、顺序与枚举；字段缺失用 "" 或 [] 补齐，不得省略。
 3. 若新闻包含多事件，请全部列出，每条事件都要有 \`event_level\`。
-4. 不得凭空臆测；只使用新闻中出现的信息。
-
+4. **不做推测**：仅使用新闻中出现的信息，若信息缺失，填写空值或数组，不推测填补。
+   
 ═══════════ 🏷️ 统一标准（务必遵守）🏷️ ═══════════
 ◆ Company  
   - \`company_name\`：国家企业信用、招股书或年报里的**完整注册名**。  
@@ -904,7 +925,8 @@ export class EntityExtractionService {
     · ✅ \`person_name\`:"蒂姆·库克", \`title\`:"首席执行官"  
 
 ◆ Organization  
-  - \`organization_name\`：法定或官方名称。\`type\` 取枚举："government/regulator/intl_org/fin_inst/industry_assoc/other"。  
+  - \`organization_name\`：法定或官方名称。\`type\` 取枚举："${organizationTypeList}"。  
+  - 类型说明：${organizationTypeDescriptions}  
 
 ◆ Location  
   - 提供 \`country\`（ISO Alpha-2 或中文官方）。  
@@ -917,10 +939,10 @@ export class EntityExtractionService {
 - **Level 5**  信息性报道、背景资料、例行统计  
 
 ═════════════ 🎯 事件 & 情感 指南 🎯 ═════════════
-- \`event_type\`（枚举）：macro | policy | market | corporate | industry | tech | geopolitics | other  
+- \`event_type\`（枚举）：${eventTypeList}  
 - \`significance\`：1=低 4=最高；以事件对资本市场潜在影响评估。  
 - \`magnitude\`：范围 -1.0 – 1.0，负值表示利空。  
-- \`sentiment\`：positive / negative / neutral  
+- \`sentiment\`：${sentimentList}  
 
 ═════════════ 🔄 去重规则 🔄 ═════════════
 同一实体出现多次 → 合并，并用 \`aliases\` 记录别名；输出数组不得含重复对象。
@@ -934,11 +956,11 @@ export class EntityExtractionService {
   "events":[{
     "event_name":"阿里巴巴收购 Asos",
     "event_description":"阿里巴巴以 50 亿美元收购 Asos PLC",
-    "event_type":"corporate",
+    "event_type":"${EventType.CORPORATE}",
     "significance":3,
-    "sentiment":"positive",
+    "sentiment":"${Sentiment.POSITIVE}",
     "magnitude":0.6,
-    "event_level":"Level 3",
+    "event_level":"${EventLevel.LEVEL_3}",
     "timestamp":"2025-07-06T00:00:00.000Z"
   }],
   "companies":[
@@ -964,14 +986,14 @@ export class EntityExtractionService {
   "locations":[
     {
       "location_name":"北京",
-      "type":"city",
+      "type":"${LocationType.CITY}",
       "country":"CN",
       "region":"北京市"
     }
   ],
   "relationships":[
     {
-      "type":"ACQUIRES",
+      "type":"${RelationshipType.ACQUIRES}",
       "from":"阿里巴巴集团控股有限公司",
       "to":"Asos PLC",
       "description":"50亿美元收购",
@@ -991,6 +1013,7 @@ export class EntityExtractionService {
 }
 
 ―― 充分理解后，请等待新闻输入并仅输出符合格式的 JSON ――
+
     `;
   }
 
