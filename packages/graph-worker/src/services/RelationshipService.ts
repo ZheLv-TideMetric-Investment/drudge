@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
-import { getCurrentTime } from '../utils/timeUtils';
+import { getCurrentTimestamp } from '../utils/timeUtils';
 import { RELATIONSHIP_TYPES, SYSTEM_RELATIONSHIP_TYPES } from '../constants/enums';
 import { 
   NewsExtractionResult, 
@@ -78,8 +78,8 @@ export class RelationshipService {
       description: relationship.description || '',
       confidence: relationship.confidence || 0.8,
       newsId,
-      createdAt: getCurrentTime(),
-      updatedAt: getCurrentTime()
+      createdAt: getCurrentTimestamp(),
+      updatedAt: getCurrentTimestamp()
     };
 
     try {
@@ -134,8 +134,8 @@ export class RelationshipService {
           description: relationship.description || '',
           confidence: relationship.confidence || 0.8,
           newsId: result.newsId || '',
-          createdAt: getCurrentTime(),
-          updatedAt: getCurrentTime()
+          createdAt: getCurrentTimestamp(),
+          updatedAt: getCurrentTimestamp()
         };
 
         paramIndex++;
@@ -206,8 +206,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${getCurrentTime()}",
-                  r.updated_at = "${getCurrentTime()}"
+                  r.created_at = "${getCurrentTimestamp()}",
+                  r.updated_at = "${getCurrentTimestamp()}"
             `);
           }
         }
@@ -226,8 +226,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${getCurrentTime()}",
-                  r.updated_at = "${getCurrentTime()}"
+                  r.created_at = "${getCurrentTimestamp()}",
+                  r.updated_at = "${getCurrentTimestamp()}"
             `);
           }
         }
@@ -246,8 +246,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${getCurrentTime()}",
-                  r.updated_at = "${getCurrentTime()}"
+                  r.created_at = "${getCurrentTimestamp()}",
+                  r.updated_at = "${getCurrentTimestamp()}"
             `);
           }
         }
@@ -266,8 +266,8 @@ export class RelationshipService {
               SET r.inferred = true, 
                   r.confidence = 0.6,
                   r.source_news = "${result.newsId || ''}",
-                  r.created_at = "${getCurrentTime()}",
-                  r.updated_at = "${getCurrentTime()}"
+                  r.created_at = "${getCurrentTimestamp()}",
+                  r.updated_at = "${getCurrentTimestamp()}"
             `);
           }
         }

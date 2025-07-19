@@ -1,6 +1,6 @@
 import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
-import { parseTime, getCurrentTime } from '../utils/timeUtils';
+import { parseTime, getCurrentTime, getCurrentTimestamp } from '../utils/timeUtils';
 import {
   EVENT_LEVELS,
   EVENT_TYPES,
@@ -77,8 +77,8 @@ export class EntityService {
       url: newsItem.url || '',
       level: newsItem.level || 0,
       newsLevel,
-      createdAt: getCurrentTime(),
-      updatedAt: getCurrentTime(),
+      createdAt: getCurrentTimestamp(),
+      updatedAt: getCurrentTimestamp(),
     };
 
     await this.neo4j.executeQuery(cypher, parameters);
@@ -119,8 +119,8 @@ export class EntityService {
       magnitude: event.magnitude || 0,
       eventLevel: event.event_level || EVENT_LEVELS.LEVEL_5,
       significance: event.significance || 1,
-      createdAt: getCurrentTime(),
-      updatedAt: getCurrentTime(),
+      createdAt: getCurrentTimestamp(),
+      updatedAt: getCurrentTimestamp(),
       newsId,
     };
 
@@ -154,8 +154,8 @@ export class EntityService {
       market: company.market || '',
       country: company.country || '',
       aliases: company.aliases && company.aliases.length > 0 ? company.aliases : [],
-      createdAt: getCurrentTime(),
-      updatedAt: getCurrentTime(),
+      createdAt: getCurrentTimestamp(),
+      updatedAt: getCurrentTimestamp(),
       newsId,
     };
 
@@ -185,8 +185,8 @@ export class EntityService {
       title: person.title || '',
       company: person.company || '',
       nationality: person.nationality || '',
-      createdAt: getCurrentTime(),
-      updatedAt: getCurrentTime(),
+      createdAt: getCurrentTimestamp(),
+      updatedAt: getCurrentTimestamp(),
       newsId,
     };
 
@@ -214,8 +214,8 @@ export class EntityService {
       organizationName: organization.organization_name,
       type: organization.type || ORGANIZATION_TYPES.OTHER,
       country: organization.country || '',
-      createdAt: getCurrentTime(),
-      updatedAt: getCurrentTime(),
+      createdAt: getCurrentTimestamp(),
+      updatedAt: getCurrentTimestamp(),
       newsId,
     };
 
@@ -251,8 +251,8 @@ export class EntityService {
       coordinates: location.coordinates ? JSON.stringify(location.coordinates) : null,
       latitude: location.coordinates?.latitude || null,
       longitude: location.coordinates?.longitude || null,
-      createdAt: getCurrentTime(),
-      updatedAt: getCurrentTime(),
+      createdAt: getCurrentTimestamp(),
+      updatedAt: getCurrentTimestamp(),
       newsId,
     };
 

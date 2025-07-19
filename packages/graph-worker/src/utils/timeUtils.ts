@@ -82,3 +82,11 @@ export function parseTime(timeInput: any): string {
 export function getCurrentTime(): string {
   return dayjs().utc().toISOString();
 }
+
+/**
+ * 获取当前UTC时间的ISO字符串
+ * @returns 当前UTC时间的ISO字符串
+ */
+export function getCurrentTimestamp(): number {
+  return dayjs().utc().valueOf();
+}
