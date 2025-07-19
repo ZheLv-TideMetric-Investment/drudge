@@ -92,7 +92,7 @@ export function Layout({ children }: LayoutProps) {
         onClose={() => setDrawerOpen(false)}
         open={drawerOpen}
         width={256}
-        bodyStyle={{ padding: 0 }}
+        styles={{ body: { padding: 0 } }}
         className="drawer-mobile"
       >
         <Menu

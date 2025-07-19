@@ -16,8 +16,8 @@ export interface ScanOptions {
 }
 
 /**
- * 高级别新闻扫描服务
- * 基于Neo4j数据，扫描高等级新闻并发送通知
+ * Level 1 新闻扫描服务
+ * 基于Neo4j数据，扫描 Level 1 新闻并批量发送聚合通知
  */
 class HighLevelNewsScanner {
   private lastScanTime: string | null = null;
@@ -28,7 +28,7 @@ class HighLevelNewsScanner {
   }
 
   /**
-   * 扫描高级别新闻
+   * 扫描 Level 1 新闻
    * @param startTime 开始时间（ISO字符串或moment对象），如果不提供则使用上次扫描时间或5分钟前
    * @param endTime 结束时间（ISO字符串或moment对象），如果不提供则使用当前时间
    * @param options 扫描选项
@@ -46,7 +46,7 @@ class HighLevelNewsScanner {
         source = CallSource.API
       } = options;
 
-      console.log('开始扫描高级别新闻...');
+      console.log('开始扫描 Level 1 新闻...');
       
       // 计算扫描时间范围
       const end = endTime ? moment(endTime) : moment();
@@ -64,7 +64,7 @@ class HighLevelNewsScanner {
 
       console.log(`扫描时间范围: ${start.format('YYYY-MM-DD HH:mm')} - ${end.format('YYYY-MM-DD HH:mm')}`);
 
-      // 从Neo4j获取高级别新闻
+      // 从Neo4j获取 Level 1 新闻
       const highLevelNews = await queryService.getHighLevelNews(
         start.toISOString(),
         end.toISOString()
@@ -76,7 +76,7 @@ class HighLevelNewsScanner {
           success: true,
           found: 0,
           sent: 0,
-          message: `${start.format('HH:mm')}-${end.format('HH:mm')} 时段没有发现高级别新闻`,
+          message: `${start.format('HH:mm')}-${end.format('HH:mm')} 时段没有发现 Level 1 新闻`,
           period: this.formatPeriod(start, end),
           timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
         };
@@ -93,7 +93,7 @@ class HighLevelNewsScanner {
           success: true,
           found: highLevelNews.length,
           sent: 0,
-          message: `发现 ${highLevelNews.length} 条高级别新闻，但都已处理过`,
+          message: `发现 ${highLevelNews.length} 条 Level 1 新闻，但都已处理过`,
           period: this.formatPeriod(start, end),
           timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
         };
@@ -120,23 +120,27 @@ class HighLevelNewsScanner {
       const scanType = startTime || endTime ? '自定义' : '定时';
       const processType = skipProcessed ? '新发现' : '全部';
       
+      const notificationText = sendNotifications && sentCount > 0 ? 
+        `，聚合发送 1 条批量通知 (包含 ${sentCount} 条新闻)` : 
+        (sendNotifications ? '，无需发送通知' : '');
+
       return {
         success: true,
         found: newsToProcess.length,
         sent: sentCount,
-        message: `${scanType}扫描完成：发现 ${newsToProcess.length} 条${processType}高级别新闻${sendNotifications ? `，成功发送 ${sentCount} 条通知` : ''}`,
+        message: `${scanType}扫描完成：发现 ${newsToProcess.length} 条${processType} Level 1 新闻${notificationText}`,
         period: this.formatPeriod(start, end),
         high_level_news: newsToProcess.map(news => this.formatNewsItem(news)),
         timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
       };
 
     } catch (error: any) {
-      console.error('扫描高级别新闻失败:', error);
+      console.error('扫描 Level 1 新闻失败:', error);
       return {
         success: false,
         found: 0,
         sent: 0,
-        message: '扫描高级别新闻失败',
+        message: '扫描 Level 1 新闻失败',
         error: error.message,
         period: '',
         timestamp: moment().format('YYYY-MM-DD HH:mm:ss')
@@ -145,7 +149,7 @@ class HighLevelNewsScanner {
   }
 
   /**
-   * 定时扫描高级别新闻（向后兼容方法）
+   * 定时扫描 Level 1 新闻（向后兼容方法）
    * @param source 调用来源
    */
   async scanHighLevelNewsScheduled(source: CallSource = CallSource.SCHEDULER): Promise<HighLevelScanResult> {
@@ -157,7 +161,7 @@ class HighLevelNewsScanner {
   }
 
   /**
-   * 手动扫描高级别新闻（向后兼容方法）
+   * 手动扫描 Level 1 新闻（向后兼容方法）
    * @param minutes 扫描最近几分钟的新闻
    * @param source 调用来源
    */
@@ -173,7 +177,7 @@ class HighLevelNewsScanner {
   }
 
   /**
-   * 扫描指定时间范围的高级别新闻
+   * 扫描指定时间范围的 Level 1 新闻
    * @param startTime 开始时间
    * @param endTime 结束时间
    * @param source 调用来源
@@ -191,7 +195,7 @@ class HighLevelNewsScanner {
   }
 
   /**
-   * 仅查询高级别新闻（不发送通知）
+   * 仅查询 Level 1 新闻（不发送通知）
    * @param startTime 开始时间
    * @param endTime 结束时间
    */
@@ -207,23 +211,28 @@ class HighLevelNewsScanner {
   }
 
   /**
-   * 发送通知
+   * 发送通知 (批量聚合方式)
    */
   private async sendNotifications(newsItems: any[], source: CallSource): Promise<number> {
-    let sentCount = 0;
-    
-    for (const news of newsItems) {
-      try {
-        const notificationSent = await notificationService.sendHighLevelNewsNotification(news, source);
-        if (notificationSent) {
-          sentCount++;
-        }
-      } catch (notificationError: any) {
-        console.error(`发送高级别新闻通知失败 (ID: ${news.newsId}):`, notificationError.message);
-      }
+    if (newsItems.length === 0) {
+      return 0;
     }
-    
-    return sentCount;
+
+    try {
+      // 使用批量通知方法，将多条新闻聚合成一条消息发送
+      const notificationSent = await notificationService.sendBatchHighLevelNewsNotification(newsItems, source);
+      
+      if (notificationSent) {
+        console.log(`批量发送 Level 1 新闻通知成功: ${newsItems.length} 条新闻`);
+        return newsItems.length; // 返回发送的新闻数量
+      } else {
+        console.log(`批量发送高级别新闻通知跳过或失败`);
+        return 0;
+      }
+    } catch (notificationError: any) {
+      console.error(`批量发送高级别新闻通知失败:`, notificationError.message);
+      return 0;
+    }
   }
 
   /**

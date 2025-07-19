@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         console.log(`[Summary API] ${result.period} 时段没有新闻`);
       } else {
         console.log(
-          `[Summary API] 总结生成成功: ${result.period}, 新闻数量: ${data.news_count || 0}, 高级别: ${data.high_level_count || 0}`
+          `[Summary API] 总结生成成功: ${result.period}, 新闻数量: ${data.news_count || 0}, Level 1: ${data.high_level_count || 0}`
         );
       }
     } else {
