@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   Card,
   Input,
@@ -231,6 +231,7 @@ function NewsCard({
 
 export default function NewsPage() {
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -258,9 +259,18 @@ export default function NewsPage() {
     sortOrder: 'desc' as string
   });
 
+  // 滚动监听相关
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
   // 获取新闻列表
-  const fetchNews = async (page: number = 1, searchParams?: any) => {
-    setLoading(true);
+  const fetchNews = async (page: number = 1, searchParams?: any, isLoadMore: boolean = false) => {
+    if (isLoadMore) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
+    
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -288,7 +298,13 @@ export default function NewsPage() {
       const result: NewsResponse = await response.json();
 
       if (result.success) {
-        setNews(result.data.news);
+        if (isLoadMore) {
+          // 追加数据
+          setNews(prevNews => [...prevNews, ...result.data.news]);
+        } else {
+          // 替换数据（首次加载或刷新）
+          setNews(result.data.news);
+        }
         setPagination(result.data.pagination);
       } else {
         message.error(result.error || '获取新闻失败');
@@ -298,18 +314,21 @@ export default function NewsPage() {
       message.error('网络请求失败');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
+
+  // 加载更多数据
+  const loadMoreNews = useCallback(() => {
+    if (loadingMore || !pagination.hasNext) return;
+    fetchNews(pagination.page + 1, undefined, true);
+  }, [loadingMore, pagination.hasNext, pagination.page, fetchNews]);
 
   // 搜索新闻
   const handleSearch = (keyword: string) => {
     setSearchKeyword(keyword);
     setIsSearchMode(!!keyword);
-    if (keyword) {
-      fetchNews(1);
-    } else {
-      fetchNews(1);
-    }
+    fetchNews(1);
   };
 
   // 清除搜索
@@ -330,6 +349,33 @@ export default function NewsPage() {
     setSearchKeyword('');
     setIsSearchMode(false);
   };
+
+  // 设置滚动监听
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && pagination.hasNext && !loadingMore) {
+          loadMoreNews();
+        }
+      },
+      {
+        threshold: 0.1,
+        rootMargin: '100px'
+      }
+    );
+
+    if (loadMoreRef.current && observerRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, [loadMoreNews, pagination.hasNext, loadingMore]);
 
   // 页面加载时获取数据
   useEffect(() => {
@@ -381,7 +427,6 @@ export default function NewsPage() {
 
   return (
     <Layout>
-
       <div className="newspaper-page" style={{ padding: 'var(--space-2xl) var(--space-lg)', maxWidth: '100%', overflow: 'hidden' }}>
         {/* 传统报纸头部 */}
         <div className="newspaper-header-frame" style={{ marginBottom: 'var(--space-2xl)' }}>
@@ -480,7 +525,7 @@ export default function NewsPage() {
                   <Button 
                     className="newspaper-button"
                     icon={<ReloadOutlined className="newspaper-icon" />} 
-                    onClick={() => fetchNews(pagination.page)}
+                    onClick={() => fetchNews(1)}
                     loading={loading}
                   >
                     刷新
@@ -583,55 +628,50 @@ export default function NewsPage() {
           </Spin>
         </div>
 
-        {/* 分页 */}
+        {/* 加载更多区域 */}
         {news.length > 0 && (
-          <Card style={{ backgroundColor: 'var(--newspaper-paper)', border: '2px solid var(--newspaper-red)' }}>
-            <Row justify="center">
-              <Col>
-                <Space direction="vertical" align="center" size="small">
-                  <div className="newspaper-subtitle" style={{ fontSize: '14px', textAlign: 'center' }}>
-                    📃 第 {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} 条，共 {pagination.total} 条新闻
-                  </div>
-                  <Space>
-                    <Button 
-                      className="newspaper-button"
-                      disabled={!pagination.hasPrev}
-                      onClick={() => fetchNews(pagination.page - 1)}
-                    >
-                      ◀ 上一页
-                    </Button>
-                    <div className="newspaper-body" style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--newspaper-red)' }}>
-                      {pagination.page} / {pagination.totalPages}
+          <div ref={loadMoreRef} style={{ textAlign: 'center', padding: '20px 0' }}>
+            {pagination.hasNext ? (
+              <div>
+                {loadingMore ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                    <Spin />
+                    <div className="newspaper-body" style={{ fontSize: '14px', color: 'var(--newspaper-gray)' }}>
+                      📥 正在加载更多新闻...
                     </div>
+                  </div>
+                ) : (
+                  <div>
                     <Button 
                       className="newspaper-button"
-                      disabled={!pagination.hasNext}
-                      onClick={() => fetchNews(pagination.page + 1)}
+                      onClick={loadMoreNews}
+                      size="large"
+                      style={{ marginBottom: '12px' }}
                     >
-                      下一页 ▶
+                      📖 加载更多新闻
                     </Button>
-                  </Space>
-                  <Space>
-                    <div className="newspaper-body" style={{ fontSize: '13px' }}>每页显示：</div>
-                    <Select
-                      className="newspaper-search"
-                      value={pagination.limit}
-                      onChange={(value) => {
-                        setPagination(prev => ({ ...prev, limit: value }));
-                        fetchNews(1);
-                      }}
-                      style={{ width: 80 }}
-                    >
-                      <Option value={10}>10</Option>
-                      <Option value={20}>20</Option>
-                      <Option value={50}>50</Option>
-                      <Option value={100}>100</Option>
-                    </Select>
-                  </Space>
-                </Space>
-              </Col>
-            </Row>
-          </Card>
+                    <div className="newspaper-body" style={{ fontSize: '13px', color: 'var(--newspaper-gray)' }}>
+                      已显示 {news.length} 条，共 {pagination.total} 条新闻
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ 
+                padding: '20px', 
+                backgroundColor: 'var(--newspaper-beige)', 
+                border: '1px solid var(--newspaper-light-gray)',
+                borderRadius: '4px'
+              }}>
+                <div className="newspaper-subtitle" style={{ fontSize: '16px', marginBottom: '8px' }}>
+                  📰 所有新闻已加载完毕
+                </div>
+                <div className="newspaper-body" style={{ fontSize: '14px' }}>
+                  共 {news.length} 条新闻，感谢您的阅读！
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* 新闻详情模态框 */}
