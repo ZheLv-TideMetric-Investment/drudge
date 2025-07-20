@@ -1,26 +1,901 @@
 @import "tailwindcss";
 
+/* 传统中文报纸全局样式 - 柔和色调版 */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --newspaper-bg: #E4D5B7; /* 加深背景色，更接近泛黄纸张 */
+  --newspaper-paper: #F8F6F0; /* 稍微调整纸张色 */
+  --newspaper-red: #6B4423; /* 深棕红色，更柔和 */
+  --newspaper-dark-red: #5A3A1E; /* 更深的棕红色 */
+  --newspaper-brick-red: #8B5A3C; /* 砖棕色，统一按钮色调 */
+  --newspaper-gray: #4F4F4F;
+  --newspaper-light-gray: #C8C8C8; /* 稍微加深分割线 */
+  --newspaper-green: #556B2F; /* 橄榄绿，更低调 */
+  --newspaper-dark-green: #3D4F23; /* 深橄榄绿 */
+  --newspaper-blue: #2F4F4F; /* 深石板蓝 */
+  --newspaper-beige: #DDD0B8; /* 调整米色调 */
+  --newspaper-border-width: 1px;
+  --newspaper-fine-border: #B8B8B8; /* 加深细边框 */
+  --newspaper-shadow: rgba(0, 0, 0, 0.12); /* 进一步减少阴影强度 */
+  --newspaper-accent: #8B7355; /* 新增：柔和的重点色 */
+  --newspaper-muted: #9B8B7A; /* 新增：静音色调 */
+  --newspaper-title-light: #F5F0E8; /* 新增：导航栏标题专用浅色 */
+  --newspaper-subtitle-light: #EAE0D0; /* 新增：导航栏副标题专用浅色 */
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--newspaper-bg) !important;
+  font-family: 'SimSun', '宋体', serif !important;
+  color: #000000 !important;
+  line-height: 1.8 !important;
+  letter-spacing: 0.5px !important;
+  word-spacing: 1px !important;
+}
+
+/* 传统报纸字体层次优化 */
+.newspaper-title {
+  font-family: 'SimHei', '黑体', 'Microsoft YaHei', sans-serif !important;
+  font-weight: bold !important;
+  color: var(--newspaper-red) !important;
+  letter-spacing: 1.2px !important;
+  line-height: 1.3 !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.08) !important; /* 减轻阴影 */
+}
+
+.newspaper-title-large {
+  font-size: 36px !important;
+  letter-spacing: 2px !important;
+  margin-bottom: 12px !important;
+}
+
+.newspaper-title-medium {
+  font-size: 24px !important;
+  letter-spacing: 1.5px !important;
+  margin-bottom: 8px !important;
+}
+
+.newspaper-title-small {
+  font-size: 18px !important;
+  letter-spacing: 1px !important;
+  margin-bottom: 6px !important;
+}
+
+.newspaper-subtitle {
+  font-family: 'SimSun', '宋体', 'FangSong', '仿宋', serif !important;
+  color: var(--newspaper-gray) !important;
+  letter-spacing: 0.8px !important;
+  line-height: 1.6 !important;
+  font-weight: normal !important;
+}
+
+.newspaper-subtitle-secondary {
+  font-family: 'KaiTi', '楷体', serif !important;
+  color: #666666 !important;
+  font-style: italic !important;
+  letter-spacing: 0.6px !important;
+}
+
+.newspaper-body {
+  font-family: 'SimSun', '宋体', serif !important;
+  color: #000000 !important;
+  line-height: 1.9 !important; /* 增加行间距 */
+  letter-spacing: 0.5px !important;
+  text-indent: 2em !important;
+  margin-bottom: 12px !important;
+}
+
+.newspaper-body-no-indent {
+  text-indent: 0 !important;
+}
+
+/* 传统报纸分栏和装饰 */
+.newspaper-column-divider {
+  width: 1px !important;
+  background: linear-gradient(to bottom, transparent 0%, var(--newspaper-fine-border) 20%, var(--newspaper-fine-border) 80%, transparent 100%) !important;
+  height: 100% !important;
+  margin: 0 20px !important;
+}
+
+.newspaper-section-header {
+  border-top: 2px solid var(--newspaper-red) !important;
+  border-bottom: 1px solid var(--newspaper-fine-border) !important;
+  background-color: var(--newspaper-beige) !important;
+  padding: 12px 20px !important;
+  font-family: 'SimHei', '黑体', sans-serif !important;
+  font-weight: bold !important;
+  text-align: center !important;
+  position: relative !important;
+  margin: 24px 0 16px 0 !important;
+}
+
+.newspaper-section-header::before,
+.newspaper-section-header::after {
+  content: '◆' !important;
+  color: var(--newspaper-accent) !important; /* 使用更柔和的重点色 */
+  font-size: 14px !important;
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+}
+
+.newspaper-section-header::before {
+  left: 20px !important;
+}
+
+.newspaper-section-header::after {
+  right: 20px !important;
+}
+
+/* 传统报纸装饰线条 */
+.newspaper-decorative-frame {
+  border: 2px solid var(--newspaper-red) !important;
+  border-radius: 0 !important;
+  position: relative !important;
+}
+
+.newspaper-decorative-frame::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 4px !important;
+  left: 4px !important;
+  right: 4px !important;
+  bottom: 4px !important;
+  border: 1px solid var(--newspaper-fine-border) !important;
+  pointer-events: none !important;
+}
+
+/* 传统报纸卡片样式优化 */
+.newspaper-card {
+  background-color: var(--newspaper-paper) !important;
+  border: 1px solid var(--newspaper-fine-border) !important;
+  box-shadow: 1px 1px 3px var(--newspaper-shadow) !important; /* 减少阴影 */
+  border-radius: 0 !important;
+  position: relative !important;
+  margin-bottom: 16px !important;
+}
+
+.newspaper-card::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 6px !important;
+  left: 6px !important;
+  right: 6px !important;
+  bottom: 6px !important;
+  border: 1px solid var(--newspaper-light-gray) !important;
+  pointer-events: none !important;
+}
+
+.newspaper-card:hover {
+  box-shadow: 2px 2px 4px var(--newspaper-shadow) !important; /* 简化悬停效果 */
+  transform: none !important;
+}
+
+/* 头条新闻样式 */
+.newspaper-card-important {
+  background-color: #FFF8F0 !important;
+  border: 2px solid var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  box-shadow: 2px 2px 4px rgba(139, 115, 85, 0.2) !important; /* 调整阴影颜色 */
+  position: relative !important;
+  border-radius: 0 !important;
+}
+
+.newspaper-card-important::before {
+  content: '头条' !important;
+  position: absolute !important;
+  top: -8px !important;
+  left: 16px !important;
+  background-color: var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  color: var(--newspaper-bg) !important;
+  padding: 2px 12px !important;
+  font-size: 11px !important;
+  font-weight: bold !important;
+  font-family: 'SimHei', '黑体', sans-serif !important;
+  z-index: 1 !important;
+}
+
+/* 统一按钮风格 - 更柔和的色调 - 增强优先级 */
+.newspaper-button,
+.ant-btn.newspaper-button,
+a.newspaper-button,
+button.newspaper-button {
+  background-color: var(--newspaper-green) !important;
+  border: 1px solid var(--newspaper-dark-green) !important;
+  color: var(--newspaper-bg) !important;
+  font-family: 'SimSun', '宋体', serif !important;
+  border-radius: 0 !important;
+  box-shadow: 1px 1px 2px var(--newspaper-shadow) !important;
+  letter-spacing: 0.5px !important;
+  padding: 6px 16px !important;
+  font-weight: normal !important;
+}
+
+.newspaper-button:hover,
+.ant-btn.newspaper-button:hover,
+.newspaper-button:focus,
+.ant-btn.newspaper-button:focus,
+a.newspaper-button:hover,
+button.newspaper-button:hover,
+a.newspaper-button:focus,
+button.newspaper-button:focus {
+  background-color: var(--newspaper-dark-green) !important;
+  border-color: var(--newspaper-dark-green) !important;
+  color: var(--newspaper-bg) !important;
+  box-shadow: 2px 2px 4px var(--newspaper-shadow) !important;
+  transform: none !important;
+  /* 覆盖可能的内联样式 */
+  background: var(--newspaper-dark-green) !important;
+}
+
+.newspaper-button-secondary,
+.ant-btn.newspaper-button-secondary,
+a.newspaper-button-secondary,
+button.newspaper-button-secondary {
+  background-color: var(--newspaper-muted) !important; /* 使用静音色调 */
+  border: 1px solid var(--newspaper-accent) !important;
+  color: var(--newspaper-bg) !important;
+}
+
+.newspaper-button-secondary:hover,
+.ant-btn.newspaper-button-secondary:hover,
+.newspaper-button-secondary:focus,
+.ant-btn.newspaper-button-secondary:focus,
+a.newspaper-button-secondary:hover,
+button.newspaper-button-secondary:hover,
+a.newspaper-button-secondary:focus,
+button.newspaper-button-secondary:focus {
+  background-color: var(--newspaper-accent) !important;
+  border-color: var(--newspaper-red) !important;
+  color: var(--newspaper-bg) !important;
+  /* 覆盖可能的内联样式 */
+  background: var(--newspaper-accent) !important;
+}
+
+/* 输入框和搜索 */
+.newspaper-search {
+  background-color: var(--newspaper-paper) !important;
+  border: 1px solid var(--newspaper-fine-border) !important;
+  font-family: 'SimSun', '宋体', serif !important;
+  border-radius: 0 !important;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+.newspaper-search:focus {
+  border-color: var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.05), 0 0 2px rgba(139, 115, 85, 0.2) !important;
+}
+
+/* 黑白图标样式 */
+.newspaper-icon {
+  filter: grayscale(100%) contrast(1.1) brightness(0.9) !important; /* 减少对比度 */
+  opacity: 0.75 !important; /* 降低不透明度 */
+}
+
+.newspaper-icon:hover {
+  opacity: 0.9 !important;
+}
+
+/* 标签和徽章 */
+.newspaper-tag {
+  background-color: var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  color: var(--newspaper-bg) !important;
+  border: none !important;
+  font-family: 'SimSun', '宋体', serif !important;
+  border-radius: 0 !important;
+  font-size: 11px !important;
+  letter-spacing: 0.3px !important;
+  padding: 2px 8px !important;
+}
+
+.newspaper-tag-secondary {
+  background-color: var(--newspaper-muted) !important;
+  color: var(--newspaper-bg) !important;
+}
+
+.newspaper-tag-green {
+  background-color: var(--newspaper-green) !important;
+  color: var(--newspaper-bg) !important;
+}
+
+/* 传统报纸分割线优化 */
+.newspaper-divider {
+  border: none !important;
+  height: 1px !important;
+  background: linear-gradient(to right, transparent 0%, var(--newspaper-fine-border) 20%, var(--newspaper-light-gray) 50%, var(--newspaper-fine-border) 80%, transparent 100%) !important;
+  margin: 24px 0 !important;
+}
+
+.newspaper-divider-thick {
+  height: 2px !important;
+  background: var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  margin: 32px 0 !important;
+}
+
+.newspaper-divider-decorative {
+  height: 3px !important;
+  background: linear-gradient(to right, 
+    transparent 0%, 
+    var(--newspaper-accent) 25%, 
+    var(--newspaper-accent) 35%, 
+    var(--newspaper-fine-border) 40%, 
+    var(--newspaper-fine-border) 60%, 
+    var(--newspaper-accent) 65%, 
+    var(--newspaper-accent) 75%, 
+    transparent 100%) !important;
+  margin: 20px 0 !important;
+}
+
+/* 统计信息框优化 */
+.newspaper-stats {
+  background-color: var(--newspaper-beige) !important;
+  border: 1px solid var(--newspaper-fine-border) !important;
+  font-family: 'SimSun', '宋体', serif !important;
+  color: var(--newspaper-gray) !important;
+  border-radius: 0 !important;
+  padding: 16px !important;
+  position: relative !important;
+  margin: 8px 0 !important;
+}
+
+.newspaper-stats::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 4px !important;
+  left: 4px !important;
+  right: 4px !important;
+  bottom: 4px !important;
+  border: 1px dotted var(--newspaper-fine-border) !important;
+  pointer-events: none !important;
+}
+
+/* 时间显示 */
+.newspaper-time {
+  background-color: var(--newspaper-beige) !important;
+  color: var(--newspaper-gray) !important;
+  font-family: 'KaiTi', '楷体', serif !important;
+  padding: 4px 12px !important;
+  border: 1px solid var(--newspaper-fine-border) !important;
+  font-size: 12px !important;
+  letter-spacing: 0.3px !important;
+  display: inline-block !important;
+}
+
+/* 链接样式 */
+.newspaper-link {
+  color: var(--newspaper-green) !important;
+  text-decoration: underline !important;
+  font-family: 'SimSun', '宋体', serif !important;
+}
+
+.newspaper-link:hover {
+  color: var(--newspaper-blue) !important;
+  background-color: rgba(85, 107, 47, 0.05) !important; /* 调整悬停背景 */
+}
+
+/* 全局传统报纸样式类 */
+.newspaper-page {
+  background-color: var(--newspaper-bg) !important;
+  min-height: 100vh !important;
+  background-image: 
+    radial-gradient(circle at 25% 25%, rgba(107, 68, 35, 0.015) 1px, transparent 1px),
+    radial-gradient(circle at 75% 75%, rgba(107, 68, 35, 0.015) 1px, transparent 1px) !important; /* 调整背景纹理颜色 */
+  background-size: 50px 50px !important;
+}
+
+/* 传统排版样式 - 优化版 */
+.newspaper-column {
+  position: relative !important;
+}
+
+/* 只在两栏布局时应用分割线效果 */
+.newspaper-column:not(:last-child):after {
+  content: '' !important;
+  position: absolute !important;
+  right: -12px !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 1px !important;
+  background: linear-gradient(to bottom, transparent 0%, var(--newspaper-fine-border) 20%, var(--newspaper-fine-border) 80%, transparent 100%) !important;
+}
+
+/* 内容区域左对齐 */
+.newspaper-content-left {
+  text-align: left !important;
+}
+
+/* 段落间距优化 */
+.newspaper-paragraph {
+  margin-bottom: 16px !important;
+  line-height: 1.9 !important;
+}
+
+/* 传统报纸头部框架 */
+.newspaper-header-frame {
+  border: 2px double var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  padding: 20px !important;
+  margin-bottom: 24px !important;
+  position: relative !important;
+  background-color: var(--newspaper-paper) !important;
+}
+
+.newspaper-header-frame::before,
+.newspaper-header-frame::after {
+  content: '' !important;
+  position: absolute !important;
+  width: 20px !important;
+  height: 20px !important;
+  border: 2px solid var(--newspaper-accent) !important; /* 使用柔和重点色 */
+}
+
+.newspaper-header-frame::before {
+  top: 8px !important;
+  left: 8px !important;
+  border-right: none !important;
+  border-bottom: none !important;
+}
+
+.newspaper-header-frame::after {
+  top: 8px !important;
+  right: 8px !important;
+  border-left: none !important;
+  border-bottom: none !important;
+}
+
+/* Ant Design 组件覆盖优化 */
+.ant-layout {
+  background-color: var(--newspaper-bg) !important;
+}
+
+.ant-layout-header {
+  background-color: var(--newspaper-red) !important;
+  border-bottom: 2px solid var(--newspaper-dark-red) !important;
+  box-shadow: 0 2px 4px var(--newspaper-shadow) !important;
+}
+
+.ant-layout-sider {
+  background-color: var(--newspaper-red) !important;
+  box-shadow: 2px 0 4px var(--newspaper-shadow) !important;
+}
+
+.ant-menu {
+  background-color: var(--newspaper-red) !important;
+  color: var(--newspaper-title-light) !important;
+  font-family: 'SimSun', '宋体', serif !important;
+  border: none !important;
+}
+
+.ant-menu-item {
+  color: var(--newspaper-title-light) !important;
+  margin: 4px 8px !important;
+  border-radius: 0 !important;
+  letter-spacing: 0.5px !important;
+  font-weight: normal !important;
+}
+
+.ant-menu-item:hover,
+.ant-menu-item-selected {
+  background-color: var(--newspaper-dark-red) !important;
+  color: var(--newspaper-bg) !important;
+}
+
+.ant-card {
+  background-color: var(--newspaper-paper) !important;
+  border: 1px solid var(--newspaper-fine-border) !important;
+  border-radius: 0 !important;
+  box-shadow: 1px 1px 2px var(--newspaper-shadow) !important;
+}
+
+.ant-card-head {
+  background-color: var(--newspaper-beige) !important;
+  border-bottom: 1px solid var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  border-radius: 0 !important;
+}
+
+.ant-card-head-title {
+  font-family: 'SimHei', '黑体', sans-serif !important;
+  color: var(--newspaper-red) !important;
+  font-weight: bold !important;
+  letter-spacing: 0.5px !important;
+}
+
+.ant-card-body {
+  font-family: 'SimSun', '宋体', serif !important;
+  line-height: 1.8 !important;
+}
+
+.ant-table {
+  background-color: var(--newspaper-paper) !important;
+  font-family: 'SimSun', '宋体', serif !important;
+  border: 1px solid var(--newspaper-fine-border) !important;
+}
+
+.ant-table-thead > tr > th {
+  background-color: var(--newspaper-beige) !important;
+  color: var(--newspaper-red) !important;
+  font-family: 'SimHei', '黑体', sans-serif !important;
+  font-weight: bold !important;
+  border-bottom: 2px solid var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  border-right: 1px solid var(--newspaper-fine-border) !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid var(--newspaper-light-gray) !important;
+  border-right: 1px solid var(--newspaper-fine-border) !important;
+  line-height: 1.6 !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background-color: #FFF8F0 !important;
+}
+
+.ant-input,
+.ant-input-affix-wrapper {
+  background-color: var(--newspaper-paper) !important;
+  border: 1px solid var(--newspaper-fine-border) !important;
+  font-family: 'SimSun', '宋体', serif !important;
+  border-radius: 0 !important;
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.03) !important;
+}
+
+.ant-input:focus,
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused {
+  border-color: var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  box-shadow: inset 1px 1px 1px rgba(0, 0, 0, 0.03), 0 0 2px rgba(139, 115, 85, 0.15) !important;
+}
+
+.ant-select-selector {
+  background-color: var(--newspaper-paper) !important;
+  border: 1px solid var(--newspaper-fine-border) !important;
+  font-family: 'SimSun', '宋体', serif !important;
+  border-radius: 0 !important;
+}
+
+.ant-btn {
+  border-radius: 0 !important;
+  font-family: 'SimSun', '宋体', serif !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: 1px 1px 1px var(--newspaper-shadow) !important;
+}
+
+.ant-btn-primary {
+  background-color: var(--newspaper-green) !important;
+  border-color: var(--newspaper-dark-green) !important;
+  color: var(--newspaper-bg) !important;
+}
+
+.ant-btn-primary:hover,
+.ant-btn-primary:focus {
+  background-color: var(--newspaper-dark-green) !important;
+  border-color: var(--newspaper-dark-green) !important;
+  color: var(--newspaper-bg) !important;
+  box-shadow: 2px 2px 4px var(--newspaper-shadow) !important;
+}
+
+.ant-btn-default {
+  background-color: var(--newspaper-paper) !important;
+  border-color: var(--newspaper-fine-border) !important;
+  color: var(--newspaper-gray) !important;
+}
+
+.ant-btn-default:hover,
+.ant-btn-default:focus {
+  border-color: var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  background-color: var(--newspaper-beige) !important;
+  color: var(--newspaper-red) !important;
+  box-shadow: 2px 2px 4px var(--newspaper-shadow) !important;
+}
+
+.ant-modal-content {
+  background-color: var(--newspaper-paper) !important;
+  border: 2px solid var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  border-radius: 0 !important;
+  box-shadow: 4px 4px 8px var(--newspaper-shadow) !important;
+}
+
+.ant-modal-header {
+  background-color: var(--newspaper-beige) !important;
+  border-bottom: 2px solid var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  border-radius: 0 !important;
+}
+
+.ant-modal-title {
+  font-family: 'SimHei', '黑体', sans-serif !important;
+  color: var(--newspaper-red) !important;
+  font-weight: bold !important;
+}
+
+.ant-progress-bg {
+  background-color: var(--newspaper-green) !important;
+}
+
+.ant-progress-inner {
+  background-color: var(--newspaper-light-gray) !important;
+}
+
+.ant-statistic-title {
+  font-family: 'SimSun', '宋体', serif !important;
+  color: var(--newspaper-gray) !important;
+  letter-spacing: 0.5px !important;
+}
+
+.ant-statistic-content {
+  font-family: 'SimHei', '黑体', sans-serif !important;
+  color: var(--newspaper-red) !important;
+}
+
+.ant-tag {
+  border-radius: 0 !important;
+  font-family: 'SimSun', '宋体', serif !important;
+  letter-spacing: 0.3px !important;
+}
+
+.ant-pagination-item {
+  border-radius: 0 !important;
+  border-color: var(--newspaper-fine-border) !important;
+}
+
+.ant-pagination-item-active {
+  background-color: var(--newspaper-accent) !important; /* 使用柔和重点色 */
+  border-color: var(--newspaper-accent) !important;
+}
+
+.ant-pagination-item-active a {
+  color: var(--newspaper-bg) !important;
+}
+
+/* 移除现代动画效果，保持传统感 */
+* {
+  animation: none !important;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.2s ease !important;
+}
+
+/* 响应式字体调整 */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px !important;
+    line-height: 1.7 !important;
+  }
+  
+  .newspaper-title-large {
+    font-size: 28px !important;
+  }
+  
+  .newspaper-title-medium {
+    font-size: 20px !important;
+  }
+  
+  .newspaper-title-small {
+    font-size: 16px !important;
+  }
+}
+
+/* 打印样式 - 真正的报纸效果 */
+@media print {
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  .newspaper-page {
+    background-image: none !important;
+  }
+  
+  .newspaper-card {
+    border: 1px solid black !important;
+    box-shadow: none !important;
+  }
+}
+
+/* 额外的悬停效果优化 */
+.newspaper-card,
+.newspaper-button,
+.newspaper-link,
+.ant-btn,
+.ant-menu-item {
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+}
+
+.newspaper-card:hover {
+  background-color: var(--newspaper-paper) !important;
+  border-color: var(--newspaper-accent) !important;
+}
+
+.newspaper-link:hover {
+  text-decoration: none !important;
+}
+
+/* Ant Design 菜单项特殊优化 */
+.ant-menu-item {
+  transition: background-color 0.3s ease, color 0.3s ease !important;
+}
+
+.ant-menu-item:hover {
+  background-color: var(--newspaper-dark-red) !important;
+  color: var(--newspaper-bg) !important;
+}
+
+.ant-menu-item-selected {
+  background-color: var(--newspaper-dark-red) !important;
+  color: var(--newspaper-bg) !important;
+  border-left: 3px solid var(--newspaper-bg) !important;
+}
+
+.ant-menu-item-selected::after {
+  border-right: none !important;
+}
+
+/* 按钮悬停优化 - 统一处理 */
+.ant-btn:hover,
+.ant-btn:focus {
+  transform: none !important;
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+/* 确保所有按钮都遵循传统报纸风格 */
+.ant-btn:not(.newspaper-button):not(.newspaper-button-secondary):hover,
+.ant-btn:not(.newspaper-button):not(.newspaper-button-secondary):focus {
+  box-shadow: 2px 2px 4px var(--newspaper-shadow) !important;
+}
+
+/* 输入框悬停优化 */
+.ant-input:hover,
+.ant-select-selector:hover {
+  border-color: var(--newspaper-accent) !important;
+  transition: border-color 0.3s ease !important;
+}
+
+/* 最高优先级按钮hover覆盖 - 确保传统报纸风格 */
+[class*="newspaper-button"]:hover,
+[class*="newspaper-button"]:focus {
+  box-shadow: 2px 2px 4px var(--newspaper-shadow) !important;
+  transition: all 0.3s ease !important;
+}
+
+/* 确保所有newspaper-button类的按钮hover效果 */
+*[class~="newspaper-button"]:hover,
+*[class~="newspaper-button"]:focus {
+  background-color: var(--newspaper-dark-green) !important;
+  background: var(--newspaper-dark-green) !important;
+  border-color: var(--newspaper-dark-green) !important;
+  color: var(--newspaper-bg) !important;
+}
+
+*[class~="newspaper-button-secondary"]:hover,
+*[class~="newspaper-button-secondary"]:focus {
+  background-color: var(--newspaper-accent) !important;
+  background: var(--newspaper-accent) !important;
+  border-color: var(--newspaper-red) !important;
+  color: var(--newspaper-bg) !important;
+}
+
+/* 调试：确保hover状态的颜色正确应用 */
+.newspaper-button:hover::before,
+.ant-btn.newspaper-button:hover::before {
+  content: '' !important;
+}
+
+/* 强制覆盖任何可能的内联style属性 */
+.newspaper-button[style*="background"]:hover,
+.newspaper-button-secondary[style*="background"]:hover {
+  background-color: var(--newspaper-dark-green) !important;
+  background: var(--newspaper-dark-green) !important;
+}
+
+.newspaper-button-secondary[style*="background"]:hover {
+  background-color: var(--newspaper-accent) !important;
+  background: var(--newspaper-accent) !important;
+}
+
+/* 瀑布流布局样式 - 传统报纸版面 */
+.masonry-container {
+  column-count: auto !important;
+  column-width: 300px !important;
+  column-gap: 24px !important;
+  column-fill: balance !important;
+  width: 100% !important;
+  max-width: 1400px !important;
+  margin: 0 auto !important;
+  padding: 0 8px !important;
+}
+
+.masonry-item {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+  display: inline-block !important;
+  width: 100% !important;
+  margin-bottom: 24px !important;
+  vertical-align: top !important;
+}
+
+/* 新闻卡片自适应高度优化 */
+.masonry-item .newspaper-card,
+.masonry-item .newspaper-card-important {
+  height: auto !important;
+  min-height: unset !important;
+  margin-bottom: 0 !important;
+}
+
+/* 响应式瀑布流 */
+@media (max-width: 768px) {
+  .masonry-container {
+    column-count: 1 !important;
+    column-width: 100% !important;
+    column-gap: 0 !important;
+    padding: 0 8px !important;
+  }
+  
+  .masonry-item {
+    margin-bottom: 16px !important;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .masonry-container {
+    column-width: 280px !important;
+    column-gap: 20px !important;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1440px) {
+  .masonry-container {
+    column-width: 320px !important;
+    column-gap: 24px !important;
+  }
+}
+
+@media (min-width: 1441px) and (max-width: 1920px) {
+  .masonry-container {
+    column-width: 350px !important;
+    column-gap: 28px !important;
+  }
+}
+
+@media (min-width: 1921px) {
+  .masonry-container {
+    column-width: 380px !important;
+    column-gap: 32px !important;
+  }
+}
+
+/* 确保新闻卡片在瀑布流中的效果 */
+.masonry-container .ant-card {
+  box-shadow: 2px 2px 6px var(--newspaper-shadow) !important;
+  transition: all 0.3s ease !important;
+  margin-bottom: 0 !important;
+}
+
+.masonry-container .ant-card:hover {
+  box-shadow: 3px 3px 8px var(--newspaper-shadow) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* 防止卡片内容被裁切 */
+.masonry-item * {
+  overflow: visible !important;
+}
+
+/* 新闻卡片内容优化 */
+.masonry-item .ant-card-body {
+  padding: 16px !important;
+}
+
+/* 确保头条新闻卡片在瀑布流中的突出效果 */
+.masonry-container .newspaper-card-important {
+  border: 2px solid var(--newspaper-accent) !important;
+  box-shadow: 3px 3px 8px rgba(139, 115, 85, 0.25) !important;
+}
+
+.masonry-container .newspaper-card-important:hover {
+  box-shadow: 4px 4px 12px rgba(139, 115, 85, 0.35) !important;
+  transform: translateY(-3px) !important;
+}
+
+/* 优化新闻卡片的标题间距 */
+.masonry-item .newspaper-title {
+  margin-bottom: 8px !important;
+}
+
+/* 优化新闻卡片的正文间距 */
+.masonry-item .newspaper-body {
+  margin-bottom: 12px !important;
 }

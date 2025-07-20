@@ -6,26 +6,20 @@ import {
   Input,
   Button,
   Space,
-  Tag,
   DatePicker,
   Select,
   Row,
   Col,
   Typography,
   message,
-  Tooltip,
   Spin,
   Alert,
-  Modal,
-  Descriptions
+  Modal
 } from 'antd';
 import {
   SearchOutlined,
   ReloadOutlined,
-  ClearOutlined,
-  EyeOutlined,
-  LinkOutlined,
-  CalendarOutlined
+  ClearOutlined
 } from '@ant-design/icons';
 import { Layout } from '../../components/Layout';
 import moment, { Moment } from 'moment-timezone';
@@ -114,78 +108,42 @@ function NewsCard({
 
   const isLevel1 = news.level === '1';
 
-  return (
+    return (
     <Card
       size="small"
       hoverable
-      className="news-card-enter"
-      style={{ 
-        marginBottom: '16px',
-        border: isLevel1 ? '2px solid #ff4d4f' : '1px solid #d9d9d9',
-        boxShadow: isLevel1 ? '0 6px 16px rgba(255, 77, 79, 0.2)' : '0 2px 8px rgba(0, 0, 0, 0.06)',
-        background: isLevel1 ? 'linear-gradient(135deg, #fff2f0 0%, #ffffff 100%)' : '#ffffff',
-        position: 'relative',
-        transition: 'all 0.3s ease',
-        animation: isLevel1 ? 'pulse-border 2s infinite' : undefined,
-        transform: isLevel1 ? 'scale(1.02)' : 'scale(1)'
-      }}
+      className={isLevel1 ? 'newspaper-card-important' : 'newspaper-card'}
       styles={{
         body: {
           padding: '16px'
         }
       }}
-          >
-        {/* Level 1 特殊标识 */}
-        {isLevel1 && (
-          <>
-            {/* 左侧红色条带 */}
-            <div style={{
-              position: 'absolute',
-              left: '-2px',
-              top: '-2px',
-              bottom: '-2px',
-              width: '4px',
-              background: 'linear-gradient(180deg, #ff4d4f 0%, #cf1322 100%)',
-              borderRadius: '2px 0 0 2px',
-              zIndex: 1
-            }} />
-            
-            {/* 右上角标识 */}
-            <div style={{
-              position: 'absolute',
-              top: '-1px',
-              right: '-1px',
-              background: '#ff4d4f',
-              color: 'white',
-              padding: '2px 8px',
-              fontSize: '10px',
-              fontWeight: 'bold',
-              borderRadius: '0 6px 0 6px',
-              zIndex: 1
-            }}>
-              ⚡ 重要
-            </div>
-          </>
-        )}
-
+    >
         {/* 标题和级别 */}
         <div style={{ marginBottom: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-            <Tag color={getLevelColor(news.level)} style={{ margin: 0 }}>
+            <div className="newspaper-tag" style={{ 
+              padding: '2px 8px', 
+              fontSize: '11px', 
+              fontWeight: 'bold',
+                      color: 'var(--newspaper-bg)',
+        backgroundColor: getLevelColor(news.level) === 'red' ? 'var(--newspaper-red)' : 'var(--newspaper-gray)'
+            }}>
               {getLevelText(news.level)}
-            </Tag>
-            <Text type="secondary" style={{ fontSize: '12px' }}>
-              {news.source}
-            </Text>
+            </div>
+            <div className="newspaper-body" style={{ fontSize: '11px', color: 'var(--newspaper-gray)' }}>
+              📰 {news.source}
+            </div>
           </div>
         
         <div 
+          className="newspaper-title"
           style={{ 
             margin: 0, 
             lineHeight: '1.4',
-            fontSize: isLevel1 ? '15px' : '14px',
-            fontWeight: isLevel1 ? 600 : 500,
-            color: isLevel1 ? '#d4380d' : '#262626'
+            fontSize: isLevel1 ? '16px' : '15px',
+            fontWeight: 'bold',
+            color: 'var(--newspaper-red)'
           }}
           dangerouslySetInnerHTML={{ 
             __html: news.highlightedTitle || news.title 
@@ -196,11 +154,13 @@ function NewsCard({
       {/* 内容 */}
       <div style={{ marginBottom: 16 }}>
         <div 
+          className="newspaper-body"
           style={{ 
-            lineHeight: '1.5',
+            lineHeight: '1.8',
             fontSize: '13px',
-            color: '#666',
-            wordBreak: 'break-word'
+            color: '#000000',
+            wordBreak: 'break-word',
+            textIndent: '2em'
           }}
           dangerouslySetInnerHTML={{ 
             __html: getDisplayContent()
@@ -210,47 +170,59 @@ function NewsCard({
 
       {/* 底部操作区 */}
       <div>
+        <div className="newspaper-divider" style={{ height: '1px', backgroundColor: 'var(--newspaper-light-gray)', margin: '8px 0' }}></div>
+        
         <Space size="small" style={{ marginBottom: 8 }}>
           {hasContent && needsExpansion && (
-            <Button 
-              type="link" 
-              size="small"
+            <button 
               onClick={() => onToggleExpand(news.id)}
-              style={{ padding: 0, height: 'auto', fontSize: '12px' }}
+              className="newspaper-link"
+              style={{ 
+                background: 'none', 
+                border: 'none', 
+                padding: 0, 
+                fontSize: '12px',
+                cursor: 'pointer'
+              }}
             >
-              {isExpanded ? '收起' : '展开'}
-            </Button>
+              📖 {isExpanded ? '收起' : '展开'}
+            </button>
           )}
-          <Button 
-            type="link" 
-            size="small"
-            icon={<EyeOutlined />}
+          <button 
             onClick={() => onShowDetail(news)}
-            style={{ padding: 0, height: 'auto', fontSize: '12px' }}
+            className="newspaper-link"
+            style={{ 
+              background: 'none', 
+              border: 'none', 
+              padding: 0, 
+              fontSize: '12px',
+              cursor: 'pointer'
+            }}
           >
-            详情
-          </Button>
+            👁️ 详情
+          </button>
           {news.url && (
-            <Button 
-              type="link" 
-              size="small" 
-              icon={<LinkOutlined />}
+            <a 
               href={news.url}
               target="_blank"
-              style={{ padding: 0, height: 'auto', fontSize: '12px' }}
+              rel="noopener noreferrer"
+              className="newspaper-link"
+              style={{ fontSize: '12px' }}
             >
-              原文
-            </Button>
+              🔗 原文
+            </a>
           )}
         </Space>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Tooltip title={`处理时间: ${news.processedDisplayTime || '未知'}`}>
-            <Text type="secondary" style={{ fontSize: '11px' }}>
-              <CalendarOutlined style={{ marginRight: 4 }} />
-              {news.displayTime}
-            </Text>
-          </Tooltip>
+                        <div className="newspaper-body" style={{ fontSize: '10px', color: 'var(--newspaper-gray)' }}>
+            📅 {news.displayTime}
+            {news.processedDisplayTime && (
+              <span style={{ marginLeft: '8px' }}>
+                ⚙️ 处理: {news.processedDisplayTime}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </Card>
@@ -400,144 +372,122 @@ export default function NewsPage() {
   // 级别标签文本
   const getLevelText = (level: string) => {
     switch (level) {
-      case '1': return 'Level 1';
-      case '2': return 'Level 2';
-      case '3': return 'Level 3';
-      default: return `Level ${level}`;
+      case '1': return '头条新闻';
+      case '2': return '重要新闻';
+      case '3': return '一般新闻';
+      default: return `${level}级新闻`;
     }
   };
 
   return (
     <Layout>
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          @keyframes pulse-border {
-            0% { 
-              box-shadow: 0 6px 16px rgba(255, 77, 79, 0.2), 0 0 0 0 rgba(255, 77, 79, 0.3);
-            }
-            50% { 
-              box-shadow: 0 6px 16px rgba(255, 77, 79, 0.2), 0 0 0 4px rgba(255, 77, 79, 0.1);
-            }
-            100% { 
-              box-shadow: 0 6px 16px rgba(255, 77, 79, 0.2), 0 0 0 0 rgba(255, 77, 79, 0.3);
-            }
-          }
-          
-          @keyframes slide-in {
-            0% {
-              opacity: 0;
-              transform: translateY(20px) scale(0.95);
-            }
-            100% {
-              opacity: 1;
-              transform: translateY(0) scale(1);
-            }
-          }
-          
-          .news-card-enter {
-            animation: slide-in 0.3s ease-out;
-          }
-          
-          .masonry-container {
-            column-count: auto;
-            column-width: 300px;
-            column-gap: 16px;
-            column-fill: balance;
-          }
-          
-          @media (max-width: 768px) {
-            .masonry-container {
-              column-width: 100%;
-              column-count: 1;
-            }
-          }
-          
-          @media (min-width: 769px) and (max-width: 1024px) {
-            .masonry-container {
-              column-width: 280px;
-            }
-          }
-          
-          @media (min-width: 1025px) and (max-width: 1440px) {
-            .masonry-container {
-              column-width: 300px;
-            }
-          }
-          
-          @media (min-width: 1441px) {
-            .masonry-container {
-              column-width: 320px;
-            }
-          }
-        `
-      }} />
-      <div style={{ padding: '16px 24px', maxWidth: '100%', overflow: 'hidden' }}>
-        <Title level={2}>新闻浏览</Title>
+
+      <div className="newspaper-page" style={{ padding: '24px 16px', maxWidth: '100%', overflow: 'hidden' }}>
+        {/* 传统报纸头部 */}
+        <div className="newspaper-header-frame" style={{ marginBottom: '24px' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div className="newspaper-title newspaper-title-large">
+              📰 大公报纸 • 新闻浏览
+            </div>
+            <div className="newspaper-subtitle" style={{ fontSize: '16px', marginBottom: '12px' }}>
+              传统报纸式新闻阅读体验 • 智能检索与筛选
+            </div>
+            <div className="newspaper-time">
+              {new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} • 实时更新
+            </div>
+          </div>
+        </div>
         
         {/* 搜索和筛选区域 */}
-        <Card style={{ marginBottom: 16 }}>
-          <Row gutter={[16, 16]}>
-            <Col xs={24} lg={8}>
-              <Search
-                placeholder="搜索新闻标题或内容..."
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-                onSearch={handleSearch}
-                enterButton={<SearchOutlined />}
-                allowClear
-              />
-            </Col>
-            
-            <Col xs={12} sm={8} lg={4}>
-              <Select
-                placeholder="选择新闻级别"
-                value={filters.level}
-                onChange={(value) => setFilters(prev => ({ ...prev, level: value }))}
-                allowClear
-                style={{ width: '100%' }}
-              >
-                <Option value="1">Level 1</Option>
-                <Option value="2">Level 2</Option>
-                <Option value="3">Level 3</Option>
-              </Select>
-            </Col>
-            
-            <Col xs={12} sm={16} lg={8}>
-              <RangePicker
-                value={filters.dateRange ? [
-                  moment(filters.dateRange[0].toISOString()) as any, 
-                  moment(filters.dateRange[1].toISOString()) as any
-                ] : null}
-                onChange={(dates) => {
-                  if (dates && dates[0] && dates[1]) {
-                    setFilters(prev => ({ 
-                      ...prev, 
-                      dateRange: [
-                        moment(dates[0]!.toISOString()), 
-                        moment(dates[1]!.toISOString())
-                      ] as [Moment, Moment] 
-                    }));
-                  } else {
-                    setFilters(prev => ({ ...prev, dateRange: undefined }));
+        <div style={{ marginBottom: '24px' }}>
+          <div className="newspaper-section-header" style={{ marginBottom: '16px' }}>
+            📋 新闻检索台 • 智能搜索
+          </div>
+          
+          <Card className="newspaper-card" style={{ marginBottom: 16 }}>
+            <Row gutter={[20, 16]}>
+              <Col xs={24} lg={8}>
+                <div className="newspaper-body newspaper-body-no-indent" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                  <strong>关键词搜索：</strong>
+                </div>
+                <Search
+                  className="newspaper-search"
+                  placeholder="搜索新闻标题或内容..."
+                  value={searchKeyword}
+                  onChange={(e) => setSearchKeyword(e.target.value)}
+                  onSearch={handleSearch}
+                  enterButton={
+                    <Button className="newspaper-button" icon={<SearchOutlined className="newspaper-icon" />}>
+                      搜索
+                    </Button>
                   }
-                }}
-                placeholder={['开始时间', '结束时间']}
-                style={{ width: '100%' }}
-                showTime
-              />
-            </Col>
-            
-            <Col xs={24} lg={4}>
-              <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
-                <Button 
-                  icon={<ReloadOutlined />} 
-                  onClick={() => fetchNews(pagination.page)}
-                  loading={loading}
+                  allowClear
+                />
+              </Col>
+              
+              <Col xs={12} sm={8} lg={4}>
+                <div className="newspaper-body newspaper-body-no-indent" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                  <strong>新闻级别：</strong>
+                </div>
+                <Select
+                  className="newspaper-search"
+                  placeholder="选择级别"
+                  value={filters.level}
+                  onChange={(value) => setFilters(prev => ({ ...prev, level: value }))}
+                  allowClear
+                  style={{ width: '100%' }}
                 >
-                  刷新
-                </Button>
-                <Button 
-                  icon={<ClearOutlined />} 
+                  <Option value="1">头条新闻</Option>
+                  <Option value="2">重要新闻</Option>
+                  <Option value="3">一般新闻</Option>
+                </Select>
+              </Col>
+            
+              <Col xs={12} sm={16} lg={8}>
+                <div className="newspaper-body newspaper-body-no-indent" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                  <strong>时间范围：</strong>
+                </div>
+                <RangePicker
+                  className="newspaper-search"
+                  value={filters.dateRange ? [
+                    moment(filters.dateRange[0].toISOString()) as any, 
+                    moment(filters.dateRange[1].toISOString()) as any
+                  ] : null}
+                  onChange={(dates) => {
+                    if (dates && dates[0] && dates[1]) {
+                      setFilters(prev => ({ 
+                        ...prev, 
+                        dateRange: [
+                          moment(dates[0]!.toISOString()), 
+                          moment(dates[1]!.toISOString())
+                        ] as [Moment, Moment] 
+                      }));
+                    } else {
+                      setFilters(prev => ({ ...prev, dateRange: undefined }));
+                    }
+                  }}
+                  placeholder={['开始时间', '结束时间']}
+                  style={{ width: '100%' }}
+                  showTime
+                />
+              </Col>
+              
+              <Col xs={24} lg={4}>
+                <div className="newspaper-body newspaper-body-no-indent" style={{ fontSize: '13px', marginBottom: '8px' }}>
+                  <strong>操作：</strong>
+                </div>
+                <Space style={{ width: '100%', justifyContent: 'flex-start' }}>
+                  <Button 
+                    className="newspaper-button"
+                    icon={<ReloadOutlined className="newspaper-icon" />} 
+                    onClick={() => fetchNews(pagination.page)}
+                    loading={loading}
+                  >
+                    刷新
+                  </Button>
+                  <Button 
+                    className="newspaper-button-secondary"
+                    icon={<ClearOutlined className="newspaper-icon" />} 
                   onClick={clearAllFilters}
                 >
                   清除
@@ -549,8 +499,17 @@ export default function NewsPage() {
           {/* 搜索状态提示 */}
           {isSearchMode && (
             <Alert
-              style={{ marginTop: 16 }}
-              message={`搜索关键词: "${searchKeyword}"`}
+              style={{ 
+                marginTop: 16, 
+                backgroundColor: 'var(--newspaper-beige)',
+                border: '1px solid var(--newspaper-light-gray)',
+                borderRadius: 0
+              }}
+              message={
+                <span className="newspaper-subtitle">
+                  🔍 搜索关键词: "{searchKeyword}"
+                </span>
+              }
               type="info"
               showIcon
               closable
@@ -558,38 +517,45 @@ export default function NewsPage() {
             />
           )}
         </Card>
+        </div>
 
         {/* 结果统计 */}
         {!loading && (
-          <div style={{ marginBottom: 16, padding: '8px 16px', backgroundColor: '#f5f5f5', borderRadius: '6px' }}>
-            <Text type="secondary">
-              共找到 <Text strong>{pagination.total}</Text> 条新闻
+          <div className="newspaper-stats" style={{ marginBottom: 16, padding: '12px 20px', textAlign: 'center' }}>
+            <div className="newspaper-subtitle" style={{ fontSize: '15px' }}>
+              📊 新闻统计：共检索到 <span style={{ color: 'var(--newspaper-red)', fontWeight: 'bold' }}>{pagination.total}</span> 条新闻
               {(() => {
                 const level1Count = news.filter(item => item.level === '1').length;
                 return level1Count > 0 && (
-                  <Text>，其中 <Text strong style={{ color: '#ff4d4f' }}>{level1Count}</Text> 条重要新闻</Text>
+                  <span>，其中头条新闻 <span style={{ color: 'var(--newspaper-red)', fontWeight: 'bold' }}>{level1Count}</span> 条</span>
                 );
               })()}
-              {isSearchMode && <Text>，搜索关键词："<Text code>{searchKeyword}</Text>"</Text>}
-              {filters.level && <Text>，级别：<Tag color={getLevelColor(filters.level)}>{getLevelText(filters.level)}</Tag></Text>}
-              {filters.dateRange && <Text>，时间范围：{filters.dateRange[0].format('MM-DD HH:mm')} ~ {filters.dateRange[1].format('MM-DD HH:mm')}</Text>}
-            </Text>
+            </div>
+            {(isSearchMode || filters.level || filters.dateRange) && (
+              <div className="newspaper-body" style={{ fontSize: '13px', marginTop: '8px' }}>
+                {isSearchMode && <span>🔍 搜索关键词："{searchKeyword}" </span>}
+                {filters.level && <span>📑 级别筛选：{getLevelText(filters.level)} </span>}
+                {filters.dateRange && (
+                  <span>📅 时间范围：{filters.dateRange[0].format('MM-DD HH:mm')} ~ {filters.dateRange[1].format('MM-DD HH:mm')}</span>
+                )}
+              </div>
+            )}
           </div>
         )}
 
         {/* 新闻卡片列表 - 瀑布流布局 */}
         <div style={{ marginBottom: 24 }}>
+          <div className="newspaper-subtitle" style={{ fontSize: '18px', textAlign: 'center', marginBottom: '16px' }}>
+            📰 新闻版面
+          </div>
+          <div className="newspaper-divider" style={{ height: '1px', backgroundColor: 'var(--newspaper-light-gray)', margin: '12px 0' }}></div>
+          
           <Spin spinning={loading}>
             <div className="masonry-container">
               {news.map((item) => (
                 <div 
                   key={item.id}
-                  style={{
-                    breakInside: 'avoid',
-                    pageBreakInside: 'avoid',
-                    display: 'inline-block',
-                    width: '100%'
-                  }}
+                  className="masonry-item"
                 >
                   <NewsCard 
                     news={item}
@@ -605,8 +571,13 @@ export default function NewsPage() {
             
             {/* 无数据提示 */}
             {!loading && news.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '40px 0' }}>
-                <Typography.Text type="secondary">暂无新闻数据</Typography.Text>
+              <div style={{ textAlign: 'center', padding: '40px 0', backgroundColor: 'var(--newspaper-paper)', border: '1px solid var(--newspaper-light-gray)' }}>
+                <div className="newspaper-subtitle" style={{ fontSize: '16px' }}>
+                  📄 暂无新闻数据
+                </div>
+                <div className="newspaper-body" style={{ fontSize: '14px', marginTop: '8px' }}>
+                  请调整搜索条件或稍后再试
+                </div>
               </div>
             )}
           </Spin>
@@ -614,31 +585,36 @@ export default function NewsPage() {
 
         {/* 分页 */}
         {news.length > 0 && (
-          <Card>
+          <Card style={{ backgroundColor: 'var(--newspaper-paper)', border: '2px solid var(--newspaper-red)' }}>
             <Row justify="center">
               <Col>
                 <Space direction="vertical" align="center" size="small">
-                  <Text type="secondary">
-                    第 {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} 条，共 {pagination.total} 条新闻
-                  </Text>
+                  <div className="newspaper-subtitle" style={{ fontSize: '14px', textAlign: 'center' }}>
+                    📃 第 {((pagination.page - 1) * pagination.limit) + 1}-{Math.min(pagination.page * pagination.limit, pagination.total)} 条，共 {pagination.total} 条新闻
+                  </div>
                   <Space>
                     <Button 
+                      className="newspaper-button"
                       disabled={!pagination.hasPrev}
                       onClick={() => fetchNews(pagination.page - 1)}
                     >
-                      上一页
+                      ◀ 上一页
                     </Button>
-                    <Text>{pagination.page} / {pagination.totalPages}</Text>
+                    <div className="newspaper-body" style={{ fontSize: '14px', fontWeight: 'bold', color: 'var(--newspaper-red)' }}>
+                      {pagination.page} / {pagination.totalPages}
+                    </div>
                     <Button 
+                      className="newspaper-button"
                       disabled={!pagination.hasNext}
                       onClick={() => fetchNews(pagination.page + 1)}
                     >
-                      下一页
+                      下一页 ▶
                     </Button>
                   </Space>
                   <Space>
-                    <Text>每页显示：</Text>
+                    <div className="newspaper-body" style={{ fontSize: '13px' }}>每页显示：</div>
                     <Select
+                      className="newspaper-search"
                       value={pagination.limit}
                       onChange={(value) => {
                         setPagination(prev => ({ ...prev, limit: value }));
@@ -661,68 +637,88 @@ export default function NewsPage() {
         {/* 新闻详情模态框 */}
         <Modal
           title={
-            <Space>
-              <EyeOutlined />
-              新闻详情
-            </Space>
+            <div className="newspaper-title" style={{ fontSize: '18px', textAlign: 'center' }}>
+              📰 新闻详情
+            </div>
           }
           open={detailModalVisible}
           onCancel={closeNewsDetail}
           footer={[
-            <Button key="close" onClick={closeNewsDetail}>
+            <Button key="close" className="newspaper-button" onClick={closeNewsDetail}>
               关闭
             </Button>,
             selectedNews?.url && (
               <Button 
                 key="original" 
-                type="primary"
-                icon={<LinkOutlined />}
+                className="newspaper-button"
                 href={selectedNews.url}
                 target="_blank"
               >
-                查看原文
+                🔗 查看原文
               </Button>
             )
           ]}
           width={800}
-          style={{ top: 20 }}
+          style={{ 
+            top: 20,
+            backgroundColor: 'var(--newspaper-bg)'
+          }}
+          styles={{
+            body: {
+              backgroundColor: 'var(--newspaper-paper)',
+              padding: '24px'
+            },
+            header: {
+              backgroundColor: 'var(--newspaper-beige)',
+              borderBottom: '2px solid var(--newspaper-red)'
+            }
+          }}
         >
           {selectedNews && (
             <div>
-              <Descriptions 
-                bordered 
-                column={1} 
-                size="small"
-                style={{ marginBottom: 16 }}
-              >
-                <Descriptions.Item label="新闻ID">
-                  {selectedNews.id}
-                </Descriptions.Item>
-                <Descriptions.Item label="级别">
-                  <Tag color={getLevelColor(selectedNews.level)}>
-                    {getLevelText(selectedNews.level)}
-                  </Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label="来源">
-                  {selectedNews.source}
-                </Descriptions.Item>
-                <Descriptions.Item label="发布时间">
-                  {selectedNews.displayTime}
-                </Descriptions.Item>
-                <Descriptions.Item label="处理时间">
-                  {selectedNews.processedDisplayTime || '未知'}
-                </Descriptions.Item>
-              </Descriptions>
+              <div style={{ 
+                marginBottom: 20, 
+                padding: '16px', 
+                backgroundColor: 'var(--newspaper-beige)',
+                border: '1px solid var(--newspaper-light-gray)'
+              }}>
+                <div className="newspaper-subtitle" style={{ fontSize: '14px', marginBottom: '12px', textAlign: 'center' }}>
+                  📋 新闻信息
+                </div>
+                <div className="newspaper-body" style={{ fontSize: '13px', lineHeight: '2' }}>
+                  <div><strong>新闻编号：</strong>{selectedNews.id}</div>
+                  <div><strong>新闻级别：</strong>
+                    <span className="newspaper-tag" style={{
+                      backgroundColor: getLevelColor(selectedNews.level) === 'red' ? 'var(--newspaper-red)' : 'var(--newspaper-gray)',
+                      color: 'var(--newspaper-bg)',
+                      padding: '2px 6px',
+                      marginLeft: '8px',
+                      fontSize: '11px'
+                    }}>
+                      {getLevelText(selectedNews.level)}
+                    </span>
+                  </div>
+                  <div><strong>新闻来源：</strong>📰 {selectedNews.source}</div>
+                  <div><strong>发布时间：</strong>📅 {selectedNews.displayTime}</div>
+                  <div><strong>处理时间：</strong>⚙️ {selectedNews.processedDisplayTime || '未知'}</div>
+                </div>
+              </div>
 
-              <div style={{ marginBottom: 16 }}>
-                <Typography.Title level={4}>标题</Typography.Title>
+              <div style={{ marginBottom: 20 }}>
+                <div className="newspaper-subtitle" style={{ fontSize: '16px', marginBottom: '12px', textAlign: 'center' }}>
+                  📖 新闻标题
+                </div>
                 <div 
+                  className="newspaper-title"
                   style={{ 
-                    padding: '12px',
-                    backgroundColor: '#f5f5f5',
-                    borderRadius: '6px',
-                    fontSize: '16px',
-                    fontWeight: 500
+                    padding: '16px',
+                    backgroundColor: 'var(--newspaper-paper)',
+                    border: '2px solid var(--newspaper-red)',
+                    fontSize: '18px',
+                    fontWeight: 'bold',
+                    color: 'var(--newspaper-red)',
+                    textAlign: 'center',
+                    lineHeight: '1.4'
                   }}
                   dangerouslySetInnerHTML={{ 
                     __html: selectedNews.highlightedTitle || selectedNews.title 
@@ -731,16 +727,22 @@ export default function NewsPage() {
               </div>
 
               <div>
-                <Typography.Title level={4}>内容</Typography.Title>
+                <div className="newspaper-subtitle" style={{ fontSize: '16px', marginBottom: '12px', textAlign: 'center' }}>
+                  📄 新闻内容
+                </div>
                 <div 
+                  className="newspaper-body"
                   style={{ 
-                    padding: '16px',
-                    backgroundColor: '#fafafa',
-                    borderRadius: '6px',
-                    lineHeight: '1.6',
+                    padding: '20px',
+                    backgroundColor: 'var(--newspaper-paper)',
+                    border: '1px solid var(--newspaper-light-gray)',
+                    lineHeight: '2',
+                    fontSize: '14px',
                     maxHeight: '400px',
                     overflowY: 'auto',
-                    wordBreak: 'break-word'
+                    wordBreak: 'break-word',
+                    textIndent: '2em',
+                    color: '#000000'
                   }}
                   dangerouslySetInnerHTML={{ 
                     __html: selectedNews.content || '暂无内容' 
