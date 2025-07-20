@@ -137,8 +137,6 @@ async function handleEvery5Minutes(timestamp: string, metadata?: Record<string, 
   console.log(`[每5分钟触发器] 执行高级别新闻扫描: ${timestamp}`);
 
   try {
-    // 使用定时扫描方法，会自动使用上次扫描时间作为起始时间
-    // const scanResult = await highLevelNewsScanner.scanHighLevelNewsScheduled();
 
     return {
       message: `每5分钟触发器执行成功`,
