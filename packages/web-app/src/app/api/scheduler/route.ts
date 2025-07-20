@@ -236,7 +236,7 @@ async function handleDaytime05(timestamp: string, metadata?: Record<string, unkn
   console.log(`[白天05分触发器] 执行小时总结: ${timestamp}`);
 
   try {
-    const currentHour = moment().hour();
+    const currentHour = moment().tz('Asia/Shanghai').hour();
 
     // 只在11-22点生成总结
     if (currentHour < 11 || currentHour > 22) {
@@ -252,7 +252,7 @@ async function handleDaytime05(timestamp: string, metadata?: Record<string, unkn
     }
 
     // 计算小时时间范围（从上一个小时05分到当前小时05分）
-    const hourEnd = moment().hour(currentHour).minute(0).second(0).millisecond(0);
+    const hourEnd = moment().tz('Asia/Shanghai').hour(currentHour).minute(0).second(0).millisecond(0);
     const hourStart = moment(hourEnd).minute(0).subtract(1, 'hour');
 
     const summaryResult = await summaryService.generateSummary(
@@ -300,7 +300,7 @@ async function handleOvernight05(timestamp: string, metadata?: Record<string, un
   console.log(`[隔夜05分触发器] 执行每日总结: ${timestamp}`);
 
   try {
-    const currentTime = moment();
+    const currentTime = moment().tz('Asia/Shanghai');
 
     // 只在每天10:05执行
     if (currentTime.hour() !== 10 || currentTime.minute() !== 5) {
@@ -316,7 +316,7 @@ async function handleOvernight05(timestamp: string, metadata?: Record<string, un
     }
 
     // 计算总结时间范围：前一天22:05 - 今天10:05
-    const summaryEnd = moment().hour(10).minute(0).second(0).millisecond(0);
+    const summaryEnd = moment().tz('Asia/Shanghai').hour(10).minute(0).second(0).millisecond(0);
     const summaryStart = moment(summaryEnd).subtract(1, 'day').hour(22).minute(0);
 
     const summaryResult = await summaryService.generateSummary(
@@ -347,7 +347,7 @@ async function handleWeeklyFriday1605(timestamp: string, metadata?: Record<strin
   console.log(`[每周五16:05分触发器] 执行周报处理: ${timestamp}`);
 
   try {
-    const currentTime = moment();
+    const currentTime = moment().tz('Asia/Shanghai');
 
     // 确认是周五的16:05
     if (currentTime.day() !== 5 || currentTime.hour() !== 16 || currentTime.minute() !== 5) {
@@ -363,7 +363,7 @@ async function handleWeeklyFriday1605(timestamp: string, metadata?: Record<strin
     }
 
     // 计算周报时间范围：上周五16:05 - 本周五16:05
-    const weekEnd = moment().day(5).hour(16).minute(0).second(0).millisecond(0);
+    const weekEnd = moment().tz('Asia/Shanghai').day(5).hour(16).minute(0).second(0).millisecond(0);
     const weekStart = moment(weekEnd).subtract(1, 'week');
 
     const summaryResult = await summaryService.generateSummary(

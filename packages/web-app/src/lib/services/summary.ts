@@ -46,7 +46,7 @@ class SummaryService {
           success: true,
           message: `${timeRangeDesc} 时段没有新闻`,
           period: timeRangeDesc,
-          timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+          timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
           data: {
             empty: true,
             time_range: {
@@ -198,7 +198,7 @@ class SummaryService {
         success: true,
         message: `新闻总结生成完成`,
         period: timeRangeDesc,
-        timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+        timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
         data: {
           news_count: newsData.news_count,
           high_level_count: this.getHighLevelCount(newsData),
@@ -217,7 +217,7 @@ class SummaryService {
         message: `生成新闻总结失败`,
         period: timeRangeDesc,
         error: error.message,
-        timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+        timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
       };
     }
   }
