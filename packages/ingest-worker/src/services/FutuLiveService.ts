@@ -46,7 +46,7 @@ export class FutuLiveService {
    */
   private async filterNewNews(news: NewsItem[]): Promise<NewsItem[]> {
     const lastNewsId = await fileStorage.getLatestNewsId();
-
+    logger.info(`🔄 过滤新新闻，最后一条新闻ID: ${lastNewsId}`);
     if (!lastNewsId) {
       // 如果没有最后一条新闻的ID，说明是首次运行，返回所有新闻
       return news;
@@ -54,6 +54,8 @@ export class FutuLiveService {
 
     // 找到最后一条新闻的位置
     const lastNewsIndex = news.findIndex(item => item.id === lastNewsId);
+    logger.info(`🔄 过滤新新闻，所有新闻id: ${news.map(item => item.id)}`);
+    logger.info(`🔄 过滤新新闻，最后一条新闻索引: ${lastNewsIndex}`);
     if (lastNewsIndex === -1) {
       // 如果找不到最后一条新闻，说明都是新数据
       return news;
@@ -198,7 +200,7 @@ export class FutuLiveService {
         const newNews = await this.filterNewNews(news || []);
         allNews = [...allNews, ...newNews];
 
-        if (newNews.length === 0) {
+        if (newNews.length < news.length) {
           logger.info(`📰 富途新闻没有更多新新闻，停止获取`);
           hasNewData = false;
           break;
