@@ -126,7 +126,7 @@ class CronScheduler {
    * 执行触发器 - 调用API接口
    */
   async executeTrigger(trigger, description) {
-    const timestamp = moment().toISOString();
+    const timestamp = moment().tz('Asia/Shanghai').toISOString();
 
     console.log(`[CronScheduler] 触发器执行: ${trigger} (${description}) at ${timestamp}`);
 
@@ -138,6 +138,7 @@ class CronScheduler {
           source: 'cron_scheduler',
           description,
           executedAt: timestamp,
+          timezone: 'Asia/Shanghai',
         },
       };
 
@@ -235,8 +236,10 @@ class CronScheduler {
 async function main() {
   console.log('[CronScheduler] 启动轻量级定时器调度器');
   console.log(`[CronScheduler] Node.js 版本: ${process.version}`);
-  console.log(`[CronScheduler] 时区: ${moment.tz.guess()}`);
-  console.log(`[CronScheduler] 当前时间: ${moment().format('YYYY-MM-DD HH:mm:ss')}`);
+  console.log(`[CronScheduler] 时区: Asia/Shanghai (北京时间)`);
+  console.log(
+    `[CronScheduler] 当前时间: ${moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')}`
+  );
 
   const scheduler = new CronScheduler();
 
@@ -254,7 +257,7 @@ async function main() {
     // 保持进程运行
     setInterval(() => {
       // 每10分钟输出一次状态
-      const now = moment();
+      const now = moment().tz('Asia/Shanghai');
       if (now.minute() % 10 === 0 && now.second() === 0) {
         console.log(`[CronScheduler] 心跳检查 - ${now.format('YYYY-MM-DD HH:mm:ss')}`);
       }

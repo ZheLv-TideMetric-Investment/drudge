@@ -43,12 +43,12 @@ class HighLevelNewsScanner {
       console.log('开始扫描 Level 1 新闻...');
 
       // 计算扫描时间范围
-      const end = endTime ? moment(endTime) : moment();
+      const end = endTime ? moment(endTime).tz('Asia/Shanghai') : moment().tz('Asia/Shanghai');
       const start = startTime
-        ? moment(startTime)
+        ? moment(startTime).tz('Asia/Shanghai')
         : this.lastScanTime
-          ? moment(this.lastScanTime)
-          : moment().subtract(5, 'minutes');
+          ? moment(this.lastScanTime).tz('Asia/Shanghai')
+          : moment().tz('Asia/Shanghai').subtract(5, 'minutes');
 
       if (!start.isValid() || !end.isValid()) {
         throw new Error('无效的时间格式');
@@ -76,7 +76,7 @@ class HighLevelNewsScanner {
           sent: 0,
           message: `${start.format('HH:mm')}-${end.format('HH:mm')} 时段没有发现 Level 1 新闻`,
           period: this.formatPeriod(start, end),
-          timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+          timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
         };
       }
 
@@ -93,7 +93,7 @@ class HighLevelNewsScanner {
           sent: 0,
           message: `发现 ${highLevelNews.length} 条 Level 1 新闻，但都已处理过`,
           period: this.formatPeriod(start, end),
-          timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+          timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
         };
       }
 
@@ -132,7 +132,7 @@ class HighLevelNewsScanner {
         message: `${scanType}扫描完成：发现 ${newsToProcess.length} 条${processType} Level 1 新闻${notificationText}`,
         period: this.formatPeriod(start, end),
         high_level_news: newsToProcess.map(news => this.formatNewsItem(news)),
-        timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+        timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
       };
     } catch (error: any) {
       console.error('扫描 Level 1 新闻失败:', error);
@@ -143,7 +143,7 @@ class HighLevelNewsScanner {
         message: '扫描 Level 1 新闻失败',
         error: error.message,
         period: '',
-        timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+        timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
       };
     }
   }
@@ -221,7 +221,7 @@ class HighLevelNewsScanner {
       lastScanTime: this.lastScanTime,
       processedNewsCount: this.processedNewsIds.size,
       isRunning: false,
-      timestamp: moment().format('YYYY-MM-DD HH:mm:ss'),
+      timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
     };
   }
 
