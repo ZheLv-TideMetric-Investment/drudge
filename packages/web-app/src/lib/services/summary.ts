@@ -1,7 +1,7 @@
 import moment from 'moment-timezone';
 import { queryService } from './query';
 import { notificationService } from './notification';
-import { SummaryResult, CallSource } from '../../types/scheduler';
+import { SummaryResult } from '../../types/scheduler';
 import { aiService, createMessages } from '../utils/llm';
 import { EventLevel } from '../../../constants/enums';
 
@@ -20,7 +20,6 @@ class SummaryService {
   async generateSummary(
     startTime: string | moment.Moment,
     endTime: string | moment.Moment,
-    source: CallSource = CallSource.API,
     sendNotification: boolean = false
   ): Promise<SummaryResult> {
     try {
@@ -192,7 +191,7 @@ class SummaryService {
 
       // 4. 发送通知（如果需要）
       if (sendNotification) {
-        await this.sendNotification(summaryContent, start, end, newsData, source);
+        await this.sendNotification(summaryContent, start, end, newsData);
       }
 
       return {
@@ -264,24 +263,20 @@ class SummaryService {
     summaryData: string,
     start: moment.Moment,
     end: moment.Moment,
-    newsData: any,
-    source: CallSource
+    newsData: any
   ): Promise<void> {
     try {
       // 检查是否有高级别新闻（仅 Level 1）
       const highLevelNews =
         newsData.news_items?.filter((item: any) => item.level === EventLevel.LEVEL_1) || [];
 
-      if (highLevelNews.length > 0) {
-        // 有高级别新闻时发送通知
-        await notificationService.sendNormalSummaryNotification(
-          { summary: summaryData },
-          start.toISOString(),
-          end.toISOString(),
-          highLevelNews,
-          source
-        );
-      }
+      // 有高级别新闻时发送通知
+      await notificationService.sendNormalSummaryNotification(
+        { summary: summaryData },
+        start.toISOString(),
+        end.toISOString(),
+        highLevelNews
+      );
     } catch (error) {
       console.error('发送通知失败:', error);
       // 通知失败不影响总结生成，只记录错误

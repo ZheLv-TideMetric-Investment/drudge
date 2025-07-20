@@ -106,11 +106,3 @@ export enum NotificationType {
   DAILY_SUMMARY = 'daily_summary',
   SYSTEM_ALERT = 'system_alert',
 }
-
-/**
- * 调用来源类型
- */
-export enum CallSource {
-  SCHEDULER = 'scheduler', // 定时任务调用
-  API = 'api', // API 手动调用
-}
