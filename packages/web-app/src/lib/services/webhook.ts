@@ -46,35 +46,30 @@ class WebhookService {
     try {
       // 构建markdown格式的消息
       const markdownTitle = title ? `[tide] Web App - ${title}` : '[tide] Web App - 系统通知';
-      
-      let markdownText = `### 📱 Web App 通知\n\n`;
-      markdownText += `**服务**: Web App\n\n`;
-      markdownText += `**消息**: ${message}\n\n`;
-      markdownText += `**时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`;
 
       const payload: NotificationPayload = {
         msgtype: 'markdown',
         markdown: {
           title: markdownTitle,
-          text: markdownText
+          text: message,
         },
         at: {
-          isAtAll: false
-        }
+          isAtAll: false,
+        },
       };
 
       const response = await axios.post(this.webhookUrl, payload, {
         timeout: 10000,
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Web-App-Webhook/2.0'
-        }
+          'User-Agent': 'Web-App-Webhook/2.0',
+        },
       });
 
       if (response.status >= 200 && response.status < 300) {
-        console.log('Webhook 消息发送成功', { 
-          title: markdownTitle, 
-          status: response.status 
+        console.log('Webhook 消息发送成功', {
+          title: markdownTitle,
+          status: response.status,
         });
         return true;
       } else {
@@ -82,9 +77,9 @@ class WebhookService {
         return false;
       }
     } catch (error: any) {
-      console.error('Webhook 消息发送异常:', { 
+      console.error('Webhook 消息发送异常:', {
         error: error.message,
-        url: this.webhookUrl 
+        url: this.webhookUrl,
       });
       return false;
     }
@@ -93,21 +88,25 @@ class WebhookService {
   /**
    * 发送系统状态通知
    */
-  async sendSystemStatusNotification(status: 'success' | 'warning' | 'error', message: string, details?: string): Promise<boolean> {
+  async sendSystemStatusNotification(
+    status: 'success' | 'warning' | 'error',
+    message: string,
+    details?: string
+  ): Promise<boolean> {
     if (!this.enabled || !this.webhookUrl) {
       return false;
     }
 
     const statusEmojis = {
       success: '✅',
-      warning: '⚠️', 
-      error: '🚨'
+      warning: '⚠️',
+      error: '🚨',
     };
 
     const statusTexts = {
       success: '正常',
       warning: '警告',
-      error: '错误'
+      error: '错误',
     };
 
     let markdownText = `### ${statusEmojis[status]} Web App - 系统状态\n\n`;
@@ -123,11 +122,11 @@ class WebhookService {
       msgtype: 'markdown',
       markdown: {
         title: `[tide] Web App - 系统${statusTexts[status]}`,
-        text: markdownText
+        text: markdownText,
       },
       at: {
-        isAtAll: status === 'error' // 错误状态时@all
-      }
+        isAtAll: status === 'error', // 错误状态时@all
+      },
     };
 
     try {
@@ -135,8 +134,8 @@ class WebhookService {
         timeout: 10000,
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Web-App-Webhook/2.0'
-        }
+          'User-Agent': 'Web-App-Webhook/2.0',
+        },
       });
 
       return response.status >= 200 && response.status < 300;
@@ -170,9 +169,9 @@ class WebhookService {
     return {
       enabled: this.enabled,
       webhookUrl: this.webhookUrl ? '已配置' : '未配置',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
 
-export const webhookService = new WebhookService(); 
+export const webhookService = new WebhookService();
