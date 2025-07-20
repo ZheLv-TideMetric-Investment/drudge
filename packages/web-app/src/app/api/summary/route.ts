@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { summaryService } from '../../../lib/services/summary';
-import { CallSource } from '../../../types/scheduler';
 
 // 定义验证模式
 const summarySchema = z.object({
@@ -21,7 +20,6 @@ export async function GET(request: NextRequest) {
     const startTime = searchParams.get('startTime');
     const endTime = searchParams.get('endTime');
     const sendNotification = searchParams.get('sendNotification') === 'true';
-    const sourceParam = searchParams.get('source');
 
     // 检查必要参数
     if (!startTime || !endTime) {
@@ -44,21 +42,14 @@ export async function GET(request: NextRequest) {
       sendNotification,
     });
 
-    // 处理 source 参数：如果不是有效枚举值，默认为 API
-    let source: CallSource = CallSource.API;
-    if (sourceParam === 'scheduler') {
-      source = CallSource.SCHEDULER;
-    }
-
     console.log(
-      `[Summary API] 收到总结请求: ${validatedParams.startTime} - ${validatedParams.endTime}, 通知: ${validatedParams.sendNotification}, 来源: ${source}`
+      `[Summary API] 收到总结请求: ${validatedParams.startTime} - ${validatedParams.endTime}, 通知: ${validatedParams.sendNotification}`
     );
 
     // 调用summary服务生成总结
     const result = await summaryService.generateSummary(
       validatedParams.startTime,
       validatedParams.endTime,
-      source,
       validatedParams.sendNotification
     );
 

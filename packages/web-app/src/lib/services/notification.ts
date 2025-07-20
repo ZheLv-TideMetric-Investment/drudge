@@ -1,5 +1,4 @@
 import { webhookService } from './webhook';
-import { CallSource } from '../../types/scheduler';
 import moment from 'moment-timezone';
 import { UrgencyLevel, EventLevel } from '../../../constants/enums';
 
@@ -33,20 +32,14 @@ class NotificationService {
    * @param newsItems 新闻数据数组
    * @param source 调用来源
    */
-  async sendBatchHighLevelNewsNotification(newsItems: any[], source: CallSource = CallSource.API): Promise<boolean> {
-    // 只有定时任务调用时才发送通知
-    if (source !== CallSource.SCHEDULER) {
-      console.log(`批量高级别新闻通知跳过发送 (来源: ${source})`);
-      return false;
-    }
-
+  async sendBatchHighLevelNewsNotification(newsItems: any[]): Promise<boolean> {
     if (newsItems.length === 0) {
       return false;
     }
 
     try {
       const currentTime = moment().tz('Asia/Shanghai').format('HH:mm:ss');
-      
+
       let message = `🚨 **${EventLevel.LEVEL_1} 新闻批量提醒** (${newsItems.length}条) - ${currentTime}
 
 `;
@@ -59,7 +52,7 @@ class NotificationService {
       newsItems.forEach((news, index) => {
         const timestamp = moment(news.timestamp).tz('Asia/Shanghai').format('HH:mm');
         message += `📰 **${index + 1}. ${news.title}** *(${timestamp})*\n`;
-        
+
         // 收集实体信息
         news.companies?.forEach((company: string) => allCompanies.add(company));
         news.persons?.forEach((person: string) => allPersons.add(person));
@@ -86,7 +79,7 @@ class NotificationService {
       const timestamps = newsItems.map(news => moment(news.timestamp));
       const earliestTime = moment.min(timestamps).tz('Asia/Shanghai').format('HH:mm');
       const latestTime = moment.max(timestamps).tz('Asia/Shanghai').format('HH:mm');
-      
+
       if (earliestTime !== latestTime) {
         message += `\n⏰ **时间范围**: ${earliestTime} - ${latestTime}`;
       }
@@ -105,18 +98,12 @@ class NotificationService {
    * @param news 新闻数据
    * @param source 调用来源
    */
-  async sendHighLevelNewsNotification(news: any, source: CallSource = CallSource.API): Promise<boolean> {
-    // 只有定时任务调用时才发送通知
-    if (source !== CallSource.SCHEDULER) {
-      console.log(`高级别新闻通知跳过发送 (来源: ${source})`);
-      return false;
-    }
-
+  async sendHighLevelNewsNotification(news: any): Promise<boolean> {
     try {
       const urgencyEmoji: { [key: string]: string } = {
         [UrgencyLevel.CRITICAL]: '🚨',
         [UrgencyLevel.HIGH]: '🔴',
-        [UrgencyLevel.MEDIUM]: '🟡'
+        [UrgencyLevel.MEDIUM]: '🟡',
       };
 
       const emoji = urgencyEmoji[news.urgency] || '⚠️';
@@ -170,36 +157,33 @@ class NotificationService {
    * @param hourStart 开始时间
    * @param hourEnd 结束时间
    * @param highLevelNews Level 1 新闻
-   * @param source 调用来源
    */
   async sendNormalSummaryNotification(
-    summary: any, 
-    hourStart: string, 
-    hourEnd: string, 
-    highLevelNews: any[], 
-    source: CallSource = CallSource.API
+    summary: any,
+    hourStart: string,
+    hourEnd: string,
+    highLevelNews: any[]
   ): Promise<boolean> {
-    // 只有定时任务调用时才发送通知
-    if (source !== CallSource.SCHEDULER) {
-      console.log(`小时总结通知跳过发送 (来源: ${source})`);
-      return false;
-    }
-
     try {
       // 提取markdown总结内容
       const summaryContent = typeof summary === 'string' ? summary : summary.summary;
-      
-      const message = `📊 **小时总结** (${moment(hourStart).tz('Asia/Shanghai').format('HH:00')}-${moment(hourEnd).tz('Asia/Shanghai').format('HH:00')})
 
+      const level1Message = `🚨 **Level 1 新闻** (${highLevelNews.length}条)  
+${highLevelNews
+  .slice(0, 3)
+  .map((item: any, index: number) => `${index + 1}. [${item.level}] ${item.title}`)
+  .join('\n')}`.trim();
+
+      const message = `${level1Message}
+
+📊 **总结** (${moment(hourStart).tz('Asia/Shanghai').format('MM-DD HH:mm')}-${moment(hourEnd).tz('Asia/Shanghai').format('MM-DD HH:mm')})  
 ${summaryContent}
-
-🚨 **Level 1 新闻** (${highLevelNews.length}条)
-${highLevelNews.slice(0, 3).map((item: any, index: number) => 
-  `${index + 1}. [${item.level}] ${item.title}`
-).join('\n')}`;
+`.trim();
 
       await this.webhook.sendMessage(message);
-      console.log(`小时总结通知已发送: ${moment(hourStart).tz('Asia/Shanghai').format('HH:00')}-${moment(hourEnd).tz('Asia/Shanghai').format('HH:00')}`);
+      console.log(
+        `小时总结通知已发送: ${moment(hourStart).tz('Asia/Shanghai').format('HH:00')}-${moment(hourEnd).tz('Asia/Shanghai').format('HH:00')}`
+      );
       return true;
     } catch (error: any) {
       console.error('发送小时总结通知失败:', error);
@@ -213,13 +197,13 @@ ${highLevelNews.slice(0, 3).map((item: any, index: number) =>
    * @param message 消息
    * @param source 调用来源
    */
-  async sendSystemAlert(title: string, message: string, source: CallSource = CallSource.API): Promise<boolean> {
+  async sendSystemAlert(title: string, message: string): Promise<boolean> {
     try {
       const alertMessage = `🚨 **系统警报** - ${title}
 
 📅 **时间**: ${moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')}
 📋 **详情**: ${message}
-🔧 **来源**: ${source}`;
+  `;
 
       await this.webhook.sendMessage(alertMessage);
       console.log(`系统警报已发送: ${title}`);
@@ -237,22 +221,22 @@ ${highLevelNews.slice(0, 3).map((item: any, index: number) =>
     try {
       // 测试webhook连接
       await this.webhook.testConnection();
-      
+
       return {
         status: 'healthy',
         service: 'NotificationService',
         timestamp: new Date().toISOString(),
-        webhook_connection: 'connected'
+        webhook_connection: 'connected',
       };
     } catch (error: any) {
       return {
         status: 'unhealthy',
         service: 'NotificationService',
         timestamp: new Date().toISOString(),
-        error: error.message
+        error: error.message,
       };
     }
   }
 }
 
-export const notificationService = new NotificationService(); 
+export const notificationService = new NotificationService();

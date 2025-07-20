@@ -5,7 +5,6 @@ import {
   SchedulerTrigger,
   SchedulerApiRequest,
   SchedulerApiResponse,
-  CallSource,
 } from '../../../types/scheduler';
 // import { highLevelNewsScanner } from '../../../lib/services/high-level-scanner';
 import { summaryService } from '../../../lib/services/summary';
@@ -139,7 +138,7 @@ async function handleEvery5Minutes(timestamp: string, metadata?: Record<string, 
 
   try {
     // 使用定时扫描方法，会自动使用上次扫描时间作为起始时间
-    // const scanResult = await highLevelNewsScanner.scanHighLevelNewsScheduled(CallSource.SCHEDULER);
+    // const scanResult = await highLevelNewsScanner.scanHighLevelNewsScheduled();
 
     return {
       message: `每5分钟触发器执行成功`,
@@ -261,7 +260,6 @@ async function handleDaytime05(timestamp: string, metadata?: Record<string, unkn
     const summaryResult = await summaryService.generateSummary(
       hourStart.toISOString(),
       hourEnd.toISOString(),
-      CallSource.SCHEDULER,
       true // 发送通知
     );
 
@@ -326,7 +324,6 @@ async function handleOvernight05(timestamp: string, metadata?: Record<string, un
     const summaryResult = await summaryService.generateSummary(
       summaryStart.toISOString(),
       summaryEnd.toISOString(),
-      CallSource.SCHEDULER,
       true // 发送通知
     );
 
@@ -374,7 +371,6 @@ async function handleWeeklyFriday1605(timestamp: string, metadata?: Record<strin
     const summaryResult = await summaryService.generateSummary(
       weekStart.toISOString(),
       weekEnd.toISOString(),
-      CallSource.SCHEDULER,
       true // 发送通知
     );
 
