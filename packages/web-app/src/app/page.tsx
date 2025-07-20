@@ -281,7 +281,7 @@ export default function Home() {
     <Layout>
       {contextHolder}
       {notificationContextHolder}
-      <div className="newspaper-page" style={{ padding: '32px' }}>
+      <div className="newspaper-page" style={{ padding: 'var(--space-3xl)' }}>
         
         {/* 传统报纸头版设计 - 优化版 */}
         <div className="newspaper-header-frame">
@@ -290,11 +290,11 @@ export default function Home() {
             textAlign: 'center'
           }}>
             <div className="newspaper-title newspaper-title-large">
-              📰 长婷
+              📰 长婷报社
             </div>
             <div className="newspaper-subtitle" style={{ 
-              fontSize: '16px', 
-              marginBottom: '12px'
+              fontSize: 'var(--font-size-xl)', 
+              marginBottom: 'var(--space-md)'
             }}>
               你的理财大学生
             </div>
@@ -309,10 +309,10 @@ export default function Home() {
           </div>
           
           <div className="newspaper-body newspaper-content-left" style={{ 
-            fontSize: '16px', 
+            fontSize: 'var(--font-size-xl)', 
             textAlign: 'center',
             backgroundColor: 'var(--newspaper-paper)',
-            padding: '20px',
+            padding: 'var(--space-xl)',
             border: '1px solid var(--newspaper-fine-border)',
             marginBottom: '0'
           }}>
@@ -331,7 +331,7 @@ export default function Home() {
               <Card className="newspaper-card" size="small" hoverable style={{ height: '220px' }}>
                 <div style={{ textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
-                    <div className="newspaper-icon" style={{ fontSize: '36px', marginBottom: '16px' }}>📋</div>
+                    <div className="newspaper-icon" style={{ fontSize: 'var(--font-size-6xl)', marginBottom: 'var(--space-lg)' }}>📋</div>
                     <div className="newspaper-title newspaper-title-small">
                       新闻浏览
                     </div>
@@ -360,7 +360,7 @@ export default function Home() {
               <Card className="newspaper-card" size="small" hoverable style={{ height: '220px' }}>
                 <div style={{ textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
-                    <div className="newspaper-icon" style={{ fontSize: '36px', marginBottom: '16px' }}>🕸️</div>
+                    <div className="newspaper-icon" style={{ fontSize: 'var(--font-size-6xl)', marginBottom: 'var(--space-lg)' }}>🕸️</div>
                     <div className="newspaper-title newspaper-title-small">
                       知识图谱
                     </div>
@@ -389,7 +389,7 @@ export default function Home() {
               <Card className="newspaper-card" size="small" hoverable style={{ height: '220px' }}>
                 <div style={{ textAlign: 'center', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                   <div>
-                    <div className="newspaper-icon" style={{ fontSize: '36px', marginBottom: '16px' }}>📊</div>
+                    <div className="newspaper-icon" style={{ fontSize: 'var(--font-size-6xl)', marginBottom: 'var(--space-lg)' }}>📊</div>
                     <div className="newspaper-title newspaper-title-small">
                       数据统计
                     </div>
@@ -423,7 +423,7 @@ export default function Home() {
             type="error"
             showIcon
             closable
-            style={{ marginBottom: '32px' }}
+            style={{ marginBottom: 'var(--space-3xl)' }}
           />
         )}
       
@@ -758,7 +758,7 @@ export default function Home() {
           backgroundColor: 'var(--newspaper-paper)',
           border: '1px solid var(--newspaper-fine-border)'
         }}>
-          <div className="newspaper-subtitle-secondary" style={{ fontSize: '12px' }}>
+                      <div className="newspaper-subtitle-secondary" style={{ fontSize: 'var(--font-size-base)' }}>
             长婷 © 2024 • 传承经典，拥抱科技 • 专业新闻分析平台
           </div>
         </div>

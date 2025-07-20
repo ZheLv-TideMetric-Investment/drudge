@@ -318,7 +318,7 @@ export default function StatsPage() {
           minHeight: '60vh' 
         }}>
           <Spin size="large" tip={
-            <div className="newspaper-body" style={{ marginTop: '16px' }}>
+            <div className="newspaper-body" style={{ marginTop: 'var(--space-lg)' }}>
               正在加载统计数据...
             </div>
           } />
@@ -405,7 +405,7 @@ export default function StatsPage() {
               fontSize: '32px', 
               marginBottom: '8px'
             }}>
-              📊 长婷 • 数据统计
+              📊 长婷报社 • 数据统计
             </div>
             <div className="newspaper-divider" style={{ 
               height: '2px', 
@@ -432,7 +432,7 @@ export default function StatsPage() {
           </div>
 
           {/* 总体统计卡片 */}
-          <div style={{ marginBottom: '32px' }}>
+          <div style={{ marginBottom: 'var(--space-3xl)' }}>
             <div className="newspaper-subtitle" style={{ 
               fontSize: '20px', 
               textAlign: 'center', 
@@ -447,7 +447,7 @@ export default function StatsPage() {
               width: '200px'
             }}></div>
             
-            <Row gutter={[16, 16]} style={{ marginTop: '24px' }}>
+            <Row gutter={[16, 16]} style={{ marginTop: 'var(--space-2xl)' }}>
               <Col xs={24} sm={12} md={6}>
                 <Card className="newspaper-card">
                   <div style={{ textAlign: 'center' }}>
@@ -630,11 +630,11 @@ export default function StatsPage() {
               <Col xs={12} sm={12} md={6}>
                 <Card className="newspaper-card">
                   <div style={{ textAlign: 'center', padding: '16px' }}>
-                    <div className="newspaper-title newspaper-title-small" style={{ color: 'var(--newspaper-green)', marginBottom: '8px' }}>
+                    <div className="newspaper-title newspaper-title-small" style={{ color: 'var(--newspaper-green)', marginBottom: 'var(--space-sm)' }}>
                       {data.overview.companies.toLocaleString()}
                     </div>
                     <div className="newspaper-body newspaper-body-no-indent" style={{ fontSize: '13px' }}>
-                      <BankOutlined className="newspaper-icon" style={{ marginRight: '4px' }} />
+                      <BankOutlined className="newspaper-icon" style={{ marginRight: 'var(--space-xs)' }} />
                       公司数量
                     </div>
                   </div>
@@ -643,11 +643,11 @@ export default function StatsPage() {
               <Col xs={12} sm={12} md={6}>
                 <Card className="newspaper-card">
                   <div style={{ textAlign: 'center', padding: '16px' }}>
-                    <div className="newspaper-title newspaper-title-small" style={{ color: 'var(--newspaper-accent)', marginBottom: '8px' }}>
+                    <div className="newspaper-title newspaper-title-small" style={{ color: 'var(--newspaper-accent)', marginBottom: 'var(--space-sm)' }}>
                       {data.overview.persons.toLocaleString()}
                     </div>
                     <div className="newspaper-body newspaper-body-no-indent" style={{ fontSize: '13px' }}>
-                      <TeamOutlined className="newspaper-icon" style={{ marginRight: '4px' }} />
+                      <TeamOutlined className="newspaper-icon" style={{ marginRight: 'var(--space-xs)' }} />
                       人物数量
                     </div>
                   </div>
@@ -656,11 +656,11 @@ export default function StatsPage() {
               <Col xs={12} sm={12} md={6}>
                 <Card className="newspaper-card">
                   <div style={{ textAlign: 'center', padding: '16px' }}>
-                    <div className="newspaper-title newspaper-title-small" style={{ color: 'var(--newspaper-red)', marginBottom: '8px' }}>
+                    <div className="newspaper-title newspaper-title-small" style={{ color: 'var(--newspaper-red)', marginBottom: 'var(--space-sm)' }}>
                       {data.overview.organizations.toLocaleString()}
                     </div>
                     <div className="newspaper-body newspaper-body-no-indent" style={{ fontSize: '13px' }}>
-                      <NodeIndexOutlined className="newspaper-icon" style={{ marginRight: '4px' }} />
+                      <NodeIndexOutlined className="newspaper-icon" style={{ marginRight: 'var(--space-xs)' }} />
                       机构数量
                     </div>
                   </div>
@@ -669,11 +669,11 @@ export default function StatsPage() {
               <Col xs={12} sm={12} md={6}>
                 <Card className="newspaper-card">
                   <div style={{ textAlign: 'center', padding: '16px' }}>
-                    <div className="newspaper-title newspaper-title-small" style={{ color: 'var(--newspaper-gray)', marginBottom: '8px' }}>
+                    <div className="newspaper-title newspaper-title-small" style={{ color: 'var(--newspaper-gray)', marginBottom: 'var(--space-sm)' }}>
                       {data.overview.locations.toLocaleString()}
                     </div>
                     <div className="newspaper-body newspaper-body-no-indent" style={{ fontSize: '13px' }}>
-                      <EnvironmentOutlined className="newspaper-icon" style={{ marginRight: '4px' }} />
+                      <EnvironmentOutlined className="newspaper-icon" style={{ marginRight: 'var(--space-xs)' }} />
                       地点数量
                     </div>
                   </div>
@@ -691,7 +691,7 @@ export default function StatsPage() {
             backgroundColor: 'var(--newspaper-paper)',
             border: '1px solid var(--newspaper-fine-border)'
           }}>
-            <div className="newspaper-subtitle-secondary" style={{ fontSize: '12px' }}>
+            <div className="newspaper-subtitle-secondary" style={{ fontSize: 'var(--font-size-base)' }}>
               长婷数据统计中心 © 2024 • 数据驱动，洞察未来 • 专业统计分析
             </div>
           </div>

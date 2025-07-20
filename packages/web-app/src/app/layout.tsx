@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '长婷 • 你的理财大学生',
-  description: '长婷，你的理财大学生',
+  title: '长婷报社 • 你的理财大学生',
+  description: '长婷报社，你的理财大学生',
 };
 
 export default function RootLayout({
