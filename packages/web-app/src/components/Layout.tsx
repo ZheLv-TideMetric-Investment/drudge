@@ -78,14 +78,14 @@ export function Layout({ children }: LayoutProps) {
           textAlign: 'center',
           textShadow: '1px 1px 2px rgba(0,0,0,0.5)'
         }}>
-          📰 大公报纸<br/>
+          📰 长婷<br/>
           <span className="newspaper-subtitle-secondary" style={{ 
             fontSize: '12px', 
             fontWeight: 'normal',
             color: 'var(--newspaper-subtitle-light)',
             fontStyle: 'italic'
           }}>
-            知识图谱系统
+            你的理财大学生
           </span>
         </div>
       </div>
@@ -131,7 +131,7 @@ export function Layout({ children }: LayoutProps) {
             color: 'var(--newspaper-red)',
             fontSize: '16px'
           }}>
-            📰 大公报纸 • 导航
+            📰 长婷 • 导航
           </div>
         }
         placement="left"
@@ -186,7 +186,7 @@ export function Layout({ children }: LayoutProps) {
             color: 'var(--newspaper-title-light)',
             fontFamily: 'SimHei, 黑体, sans-serif'
           }}>
-            📰 大公报纸
+            📰 长婷
           </Title>
           <div style={{ width: '40px' }}></div>
         </div>

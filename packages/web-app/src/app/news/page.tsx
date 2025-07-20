@@ -387,7 +387,7 @@ export default function NewsPage() {
         <div className="newspaper-header-frame" style={{ marginBottom: '24px' }}>
           <div style={{ textAlign: 'center' }}>
             <div className="newspaper-title newspaper-title-large">
-              📰 大公报纸 • 新闻浏览
+              📰 长婷 • 新闻浏览
             </div>
             <div className="newspaper-subtitle" style={{ fontSize: '16px', marginBottom: '12px' }}>
               传统报纸式新闻阅读体验 • 智能检索与筛选

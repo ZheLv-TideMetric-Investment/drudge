@@ -290,13 +290,13 @@ export default function Home() {
             textAlign: 'center'
           }}>
             <div className="newspaper-title newspaper-title-large">
-              📰 大公报纸
+              📰 长婷
             </div>
             <div className="newspaper-subtitle" style={{ 
               fontSize: '16px', 
               marginBottom: '12px'
             }}>
-              知识图谱系统 • 基于人工智能的新闻分析平台
+              你的理财大学生
             </div>
             <div className="newspaper-time">
               {moment().tz('Asia/Shanghai').format('YYYY年MM月DD日 dddd HH:mm')} • 北京时间
@@ -759,7 +759,7 @@ export default function Home() {
           border: '1px solid var(--newspaper-fine-border)'
         }}>
           <div className="newspaper-subtitle-secondary" style={{ fontSize: '12px' }}>
-            大公报纸知识图谱系统 © 2024 • 传承经典，拥抱科技 • 专业新闻分析平台
+            长婷 © 2024 • 传承经典，拥抱科技 • 专业新闻分析平台
           </div>
         </div>
       </div>

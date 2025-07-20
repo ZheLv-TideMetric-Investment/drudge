@@ -405,7 +405,7 @@ export default function StatsPage() {
               fontSize: '32px', 
               marginBottom: '8px'
             }}>
-              📊 大公报纸 • 数据统计
+              📊 长婷 • 数据统计
             </div>
             <div className="newspaper-divider" style={{ 
               height: '2px', 
@@ -692,7 +692,7 @@ export default function StatsPage() {
             border: '1px solid var(--newspaper-fine-border)'
           }}>
             <div className="newspaper-subtitle-secondary" style={{ fontSize: '12px' }}>
-              大公报纸数据统计中心 © 2024 • 数据驱动，洞察未来 • 专业统计分析
+              长婷数据统计中心 © 2024 • 数据驱动，洞察未来 • 专业统计分析
             </div>
           </div>
         </Space>
