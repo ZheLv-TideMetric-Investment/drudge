@@ -168,11 +168,14 @@ class NotificationService {
       // 提取markdown总结内容
       const summaryContent = typeof summary === 'string' ? summary : summary.summary;
 
-      const level1Message = `🚨 **Level 1 新闻** (${highLevelNews.length}条)  
+      const level1Message =
+        highLevelNews.length > 0
+          ? `🚨 **Level 1 新闻** (${highLevelNews.length}条)  
 ${highLevelNews
   .slice(0, 3)
   .map((item: any, index: number) => `${index + 1}. [${item.level}] ${item.title}`)
-  .join('\n')}`.trim();
+  .join('\n')}`.trim()
+          : '';
 
       const message = `${level1Message}
 
