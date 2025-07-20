@@ -54,6 +54,7 @@ export class FutuLiveService {
 
     // 找到最后一条新闻的位置
     const lastNewsIndex = news.findIndex(item => item.id === lastNewsId);
+    logger.info(`🔄 过滤新新闻，所有新闻id: ${news.map(item => item.id)}`);
     logger.info(`🔄 过滤新新闻，最后一条新闻索引: ${lastNewsIndex}`);
     if (lastNewsIndex === -1) {
       // 如果找不到最后一条新闻，说明都是新数据
