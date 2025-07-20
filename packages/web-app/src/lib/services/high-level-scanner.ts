@@ -149,60 +149,6 @@ class HighLevelNewsScanner {
   }
 
   /**
-   * 定时扫描 Level 1 新闻（向后兼容方法）
-   */
-  async scanHighLevelNewsScheduled(): Promise<HighLevelScanResult> {
-    return this.scanHighLevelNews(undefined, undefined, {
-      sendNotifications: true,
-      skipProcessed: true,
-    });
-  }
-
-  /**
-   * 手动扫描 Level 1 新闻（向后兼容方法）
-   * @param minutes 扫描最近几分钟的新闻
-   */
-  async manualScan(minutes: number = 30): Promise<HighLevelScanResult> {
-    const endTime = moment();
-    const startTime = moment().subtract(minutes, 'minutes');
-
-    return this.scanHighLevelNews(startTime, endTime, {
-      sendNotifications: true,
-      skipProcessed: false, // 手动扫描时不跳过已处理的新闻
-    });
-  }
-
-  /**
-   * 扫描指定时间范围的 Level 1 新闻
-   * @param startTime 开始时间
-   * @param endTime 结束时间
-   */
-  async scanTimeRange(
-    startTime: string | moment.Moment,
-    endTime: string | moment.Moment
-  ): Promise<HighLevelScanResult> {
-    return this.scanHighLevelNews(startTime, endTime, {
-      sendNotifications: true,
-      skipProcessed: false,
-    });
-  }
-
-  /**
-   * 仅查询 Level 1 新闻（不发送通知）
-   * @param startTime 开始时间
-   * @param endTime 结束时间
-   */
-  async queryHighLevelNews(
-    startTime: string | moment.Moment,
-    endTime: string | moment.Moment
-  ): Promise<HighLevelScanResult> {
-    return this.scanHighLevelNews(startTime, endTime, {
-      sendNotifications: false,
-      skipProcessed: false,
-    });
-  }
-
-  /**
    * 发送通知 (批量聚合方式)
    */
   private async sendNotifications(newsItems: any[]): Promise<number> {

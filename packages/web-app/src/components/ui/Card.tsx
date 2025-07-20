@@ -35,7 +35,7 @@ export function Card({
         {title}
       </Title>
       {subtitle && (
-        <Text type="secondary" style={{ fontSize: '14px' }}>
+        <Text type="secondary" style={{ fontSize: 'var(--font-size-lg)' }}>
           {subtitle}
         </Text>
       )}

@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: '大公报纸 • 知识图谱系统',
-  description: '基于AI的新闻知识图谱分析和可视化平台 - 传统报纸风格设计',
+  title: '长婷报社 • 你的理财大学生',
+  description: '长婷报社，你的理财大学生',
 };
 
 export default function RootLayout({

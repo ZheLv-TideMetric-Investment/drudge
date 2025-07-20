@@ -131,7 +131,7 @@ function NewsCard({
             }}>
               {getLevelText(news.level)}
             </div>
-            <div className="newspaper-body" style={{ fontSize: '11px', color: 'var(--newspaper-gray)' }}>
+            <div className="newspaper-body" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--newspaper-gray)' }}>
               📰 {news.source}
             </div>
           </div>
@@ -141,7 +141,7 @@ function NewsCard({
           style={{ 
             margin: 0, 
             lineHeight: '1.4',
-            fontSize: isLevel1 ? '16px' : '15px',
+            fontSize: isLevel1 ? 'var(--font-size-xl)' : 'var(--font-size-lg)',
             fontWeight: 'bold',
             color: 'var(--newspaper-red)'
           }}
@@ -157,8 +157,8 @@ function NewsCard({
           className="newspaper-body"
           style={{ 
             lineHeight: '1.8',
-            fontSize: '13px',
-            color: '#000000',
+            fontSize: 'var(--font-size-md)',
+            color: 'var(--newspaper-text-primary)',
             wordBreak: 'break-word',
             textIndent: '2em'
           }}
@@ -170,7 +170,7 @@ function NewsCard({
 
       {/* 底部操作区 */}
       <div>
-        <div className="newspaper-divider" style={{ height: '1px', backgroundColor: 'var(--newspaper-light-gray)', margin: '8px 0' }}></div>
+        <div className="newspaper-divider" style={{ height: '1px', backgroundColor: 'var(--newspaper-light-gray)', margin: 'var(--space-sm) 0' }}></div>
         
         <Space size="small" style={{ marginBottom: 8 }}>
           {hasContent && needsExpansion && (
@@ -207,7 +207,7 @@ function NewsCard({
               target="_blank"
               rel="noopener noreferrer"
               className="newspaper-link"
-              style={{ fontSize: '12px' }}
+              style={{ fontSize: 'var(--font-size-base)' }}
             >
               🔗 原文
             </a>
@@ -215,10 +215,10 @@ function NewsCard({
         </Space>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div className="newspaper-body" style={{ fontSize: '10px', color: 'var(--newspaper-gray)' }}>
+                        <div className="newspaper-body" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--newspaper-gray)' }}>
             📅 {news.displayTime}
             {news.processedDisplayTime && (
-              <span style={{ marginLeft: '8px' }}>
+                              <span style={{ marginLeft: 'var(--space-sm)' }}>
                 ⚙️ 处理: {news.processedDisplayTime}
               </span>
             )}
@@ -382,14 +382,14 @@ export default function NewsPage() {
   return (
     <Layout>
 
-      <div className="newspaper-page" style={{ padding: '24px 16px', maxWidth: '100%', overflow: 'hidden' }}>
+      <div className="newspaper-page" style={{ padding: 'var(--space-2xl) var(--space-lg)', maxWidth: '100%', overflow: 'hidden' }}>
         {/* 传统报纸头部 */}
-        <div className="newspaper-header-frame" style={{ marginBottom: '24px' }}>
+        <div className="newspaper-header-frame" style={{ marginBottom: 'var(--space-2xl)' }}>
           <div style={{ textAlign: 'center' }}>
             <div className="newspaper-title newspaper-title-large">
-              📰 大公报纸 • 新闻浏览
+              📰 长婷报社 • 新闻浏览
             </div>
-            <div className="newspaper-subtitle" style={{ fontSize: '16px', marginBottom: '12px' }}>
+            <div className="newspaper-subtitle" style={{ fontSize: 'var(--font-size-xl)', marginBottom: 'var(--space-md)' }}>
               传统报纸式新闻阅读体验 • 智能检索与筛选
             </div>
             <div className="newspaper-time">
@@ -742,7 +742,7 @@ export default function NewsPage() {
                     overflowY: 'auto',
                     wordBreak: 'break-word',
                     textIndent: '2em',
-                    color: '#000000'
+                    color: 'var(--newspaper-text-primary)'
                   }}
                   dangerouslySetInnerHTML={{ 
                     __html: selectedNews.content || '暂无内容' 

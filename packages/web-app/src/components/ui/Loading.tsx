@@ -25,7 +25,7 @@ export function Loading({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: 'var(--space-xl)',
         ...style,
       }}
     >
@@ -34,9 +34,9 @@ export function Loading({
         <Text
           type="secondary"
           style={{
-            marginTop: '12px',
+            marginTop: 'var(--space-md)',
             textAlign: 'center',
-            fontSize: size === 'large' ? '16px' : size === 'small' ? '12px' : '14px',
+            fontSize: size === 'large' ? 'var(--font-size-xl)' : size === 'small' ? 'var(--font-size-base)' : 'var(--font-size-lg)',
           }}
         >
           {text}

@@ -200,7 +200,7 @@ export class FutuLiveService {
         const newNews = await this.filterNewNews(news || []);
         allNews = [...allNews, ...newNews];
 
-        if (newNews.length < news.length) {
+        if (newNews.length === 0 || newNews.length < news.length) {
           logger.info(`📰 富途新闻没有更多新新闻，停止获取`);
           hasNewData = false;
           break;
