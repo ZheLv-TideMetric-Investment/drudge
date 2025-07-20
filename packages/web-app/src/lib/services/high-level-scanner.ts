@@ -100,7 +100,7 @@ class HighLevelNewsScanner {
       // 发送通知
       let sentCount = 0;
       if (sendNotifications) {
-        sentCount = await this.sendNotifications(newsToProcess, source);
+        sentCount = await this.sendNotifications(newsToProcess);
 
         // 标记为已处理（仅在skipProcessed为true时）
         if (skipProcessed) {
@@ -150,7 +150,6 @@ class HighLevelNewsScanner {
 
   /**
    * 定时扫描 Level 1 新闻（向后兼容方法）
-   * @param source 调用来源
    */
   async scanHighLevelNewsScheduled(): Promise<HighLevelScanResult> {
     return this.scanHighLevelNews(undefined, undefined, {
@@ -162,7 +161,6 @@ class HighLevelNewsScanner {
   /**
    * 手动扫描 Level 1 新闻（向后兼容方法）
    * @param minutes 扫描最近几分钟的新闻
-   * @param source 调用来源
    */
   async manualScan(minutes: number = 30): Promise<HighLevelScanResult> {
     const endTime = moment();
@@ -178,7 +176,6 @@ class HighLevelNewsScanner {
    * 扫描指定时间范围的 Level 1 新闻
    * @param startTime 开始时间
    * @param endTime 结束时间
-   * @param source 调用来源
    */
   async scanTimeRange(
     startTime: string | moment.Moment,
