@@ -90,17 +90,17 @@ export class FutuLiveService {
       // 添加请求头伪装
       const headers = {
         'User-Agent': getRandomUserAgent(),
-        'Referer': getRandomReferer(),
-        'Accept': 'application/json, text/plain, */*',
+        Referer: getRandomReferer(),
+        Accept: 'application/json, text/plain, */*',
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
         'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
+        Pragma: 'no-cache',
         'Sec-Fetch-Dest': 'empty',
         'Sec-Fetch-Mode': 'cors',
         'Sec-Fetch-Site': 'same-origin',
-        'DNT': '1',
+        DNT: '1',
         'Upgrade-Insecure-Requests': '1',
       };
 
@@ -121,14 +121,14 @@ export class FutuLiveService {
       return response;
     } catch (error: any) {
       logger.error('请求富途新闻API失败:', error.message);
-      
+
       // 发送API失败通知
       try {
         await notificationService.sendNewsApiFailureNotification(error.message);
       } catch (notifyError) {
         logger.error('发送API失败通知失败:', notifyError);
       }
-      
+
       // 如果是网络错误，等待更长时间后重试
       if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
         await new Promise(resolve => setTimeout(resolve, 5000));
@@ -150,14 +150,14 @@ export class FutuLiveService {
         if (!response || !response.data || !response.data.data || !response.data.data.data) {
           const errorMsg = '获取富途新闻失败: 响应格式错误';
           logger.error(`❌ ${errorMsg}`);
-          
+
           // 发送API响应格式错误通知
           try {
             await notificationService.sendNewsApiFailureNotification(errorMsg);
           } catch (notifyError) {
             logger.error('发送API响应格式错误通知失败:', notifyError);
           }
-          
+
           return [];
         }
 
@@ -180,8 +180,11 @@ export class FutuLiveService {
       let allNews: NewsItem[] = [];
       let seqMark: string | undefined = undefined;
       let hasNewData = true;
+      let maxPage = 10;
+      let page = 0;
 
-      while (hasNewData) {
+      while (hasNewData && page < maxPage) {
+        logger.info(`🔄 富途新闻请求第 ${page} 页`);
         const response = await this.makeRequest(seqMark);
 
         if (!response || !response.data || !response.data.data || !response.data.data.data) {
@@ -203,8 +206,14 @@ export class FutuLiveService {
 
         seqMark = nextSeqMark || undefined;
 
+        page++;
+
         // 控制请求间隔
         await new Promise(resolve => setTimeout(resolve, config.newsApi.requestInterval));
+      }
+
+      if (hasNewData && page >= maxPage) {
+        logger.info(`🔄 富途新闻命中最大页数${maxPage}，停止获取`);
       }
 
       if (allNews.length > 0) {
@@ -217,21 +226,21 @@ export class FutuLiveService {
       return allNews;
     } catch (error: any) {
       logger.error('❌ 富途新闻获取失败:', error);
-      
+
       // 发送服务异常通知
       try {
         await notificationService.sendServiceErrorNotification(
-          'FutuLiveService', 
+          'FutuLiveService',
           error.message || '富途新闻获取失败',
           {
             isFirstRun: this.isFirstRun,
-            lastRequestTime: this.lastRequestTime
+            lastRequestTime: this.lastRequestTime,
           }
         );
       } catch (notifyError) {
         logger.error('发送服务异常通知失败:', notifyError);
       }
-      
+
       return [];
     }
   }
@@ -258,9 +267,9 @@ export class FutuLiveService {
       source: 'futu_live',
       isFirstRun: this.isFirstRun,
       lastRequestTime: this.lastRequestTime,
-      minRequestInterval: this.minRequestInterval
+      minRequestInterval: this.minRequestInterval,
     };
   }
 }
 
-export default new FutuLiveService(); 
+export default new FutuLiveService();
