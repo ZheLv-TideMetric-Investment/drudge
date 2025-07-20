@@ -103,11 +103,7 @@ export class FileStorage {
     const files = await fs.promises.readdir(this.dataPath);
     return files
       .filter(file => file.startsWith(`${this.source}_`) && file.endsWith('.json'))
-      .sort((a, b) => {
-        const statsA = fs.statSync(path.join(this.dataPath, a));
-        const statsB = fs.statSync(path.join(this.dataPath, b));
-        return statsB.mtime.getTime() - statsA.mtime.getTime();
-      });
+      .sort((a, b) => b.localeCompare(a)); // 按文件名降序排序（最新的在前面）
   }
 
   /**
