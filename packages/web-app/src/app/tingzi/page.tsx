@@ -5,12 +5,12 @@ import { Button, Input, Card, message as antMessage } from 'antd';
 
 const { TextArea } = Input;
 
-export default function RobotTestPage() {
+export default function TingziTestPage() {
   const [message, setMessage] = useState('');
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const testRobotAPI = async (endpoint: string) => {
+  const testTingziAPI = async (endpoint: string) => {
     if (!message.trim()) {
       antMessage.error('请输入消息内容');
       return;
@@ -33,11 +33,11 @@ export default function RobotTestPage() {
         isInAtList: false,
         sessionWebhook: '', // 测试时不发送webhook
         text: { content: message },
-        robotCode: 'test-robot',
+        tingziCode: 'test-tingzi',
         msgtype: 'text'
       };
 
-      const response = await fetch(`/api/robot${endpoint}`, {
+      const response = await fetch(`/api/tingzi${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -66,7 +66,7 @@ export default function RobotTestPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">机器人API测试</h1>
+      <h1 className="text-2xl font-bold mb-6">Tingzi API测试</h1>
       
       <Card title="测试消息" className="mb-4">
         <TextArea
@@ -80,18 +80,10 @@ export default function RobotTestPage() {
         <div className="space-x-4">
           <Button 
             type="primary" 
-            onClick={() => testRobotAPI('')}
+            onClick={() => testTingziAPI('')}
             loading={loading}
           >
-            测试基础API (/api/robot)
-          </Button>
-          
-          <Button 
-            type="default" 
-            onClick={() => testRobotAPI('/pure')}
-            loading={loading}
-          >
-            测试Pure API (/api/robot/pure)
+            测试Tingzi API (/api/tingzi)
           </Button>
         </div>
       </Card>
@@ -104,14 +96,15 @@ export default function RobotTestPage() {
         </Card>
       )}
 
-      <Card title="API说明" className="mt-4">
-        <div className="space-y-2 text-sm">
-          <p><strong>基础API:</strong> POST /api/robot - 使用jina-deepsearch-v2模型</p>
-          <p><strong>Pure API:</strong> POST /api/robot/pure - 使用jina-deepsearch-v1模型，带经济投资提示词</p>
-          <p><strong>Token验证:</strong> 需要在请求头中包含 token: &apos;tide&apos;</p>
-          <p><strong>特殊消息:</strong> 发送&ldquo;活着没&rdquo;会返回&ldquo;活着呢&rdquo;</p>
-        </div>
-      </Card>
+              <Card title="API说明" className="mt-4">
+          <div className="space-y-2 text-sm">
+            <p><strong>Tingzi API:</strong> POST /api/tingzi - 统一处理所有tingzi请求</p>
+            <p><strong>服务类型:</strong> 支持深度搜索、经济分析、快速搜索、自定义服务</p>
+            <p><strong>指令格式:</strong> /economic、/经济、/quick、/快速、/custom、/自定义</p>
+            <p><strong>Token验证:</strong> 需要在请求头中包含 token: &apos;tide&apos;</p>
+            <p><strong>健康检查:</strong> 发送&ldquo;status check&rdquo;会返回&ldquo;ok&rdquo;</p>
+          </div>
+        </Card>
     </div>
   );
 } 

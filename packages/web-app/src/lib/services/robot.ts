@@ -10,7 +10,7 @@ import {
   JinaRequestOptions
 } from './jina';
 
-export interface RobotRequestBody {
+export interface TingziRequestBody {
   conversationId: string;
   atUsers: Array<{ dingtalkId: string }>;
   chatbotUserId: string;
@@ -25,12 +25,12 @@ export interface RobotRequestBody {
   isInAtList: boolean;
   sessionWebhook: string;
   text: { content: string };
-  robotCode: string;
+  tingziCode: string;
   msgtype: string;
 }
 
-export interface RobotResponse {
-  received: RobotRequestBody;
+export interface TingziResponse {
+  received: TingziRequestBody;
   jinaResponse: string;
   serviceType?: string;
 }
@@ -132,7 +132,7 @@ async function sendWebhookResponse(webhookUrl: string, senderNick: string, conte
     await axios.post(webhookUrl, {
       msgtype: 'markdown',
       markdown: {
-        title: 'tide jina',
+        title: 'tingzi jina',
         text: `@${senderNick} \n${content}`,
       }
     });
@@ -141,8 +141,8 @@ async function sendWebhookResponse(webhookUrl: string, senderNick: string, conte
   }
 }
 
-// 处理机器人消息
-export async function processRobotMessage(body: RobotRequestBody): Promise<RobotResponse> {
+// 处理tingzi消息
+export async function processTingziMessage(body: TingziRequestBody): Promise<TingziResponse> {
   const { text, sessionWebhook, senderNick } = body;
   const message = text?.content || '';
   
