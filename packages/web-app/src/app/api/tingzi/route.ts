@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { processRobotMessage, RobotRequestBody } from '@/lib/services/robot';
+import { processTingziMessage, TingziRequestBody } from '@/lib/services/robot';
 
-// POST /api/robot 接口 - 统一处理所有机器人请求
+// POST /api/tingzi 接口 - 统一处理所有tingzi请求
 export async function POST(request: NextRequest) {
   try {
     // 验证 token
@@ -10,15 +10,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 403 });
     }
 
-    const body: RobotRequestBody = await request.json();
+    const body: TingziRequestBody = await request.json();
     
-    // 使用机器人服务处理消息
-    const result = await processRobotMessage(body);
+    // 使用tingzi服务处理消息
+    const result = await processTingziMessage(body);
 
     return NextResponse.json(result);
 
   } catch (error) {
-    console.error('Robot API error:', error);
+    console.error('Tingzi API error:', error);
     return NextResponse.json(
       { error: 'Internal server error' }, 
       { status: 500 }
