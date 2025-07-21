@@ -137,7 +137,6 @@ async function handleEvery5Minutes(timestamp: string, metadata?: Record<string, 
   console.log(`[每5分钟触发器] 执行高级别新闻扫描: ${timestamp}`);
 
   try {
-
     return {
       message: `每5分钟触发器执行成功`,
       data: {
@@ -238,21 +237,13 @@ async function handleDaytime05(timestamp: string, metadata?: Record<string, unkn
   try {
     const currentHour = moment().tz('Asia/Shanghai').hour();
 
-    // 只在11-22点生成总结
-    if (currentHour < 11 || currentHour > 22) {
-      return {
-        message: `当前时间 ${currentHour}:05 不在工作时间范围 (11:05-22:05)`,
-        data: {
-          skipped: true,
-          reason: '不在工作时间范围',
-          executedAt: timestamp,
-          metadata,
-        },
-      };
-    }
-
     // 计算小时时间范围（从上一个小时05分到当前小时05分）
-    const hourEnd = moment().tz('Asia/Shanghai').hour(currentHour).minute(0).second(0).millisecond(0);
+    const hourEnd = moment()
+      .tz('Asia/Shanghai')
+      .hour(currentHour)
+      .minute(0)
+      .second(0)
+      .millisecond(0);
     const hourStart = moment(hourEnd).minute(0).subtract(1, 'hour');
 
     const summaryResult = await summaryService.generateSummary(
@@ -300,21 +291,6 @@ async function handleOvernight05(timestamp: string, metadata?: Record<string, un
   console.log(`[隔夜05分触发器] 执行每日总结: ${timestamp}`);
 
   try {
-    const currentTime = moment().tz('Asia/Shanghai');
-
-    // 只在每天10:05执行
-    if (currentTime.hour() !== 10 || currentTime.minute() !== 5) {
-      return {
-        message: `当前时间 ${currentTime.format('HH:mm')} 不是每日总结时间 (10:05)`,
-        data: {
-          skipped: true,
-          reason: '不是每日总结时间',
-          executedAt: timestamp,
-          metadata,
-        },
-      };
-    }
-
     // 计算总结时间范围：前一天22:05 - 今天10:05
     const summaryEnd = moment().tz('Asia/Shanghai').hour(10).minute(0).second(0).millisecond(0);
     const summaryStart = moment(summaryEnd).subtract(1, 'day').hour(22).minute(0);
@@ -347,21 +323,6 @@ async function handleWeeklyFriday1605(timestamp: string, metadata?: Record<strin
   console.log(`[每周五16:05分触发器] 执行周报处理: ${timestamp}`);
 
   try {
-    const currentTime = moment().tz('Asia/Shanghai');
-
-    // 确认是周五的16:05
-    if (currentTime.day() !== 5 || currentTime.hour() !== 16 || currentTime.minute() !== 5) {
-      return {
-        message: `当前时间 ${currentTime.format('dddd HH:mm')} 不是周报时间 (周五 16:05)`,
-        data: {
-          skipped: true,
-          reason: '不是周报时间',
-          executedAt: timestamp,
-          metadata,
-        },
-      };
-    }
-
     // 计算周报时间范围：上周五16:05 - 本周五16:05
     const weekEnd = moment().tz('Asia/Shanghai').day(5).hour(16).minute(0).second(0).millisecond(0);
     const weekStart = moment(weekEnd).subtract(1, 'week');
