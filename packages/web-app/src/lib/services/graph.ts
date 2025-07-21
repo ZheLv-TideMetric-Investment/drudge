@@ -72,10 +72,17 @@ class GraphService {
    */
   async getEntityNeighborhood(entityId: string, depth: number = 1, limit: number = 50): Promise<GraphData> {
     try {
+      // 验证entityId
+      if (!entityId || entityId === 'undefined') {
+        throw new Error('无效的实体ID');
+      }
+
+      // 限制深度并构建动态查询（Neo4j不允许在变长路径中使用参数）
+      const actualDepth = Math.min(depth, 3);
       const cypher = `
         MATCH (start)
-        WHERE elementId(start) = $entityId
-        MATCH path = (start)-[*1..$depth]-(connected)
+        WHERE id(start) = $entityId
+        MATCH path = (start)-[*1..${actualDepth}]-(connected)
         WITH nodes(path) as pathNodes, relationships(path) as pathRels
         UNWIND pathNodes as n
         UNWIND pathRels as r
@@ -87,8 +94,7 @@ class GraphService {
       `;
 
       const result = await this.neo4j.executeQuery(cypher, { 
-        entityId, 
-        depth: Math.min(depth, 3), // 限制最大深度
+        entityId: parseInt(entityId), 
         limit 
       });
       

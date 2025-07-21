@@ -5,19 +5,20 @@ import { queryService } from '../../../../../lib/services/query';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const searchTerm = searchParams.get('searchTerm');
+    const searchTerm = searchParams.get('searchTerm') ? decodeURIComponent(searchParams.get('searchTerm')!) : null;
     const nodeType = searchParams.get('nodeType');
     const limit = parseInt(searchParams.get('limit') || '20');
 
-    if (!searchTerm) {
-      return NextResponse.json({
-        success: false,
-        error: '缺少搜索关键词',
-        timestamp: moment.tz('Asia/Shanghai').toISOString()
-      }, { status: 400 });
-    }
+    // 允许空搜索词，这种情况下会返回所有数据
+    // if (!searchTerm) {
+    //   return NextResponse.json({
+    //     success: false,
+    //     error: '缺少搜索关键词',
+    //     timestamp: moment.tz('Asia/Shanghai').toISOString()
+    //   }, { status: 400 });
+    // }
 
-    const entities = await queryService.searchEntities(searchTerm, nodeType || undefined, limit);
+    const entities = await queryService.searchEntities(searchTerm || '', nodeType || undefined, limit);
 
     return NextResponse.json({
       success: true,
