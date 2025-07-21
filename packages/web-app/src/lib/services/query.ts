@@ -200,133 +200,250 @@ class QueryService {
    */
   async searchEntities(searchTerm: string, nodeType?: string, limit: number = 20): Promise<any[]> {
     try {
-      let cypher: string;
+      const hasSearchTerm = searchTerm && searchTerm.trim() !== '';
       
+      // 如果指定了节点类型，只搜索该类型
       if (nodeType) {
-        // 搜索特定类型的节点
+        let cypher: string;
+        
         switch (nodeType.toLowerCase()) {
           case 'company':
-            cypher = `
+            cypher = hasSearchTerm ? `
               MATCH (c:Company)
               WHERE c.company_name CONTAINS $searchTerm
               OPTIONAL MATCH (c)-[r]-()
-              RETURN c as entity, 
-                     $companyType as type,
-                     c.company_name as name,
-                     count(r) as connections
+              RETURN c as entity, 'Company' as type, c.company_name as name, count(r) as connections
+              ORDER BY connections DESC, c.company_name
+              LIMIT $limit
+            ` : `
+              MATCH (c:Company)
+              OPTIONAL MATCH (c)-[r]-()
+              RETURN c as entity, 'Company' as type, c.company_name as name, count(r) as connections
               ORDER BY connections DESC, c.company_name
               LIMIT $limit
             `;
             break;
-          case 'person':
-            cypher = `
-              MATCH (p:Person)
-              WHERE p.person_name CONTAINS $searchTerm
-              OPTIONAL MATCH (p)-[r]-()
-              RETURN p as entity,
-                     $personType as type,
-                     p.person_name as name,
-                     count(r) as connections
-              ORDER BY connections DESC, p.person_name
-              LIMIT $limit
-            `;
-            break;
+            
           case 'organization':
-            cypher = `
+            cypher = hasSearchTerm ? `
               MATCH (o:Organization)
               WHERE o.organization_name CONTAINS $searchTerm
               OPTIONAL MATCH (o)-[r]-()
-              RETURN o as entity,
-                     $organizationType as type,
-                     o.organization_name as name,
-                     count(r) as connections
+              RETURN o as entity, 'Organization' as type, o.organization_name as name, count(r) as connections
+              ORDER BY connections DESC, o.organization_name
+              LIMIT $limit
+            ` : `
+              MATCH (o:Organization)
+              OPTIONAL MATCH (o)-[r]-()
+              RETURN o as entity, 'Organization' as type, o.organization_name as name, count(r) as connections
               ORDER BY connections DESC, o.organization_name
               LIMIT $limit
             `;
             break;
+            
+          case 'person':
+            cypher = hasSearchTerm ? `
+              MATCH (p:Person)
+              WHERE p.person_name CONTAINS $searchTerm
+              OPTIONAL MATCH (p)-[r]-()
+              RETURN p as entity, 'Person' as type, p.person_name as name, count(r) as connections
+              ORDER BY connections DESC, p.person_name
+              LIMIT $limit
+            ` : `
+              MATCH (p:Person)
+              OPTIONAL MATCH (p)-[r]-()
+              RETURN p as entity, 'Person' as type, p.person_name as name, count(r) as connections
+              ORDER BY connections DESC, p.person_name
+              LIMIT $limit
+            `;
+            break;
+            
           case 'location':
-            cypher = `
+            cypher = hasSearchTerm ? `
               MATCH (l:Location)
               WHERE l.location_name CONTAINS $searchTerm
               OPTIONAL MATCH (l)-[r]-()
-              RETURN l as entity,
-                     $locationType as type,
-                     l.location_name as name,
-                     count(r) as connections
+              RETURN l as entity, 'Location' as type, l.location_name as name, count(r) as connections
+              ORDER BY connections DESC, l.location_name
+              LIMIT $limit
+            ` : `
+              MATCH (l:Location)
+              OPTIONAL MATCH (l)-[r]-()
+              RETURN l as entity, 'Location' as type, l.location_name as name, count(r) as connections
               ORDER BY connections DESC, l.location_name
               LIMIT $limit
             `;
             break;
+            
           case 'event':
-            cypher = `
+            cypher = hasSearchTerm ? `
               MATCH (e:Event)
               WHERE e.event_name CONTAINS $searchTerm OR e.event_description CONTAINS $searchTerm
               OPTIONAL MATCH (e)-[r]-()
-              RETURN e as entity,
-                     $eventType as type,
-                     e.event_name as name,
-                     count(r) as connections
+              RETURN e as entity, 'Event' as type, e.event_name as name, count(r) as connections
+              ORDER BY connections DESC, e.event_name
+              LIMIT $limit
+            ` : `
+              MATCH (e:Event)
+              OPTIONAL MATCH (e)-[r]-()
+              RETURN e as entity, 'Event' as type, e.event_name as name, count(r) as connections
               ORDER BY connections DESC, e.event_name
               LIMIT $limit
             `;
             break;
+            
           default:
             throw new Error(`不支持的节点类型: ${nodeType}`);
         }
-      } else {
-        // 搜索所有类型的节点
-        cypher = `
-          CALL {
-            MATCH (c:Company)
-            WHERE c.company_name CONTAINS $searchTerm
-            OPTIONAL MATCH (c)-[r]-()
-            RETURN c as entity, $companyType as type, c.company_name as name, count(r) as connections
-            UNION
-            MATCH (p:Person)
-            WHERE p.person_name CONTAINS $searchTerm
-            OPTIONAL MATCH (p)-[r]-()
-            RETURN p as entity, $personType as type, p.person_name as name, count(r) as connections
-            UNION
-            MATCH (o:Organization)
-            WHERE o.organization_name CONTAINS $searchTerm
-            OPTIONAL MATCH (o)-[r]-()
-            RETURN o as entity, $organizationType as type, o.organization_name as name, count(r) as connections
-            UNION
-            MATCH (l:Location)
-            WHERE l.location_name CONTAINS $searchTerm
-            OPTIONAL MATCH (l)-[r]-()
-            RETURN l as entity, $locationType as type, l.location_name as name, count(r) as connections
-            UNION
-            MATCH (e:Event)
-            WHERE e.event_name CONTAINS $searchTerm OR e.event_description CONTAINS $searchTerm
-            OPTIONAL MATCH (e)-[r]-()
-            RETURN e as entity, $eventType as type, e.event_name as name, count(r) as connections
-          }
-          RETURN entity, type, name, connections
-          ORDER BY connections DESC, name
-          LIMIT $limit
-        `;
+        
+        const queryParams = hasSearchTerm ? { searchTerm, limit } : { limit };
+        
+        const result = await this.neo4j.executeQuery(cypher, queryParams);
+        
+        const mappedResults = result.records.map((record: { get: (key: string) => any }) => {
+          const entityNode = record.get('entity');
+          return {
+            entity: {
+              id: entityNode.identity.toString(),
+              name: record.get('name'),
+              type: record.get('type'),
+              properties: entityNode.properties,
+              connections: record.get('connections').toNumber()
+            },
+            type: record.get('type'),
+            name: record.get('name'),
+            connections: record.get('connections').toNumber()
+          };
+        });
+        
+
+        
+        return mappedResults;
       }
+      
+      // 没有指定节点类型，搜索所有类型
+      const results: any[] = [];
+      
+      // 搜索公司
+      const companyCypher = hasSearchTerm ? `
+        MATCH (c:Company)
+        WHERE c.company_name CONTAINS $searchTerm
+        OPTIONAL MATCH (c)-[r]-()
+        RETURN c as entity, 'Company' as type, c.company_name as name, count(r) as connections
+        ORDER BY connections DESC, c.company_name
+        LIMIT $limit
+      ` : `
+        MATCH (c:Company)
+        OPTIONAL MATCH (c)-[r]-()
+        RETURN c as entity, 'Company' as type, c.company_name as name, count(r) as connections
+        ORDER BY connections DESC, c.company_name
+        LIMIT $limit
+      `;
+      
+      // 搜索组织
+      const orgCypher = hasSearchTerm ? `
+        MATCH (o:Organization)
+        WHERE o.organization_name CONTAINS $searchTerm
+        OPTIONAL MATCH (o)-[r]-()
+        RETURN o as entity, 'Organization' as type, o.organization_name as name, count(r) as connections
+        ORDER BY connections DESC, o.organization_name
+        LIMIT $limit
+      ` : `
+        MATCH (o:Organization)
+        OPTIONAL MATCH (o)-[r]-()
+        RETURN o as entity, 'Organization' as type, o.organization_name as name, count(r) as connections
+        ORDER BY connections DESC, o.organization_name
+        LIMIT $limit
+      `;
+      
+      // 搜索人物
+      const personCypher = hasSearchTerm ? `
+        MATCH (p:Person)
+        WHERE p.person_name CONTAINS $searchTerm
+        OPTIONAL MATCH (p)-[r]-()
+        RETURN p as entity, 'Person' as type, p.person_name as name, count(r) as connections
+        ORDER BY connections DESC, p.person_name
+        LIMIT $limit
+      ` : `
+        MATCH (p:Person)
+        OPTIONAL MATCH (p)-[r]-()
+        RETURN p as entity, 'Person' as type, p.person_name as name, count(r) as connections
+        ORDER BY connections DESC, p.person_name
+        LIMIT $limit
+      `;
+      
+      // 搜索地点
+      const locationCypher = hasSearchTerm ? `
+        MATCH (l:Location)
+        WHERE l.location_name CONTAINS $searchTerm
+        OPTIONAL MATCH (l)-[r]-()
+        RETURN l as entity, 'Location' as type, l.location_name as name, count(r) as connections
+        ORDER BY connections DESC, l.location_name
+        LIMIT $limit
+      ` : `
+        MATCH (l:Location)
+        OPTIONAL MATCH (l)-[r]-()
+        RETURN l as entity, 'Location' as type, l.location_name as name, count(r) as connections
+        ORDER BY connections DESC, l.location_name
+        LIMIT $limit
+      `;
+      
+      // 搜索事件
+      const eventCypher = hasSearchTerm ? `
+        MATCH (e:Event)
+        WHERE e.event_name CONTAINS $searchTerm OR e.event_description CONTAINS $searchTerm
+        OPTIONAL MATCH (e)-[r]-()
+        RETURN e as entity, 'Event' as type, e.event_name as name, count(r) as connections
+        ORDER BY connections DESC, e.event_name
+        LIMIT $limit
+      ` : `
+        MATCH (e:Event)
+        OPTIONAL MATCH (e)-[r]-()
+        RETURN e as entity, 'Event' as type, e.event_name as name, count(r) as connections
+        ORDER BY connections DESC, e.event_name
+        LIMIT $limit
+      `;
 
-      const queryParams: any = {
-        searchTerm,
-        limit,
-        // 添加所有节点类型参数
-        companyType: NodeType.COMPANY,
-        personType: NodeType.PERSON,
-        organizationType: NodeType.ORGANIZATION,
-        locationType: NodeType.LOCATION,
-        eventType: NodeType.EVENT
-      };
-
-      const result = await this.neo4j.executeQuery(cypher, queryParams);
-
-      return result.records.map((record: any) => ({
-        entity: record.get('entity').properties,
-        type: record.get('type'),
-        name: record.get('name'),
-        connections: record.get('connections').toNumber()
-      }));
+      const queryParams = hasSearchTerm ? { searchTerm, limit } : { limit };
+      
+      // 逐个执行查询并处理错误
+      const queries = [
+        { name: 'company', cypher: companyCypher },
+        { name: 'organization', cypher: orgCypher },
+        { name: 'person', cypher: personCypher },
+        { name: 'location', cypher: locationCypher },
+        { name: 'event', cypher: eventCypher }
+      ];
+      
+      for (const query of queries) {
+        try {
+          const result = await this.neo4j.executeQuery(query.cypher, queryParams);
+          result.records.forEach((record: { get: (key: string) => any }) => {
+            const entityNode = record.get('entity');
+            results.push({
+              entity: {
+                id: entityNode.identity.toString(),
+                name: record.get('name'),
+                type: record.get('type'),
+                properties: entityNode.properties,
+                connections: record.get('connections').toNumber()
+              },
+              type: record.get('type'),
+              name: record.get('name'),
+              connections: record.get('connections').toNumber()
+            });
+          });
+        } catch (error) {
+          console.error(`查询 ${query.name} 失败:`, error);
+          // 继续执行其他查询
+        }
+      }
+      
+      // 按连接数排序并限制结果数量
+      return results
+        .sort((a, b) => b.connections - a.connections)
+        .slice(0, limit);
+        
     } catch (error: any) {
       console.error('搜索实体失败:', error);
       throw error;
