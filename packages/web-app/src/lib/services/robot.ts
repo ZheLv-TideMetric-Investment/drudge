@@ -132,7 +132,7 @@ async function sendWebhookResponse(webhookUrl: string, senderNick: string, conte
     await axios.post(webhookUrl, {
       msgtype: 'markdown',
       markdown: {
-        title: 'tingzi jina',
+        title: '[tide] 婷子',
         text: `@${senderNick} \n${content}`,
       }
     });
