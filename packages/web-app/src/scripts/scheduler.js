@@ -14,8 +14,8 @@ const SchedulerTrigger = {
   EVERY_HOUR_05: 'every_hour_05', // 每小时05分（全天24小时）
   DAYTIME: 'daytime', // 白天（11-22点）
   DAYTIME_05: 'daytime_05', // 白天05分（11-22点）
-  OVERNIGHT: 'overnight', // 隔夜（22点）
-  OVERNIGHT_05: 'overnight_05', // 隔夜（22点05分）
+  OVERNIGHT: 'overnight', // 隔夜（10点）
+  OVERNIGHT_05: 'overnight_05', // 隔夜（10点05分）
   WEEKLY_FRIDAY_1605: 'weekly_friday_1605', // 每周五16:05分
 };
 
@@ -37,8 +37,8 @@ const SCHEDULER_CRON_CONFIG = {
   [SchedulerTrigger.EVERY_HOUR_05]: '5 * * * *', // 每小时05分（全天）：数据同步
   [SchedulerTrigger.DAYTIME]: '0 11-22 * * *', // 白天整点（11-22点）：业务报告
   [SchedulerTrigger.DAYTIME_05]: '5 11-22 * * *', // 白天05分（11-22点）：摘要处理
-  [SchedulerTrigger.OVERNIGHT]: '0 22 * * *', // 隔夜（22点）：日报生成
-  [SchedulerTrigger.OVERNIGHT_05]: '5 22 * * *', // 隔夜（22点05分）：数据备份
+  [SchedulerTrigger.OVERNIGHT]: '0 10 * * *', // 隔夜（10点）：日报生成
+  [SchedulerTrigger.OVERNIGHT_05]: '5 10 * * *', // 隔夜（10点05分）：数据备份
   [SchedulerTrigger.WEEKLY_FRIDAY_1605]: '5 16 * * 5', // 每周五16:05：周报处理
 };
 
@@ -49,7 +49,7 @@ const SCHEDULER_CRON_CONFIG = {
  * - 高频监控：每分钟、每5分钟、每30分钟
  * - 全天定时：每小时整点、每小时05分（24小时运行）
  * - 工作时间：白天11-22点的定时任务
- * - 夜间任务：22点的总结和维护任务
+ * - 隔夜任务：早上10点和10点05分的总结和维护任务
  * - 周期特殊：每周五的定期报告
  */
 class CronScheduler {
@@ -85,8 +85,8 @@ class CronScheduler {
     this.setupTrigger(SchedulerTrigger.DAYTIME_05, '白天05分定时器');
 
     // 夜间任务
-    this.setupTrigger(SchedulerTrigger.OVERNIGHT, '隔夜定时器');
-    this.setupTrigger(SchedulerTrigger.OVERNIGHT_05, '隔夜05分定时器');
+    this.setupTrigger(SchedulerTrigger.OVERNIGHT, '隔夜定时器（10点）');
+    this.setupTrigger(SchedulerTrigger.OVERNIGHT_05, '隔夜05分定时器（10点05分）');
 
     // 周期性特殊任务
     this.setupTrigger(SchedulerTrigger.WEEKLY_FRIDAY_1605, '每周五16:05定时器');
