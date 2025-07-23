@@ -28,7 +28,7 @@ const COST_PER_MILLION_TOKENS = 0.05;
 // 计算费用（美元）
 function calculateCost(usage: { total_tokens: number }): number {
   const totalTokens = usage.total_tokens;
-  return (totalTokens / 1_000_000) * COST_PER_MILLION_TOKENS;
+  return Math.max(0.01, (totalTokens / 1_000_000) * COST_PER_MILLION_TOKENS);
 }
 
 // 获取当前北京时间
@@ -38,7 +38,7 @@ function getCurrentBeijingTime(): string {
 
 // 基础Jina API调用
 async function callJinaAPI(
-  message: string, 
+  message: string,
   options: JinaRequestOptions = {}
 ): Promise<JinaResponse> {
   const {
@@ -46,14 +46,14 @@ async function callJinaAPI(
     reasoning_effort = 'high',
     max_attempts = 3,
     no_direct_answer = false,
-    customPrompt
+    customPrompt,
   } = options;
 
   try {
     const messages = [
-      { 
-        role: 'user', 
-        content: customPrompt || message?.trim() 
+      {
+        role: 'user',
+        content: customPrompt || message?.trim(),
       },
     ];
 
@@ -62,27 +62,23 @@ async function callJinaAPI(
       messages,
       reasoning_effort,
       max_attempts,
-      no_direct_answer
+      no_direct_answer,
     };
 
-    const response = await axios.post(
-      'https://deepsearch.jina.ai/v1/chat/completions',
-      data,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.JINA_API_KEY}`
-        }
-      }
-    );
+    const response = await axios.post('https://deepsearch.jina.ai/v1/chat/completions', data, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+      },
+    });
 
     const aiResponse = response.data.choices[0]?.message?.content || '抱歉，我没有得到有效的回答';
     const cost = calculateCost(response.data.usage);
 
-    return { 
+    return {
       content: aiResponse,
       cost,
-      usage: response.data.usage
+      usage: response.data.usage,
     };
   } catch (error) {
     if (axios.isAxiosError(error)) {
@@ -95,7 +91,7 @@ async function callJinaAPI(
 // 经济投资专业分析服务
 export async function callJinaEconomicAnalysis(message: string): Promise<JinaResponse> {
   const currentTime = getCurrentBeijingTime();
-  
+
   const customPrompt = `
 现在是北京时间 ${currentTime}
 
@@ -154,7 +150,7 @@ export async function callJinaEconomicAnalysis(message: string): Promise<JinaRes
     reasoning_effort: 'medium',
     max_attempts: 1,
     no_direct_answer: false,
-    customPrompt
+    customPrompt,
   });
 }
 
@@ -164,7 +160,7 @@ export async function callJinaDeepSearch(message: string): Promise<JinaResponse>
     model: 'jina-deepsearch-v2',
     reasoning_effort: 'high',
     max_attempts: 3,
-    no_direct_answer: false
+    no_direct_answer: false,
   });
 }
 
@@ -174,13 +170,13 @@ export async function callJinaQuickSearch(message: string): Promise<JinaResponse
     model: 'jina-deepsearch-v1',
     reasoning_effort: 'low',
     max_attempts: 1,
-    no_direct_answer: false
+    no_direct_answer: false,
   });
 }
 
 // 自定义服务
 export async function callJinaCustom(
-  message: string, 
+  message: string,
   options: JinaRequestOptions
 ): Promise<JinaResponse> {
   return callJinaAPI(message, options);
@@ -194,4 +190,4 @@ export function healthCheck(): string {
 // 检查是否为健康检查消息
 export function isHealthCheck(message: string): boolean {
   return message?.trim() === 'status check';
-} 
+}
