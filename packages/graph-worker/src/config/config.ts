@@ -21,6 +21,7 @@ const config = {
   // AI 配置
   ai: {
     provider: process.env.AI_PROVIDER || 'qwen',
+    fallbackProvider: process.env.AI_FALLBACK_PROVIDER || 'xai',
     deepseek: {
       apiKey: process.env.DEEPSEEK_API_KEY || '',
       model: process.env.DEEPSEEK_MODEL || 'deepseek-reasoner'
@@ -32,6 +33,10 @@ const config = {
     qwen: {
       apiKey: process.env.QWEN_API_KEY || '',
       model: process.env.QWEN_MODEL || 'qwen-turbo',
+    },
+    xai: {
+      apiKey: process.env.XAI_API_KEY || '',
+      model: process.env.XAI_MODEL || 'grok-3-mini',
     }
   },
   
