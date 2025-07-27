@@ -8,6 +8,7 @@ import path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import scheduler from '../scheduler/index';
+import failedNewsProcessor from '../services/FailedNewsProcessor';
 
 const execAsync = promisify(exec);
 
@@ -73,6 +74,118 @@ async function reprocessNews(newsId: string): Promise<void> {
     
   } catch (error) {
     logger.error('重新处理新闻失败:', error);
+    process.exit(1);
+  }
+}
+
+/**
+ * 批量重新处理失败的新闻
+ */
+async function retryFailedNews(limit?: number): Promise<void> {
+  try {
+    logger.info(`🔄 开始批量重新处理失败的新闻${limit ? `，限制: ${limit} 条` : ''}`);
+    
+    const stats = await failedNewsProcessor.retryFailedNews(limit);
+    
+    console.log('\n📊 重新处理结果:');
+    console.log('='.repeat(50));
+    console.log(`✅ 总计: ${stats.total} 条`);
+    console.log(`🎉 成功: ${stats.successful} 条`);
+    console.log(`❌ 失败: ${stats.failed} 条`);
+    
+    if (stats.results.length > 0) {
+      console.log('\n📋 详细结果:');
+      stats.results.forEach((result, index) => {
+        const status = result.success ? '✅' : '❌';
+        const error = result.error ? ` (${result.error})` : '';
+        console.log(`${index + 1}. ${status} ${result.newsId} - ${result.fileName}${error}`);
+      });
+    }
+    
+  } catch (error) {
+    logger.error('批量重新处理失败新闻失败:', error);
+    process.exit(1);
+  }
+}
+
+/**
+ * 根据ID重新处理失败的新闻
+ */
+async function retryFailedNewsByIds(newsIds: string[]): Promise<void> {
+  try {
+    logger.info(`🔄 根据ID重新处理失败的新闻: ${newsIds.join(', ')}`);
+    
+    const stats = await failedNewsProcessor.retryFailedNewsByIds(newsIds);
+    
+    console.log('\n📊 重新处理结果:');
+    console.log('='.repeat(50));
+    console.log(`✅ 总计: ${stats.total} 条`);
+    console.log(`🎉 成功: ${stats.successful} 条`);
+    console.log(`❌ 失败: ${stats.failed} 条`);
+    
+    if (stats.results.length > 0) {
+      console.log('\n📋 详细结果:');
+      stats.results.forEach((result, index) => {
+        const status = result.success ? '✅' : '❌';
+        const error = result.error ? ` (${result.error})` : '';
+        console.log(`${index + 1}. ${status} ${result.newsId} - ${result.fileName}${error}`);
+      });
+    }
+    
+  } catch (error) {
+    logger.error('根据ID重新处理失败新闻失败:', error);
+    process.exit(1);
+  }
+}
+
+/**
+ * 列出失败的新闻
+ */
+async function listFailedNews(limit: number = 20): Promise<void> {
+  try {
+    logger.info(`📋 列出失败的新闻，限制: ${limit} 条`);
+    
+    const failedNewsList = await failedNewsProcessor.listFailedNews(limit);
+    
+    if (failedNewsList.length === 0) {
+      console.log('✅ 没有找到失败的新闻文件');
+      return;
+    }
+    
+    console.log(`\n📋 失败新闻列表 (共 ${failedNewsList.length} 条):`);
+    console.log('='.repeat(80));
+    
+    failedNewsList.forEach((failedNews, index) => {
+      console.log(`${index + 1}. 📰 ${failedNews.newsItem.id} - ${failedNews.metadata.title}`);
+      console.log(`   📅 失败时间: ${failedNews.metadata.failedAt}`);
+      console.log(`   📡 来源: ${failedNews.metadata.source}`);
+      console.log(`   ❌ 错误: ${failedNews.error.message}`);
+      console.log(`   🔧 服务: ${failedNews.error.service}`);
+      console.log('-'.repeat(80));
+    });
+    
+  } catch (error) {
+    logger.error('列出失败新闻失败:', error);
+    process.exit(1);
+  }
+}
+
+/**
+ * 清理旧的失败文件
+ */
+async function cleanFailedFiles(daysOld: number = 30): Promise<void> {
+  try {
+    logger.info(`🧹 清理超过 ${daysOld} 天的失败文件`);
+    
+    const deletedCount = await failedNewsProcessor.cleanOldFailedFiles(daysOld);
+    
+    console.log('\n🧹 清理结果:');
+    console.log('='.repeat(50));
+    console.log(`🗑️ 删除文件数: ${deletedCount} 个`);
+    console.log(`📅 清理标准: 超过 ${daysOld} 天的文件`);
+    
+  } catch (error) {
+    logger.error('清理失败文件失败:', error);
     process.exit(1);
   }
 }
@@ -820,6 +933,12 @@ function showHelp(): void {
   console.log('  file-stats                 查看文件处理统计');
   console.log('  scheduler-status           查看调度器状态\n');
   
+  console.log('🔄 失败新闻处理:');
+  console.log('  retry-failed [限制数]      批量重新处理失败的新闻 (默认全部)');
+  console.log('  retry-failed-by-id <ID...> 根据ID重新处理失败的新闻');
+  console.log('  list-failed [限制数]       列出失败的新闻 (默认20条)');
+  console.log('  clean-failed [天数]        清理旧的失败文件 (默认30天)\n');
+  
   console.log('📝 示例:');
   console.log('  npm run cli scan                    # 手动扫描新闻文件');
   console.log('  npm run cli file-stats              # 查看文件处理状态');
@@ -827,7 +946,11 @@ function showHelp(): void {
   console.log('  npm run cli process 50              # 处理50条未处理新闻');
   console.log('  npm run cli query "小米" 5          # 查询"小米"相关新闻，限制5条');
   console.log('  npm run cli stats                   # 显示统计信息');
-  console.log('  npm run cli status                  # 检查状态\n');
+  console.log('  npm run cli status                  # 检查状态');
+  console.log('  npm run cli retry-failed 10         # 重新处理10条失败新闻');
+  console.log('  npm run cli retry-failed-by-id 123  # 重新处理ID为123的失败新闻');
+  console.log('  npm run cli list-failed 5           # 列出最近5条失败新闻');
+  console.log('  npm run cli clean-failed 7          # 清理7天前的失败文件\n');
   
   console.log('🌐 HTTP API:');
   console.log('  curl http://localhost:39111/health                    # 健康检查');
@@ -1010,6 +1133,44 @@ export async function runCLI(): Promise<void> {
 
       case 'db-help':
         showDbHelp();
+        break;
+
+      // 失败新闻处理命令
+      case 'retry-failed':
+        const retryLimit = args[1] ? parseInt(args[1], 10) : undefined;
+        if (retryLimit && (isNaN(retryLimit) || retryLimit <= 0)) {
+          console.error('❌ 限制数量必须是正整数');
+          process.exit(1);
+        }
+        await retryFailedNews(retryLimit);
+        break;
+
+      case 'retry-failed-by-id':
+        if (args.length < 2) {
+          console.error('❌ 请提供至少一个新闻ID');
+          console.error('用法: npm run cli retry-failed-by-id <newsId1> [newsId2] ...');
+          process.exit(1);
+        }
+        const newsIdsToRetry = args.slice(1);
+        await retryFailedNewsByIds(newsIdsToRetry);
+        break;
+
+      case 'list-failed':
+        const listLimit = args[1] ? parseInt(args[1], 10) : 20;
+        if (isNaN(listLimit) || listLimit <= 0) {
+          console.error('❌ 限制数量必须是正整数');
+          process.exit(1);
+        }
+        await listFailedNews(listLimit);
+        break;
+
+      case 'clean-failed':
+        const daysOld = args[1] ? parseInt(args[1], 10) : 30;
+        if (isNaN(daysOld) || daysOld <= 0) {
+          console.error('❌ 天数必须是正整数');
+          process.exit(1);
+        }
+        await cleanFailedFiles(daysOld);
         break;
         
       case 'help':
