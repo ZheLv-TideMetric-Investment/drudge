@@ -162,11 +162,15 @@ export class EntityExtractionService {
       // 保存失败的新闻数据
       await this.saveFailedNews(newsItem, error);
 
-      // 发送实体提取失败通知
+      // 发送实体提取失败通知，包含provider信息和重试次数
       try {
+        const providerInfo = aiService.getProviderInfo();
+        const detailedError = `${error.message || '实体提取失败'} | 主Provider: ${providerInfo.current}${providerInfo.hasFallback ? `, 备用: ${providerInfo.fallback}` : ' (无备用)'}`;
+        
         await notificationService.sendEntityExtractionFailureNotification(
           newsItem.id,
-          error.message || '实体提取失败'
+          detailedError,
+          this.maxRetries // 发送重试次数信息
         );
       } catch (notifyError) {
         logger.error('发送实体提取失败通知失败:', notifyError);
@@ -312,6 +316,10 @@ export class EntityExtractionService {
    * 调用AI进行六要素提取（带重试机制）
    */
   private async callAIExtraction(newsItem: NewsItem): Promise<any> {
+    // 获取AI服务的provider信息
+    const providerInfo = aiService.getProviderInfo();
+    logger.info(`🤖 使用AI提取六要素 - 主Provider: ${providerInfo.current}${providerInfo.hasFallback ? `, 备用: ${providerInfo.fallback}` : ''}`);
+
     const messages: LLMMessage[] = [
       {
         role: 'system',
@@ -343,6 +351,7 @@ export class EntityExtractionService {
         if (response.success) {
           // 对响应进行校验和解析处理
           const validatedData = this.validateAndParsing(response.data, attempt);
+          logger.debug(`✅ AI提取成功 (尝试 ${attempt})`);
           return validatedData;
         } else {
           throw new Error(response.error || 'AI提取失败');
