@@ -2,7 +2,6 @@ import { generateObject } from 'ai';
 import { deepseek } from '@ai-sdk/deepseek';
 import { google } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
-import { createXai } from '@ai-sdk/xai';
 import { z } from 'zod';
 import { logger } from '../utils/logger';
 import config from '../config/config';
@@ -107,11 +106,13 @@ export class AiService {
         if (!config.ai.xai?.model || !config.ai.xai?.apiKey) {
           throw new Error('xAI模型配置不存在');
         }
-        // 使用专门的 xAI SDK
-        const xai = createXai({
+        // 使用代理服务访问 xAI
+        const xai = createOpenAI({
           apiKey: config.ai.xai.apiKey,
+          baseURL: config.ai.xai.proxyUrl,
         });
-        logger.info(`创建 xAI 模型: ${config.ai.xai.model}`);
+        logger.info(`创建 xAI 模型 (通过代理): ${config.ai.xai.model}`);
+        logger.info(`使用代理URL: ${config.ai.xai.proxyUrl}`);
         return xai(config.ai.xai.model);
 
       default:
