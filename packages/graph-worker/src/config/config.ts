@@ -37,6 +37,7 @@ const config = {
     xai: {
       apiKey: process.env.XAI_API_KEY || '',
       model: process.env.XAI_MODEL || 'grok-3-mini',
+      proxyUrl: process.env.XAI_PROXY_URL || '',
     }
   },
   
