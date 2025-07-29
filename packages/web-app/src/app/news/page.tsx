@@ -23,13 +23,14 @@ import {
 } from '@ant-design/icons';
 import { Layout } from '../../components/Layout';
 import moment, { Moment } from 'moment-timezone';
+import { toAntdValue, fromAntdValue, formatNewsTime, formatTime } from '../../lib/utils/frontend-time';
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 const { Title, Text } = Typography;
 
-// 新闻数据接口
+// 新闻数据接口 - 更新时间字段
 interface NewsItem {
   id: string;
   title: string;
@@ -39,6 +40,10 @@ interface NewsItem {
   processedAt: string;
   source: string;
   url: string;
+  // 使用新的时间工具，这些字段由API自动提供
+  timestamp_display?: string;
+  processedAt_display?: string;
+  // 兼容旧字段
   displayTime: string;
   processedDisplayTime: string;
   highlightedTitle?: string;
@@ -215,11 +220,11 @@ function NewsCard({
         </Space>
         
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div className="newspaper-body" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--newspaper-gray)' }}>
-            📅 {news.displayTime}
-            {news.processedDisplayTime && (
-                              <span style={{ marginLeft: 'var(--space-sm)' }}>
-                ⚙️ 处理: {news.processedDisplayTime}
+          <div className="newspaper-body" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--newspaper-gray)' }}>
+            📅 {news.timestamp_display || news.displayTime || formatNewsTime(news.timestamp)}
+            {(news.processedAt_display || news.processedDisplayTime) && (
+              <span style={{ marginLeft: 'var(--space-sm)' }}>
+                ⚙️ 处理: {news.processedAt_display || news.processedDisplayTime || formatTime(news.processedAt)}
               </span>
             )}
           </div>
@@ -739,8 +744,8 @@ export default function NewsPage() {
                     </span>
                   </div>
                   <div><strong>新闻来源：</strong>📰 {selectedNews.source}</div>
-                  <div><strong>发布时间：</strong>📅 {selectedNews.displayTime}</div>
-                  <div><strong>处理时间：</strong>⚙️ {selectedNews.processedDisplayTime || '未知'}</div>
+                  <div><strong>发布时间：</strong>📅 {selectedNews.timestamp_display || selectedNews.displayTime || formatTime(selectedNews.timestamp)}</div>
+                  <div><strong>处理时间：</strong>⚙️ {selectedNews.processedAt_display || selectedNews.processedDisplayTime || (selectedNews.processedAt ? formatTime(selectedNews.processedAt) : '未知')}</div>
                 </div>
               </div>
 

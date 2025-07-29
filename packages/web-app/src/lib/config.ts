@@ -17,6 +17,7 @@ export const config = {
   // AI配置
   ai: {
     provider: process.env.AI_PROVIDER || 'deepseek',
+    simpleProvider: process.env.SIMPLE_AI_PROVIDER || 'qwen',
     deepseek: {
       model: process.env.DEEPSEEK_MODEL || 'deepseek-reasoner',
       apiKey: process.env.DEEPSEEK_API_KEY || ''

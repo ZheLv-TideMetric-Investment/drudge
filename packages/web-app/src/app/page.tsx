@@ -34,6 +34,8 @@ import {
   BarChartOutlined,
 } from '@ant-design/icons';
 import { Layout } from '../components/Layout';
+import { getCurrentTime, TIME_FORMATS } from '../lib/utils/frontend-time';
+import { buildTimeRangePreset as apiTimeRangePreset } from '../lib/utils/api-helpers';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -92,26 +94,34 @@ export default function Home() {
     setTriggerLoading(prev => ({ ...prev, [key]: true }));
 
     try {
-      // 使用北京时区
-      const beijingTz = 'Asia/Shanghai';
-      const endTime = moment.tz(beijingTz);
-      let startTime: moment.Moment;
-
+      // 使用新的时间预设工具获取时间范围
+      let timeRange: { startTime: string; endTime: string };
+      
       if (type === 'hourly') {
         // 当前小时的开始时间到现在
-        startTime = endTime.clone().startOf('hour');
+        const now = moment.tz('Asia/Shanghai');
+        const hourStart = now.clone().startOf('hour');
+        timeRange = { 
+          startTime: hourStart.toISOString(), 
+          endTime: now.toISOString() 
+        };
       } else if (type === 'daily') {
-        // 当天的开始时间到现在
-        startTime = endTime.clone().startOf('day');
+        // 今天的开始时间到现在
+        timeRange = apiTimeRangePreset('today');
       } else {
         // custom: 最近1小时的总结
-        startTime = endTime.clone().subtract(1, 'hour');
+        const now = moment.tz('Asia/Shanghai');
+        const oneHourAgo = now.clone().subtract(1, 'hour');
+        timeRange = { 
+          startTime: oneHourAgo.toISOString(), 
+          endTime: now.toISOString() 
+        };
       }
 
       // 构建查询参数
       const params = new URLSearchParams({
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
+        startTime: timeRange.startTime,
+        endTime: timeRange.endTime,
         sendNotification: 'true',
       });
 
@@ -202,7 +212,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           trigger,
-          timestamp: moment.tz('Asia/Shanghai').toISOString(),
+          timestamp: moment.tz('Asia/Shanghai').toISOString(), // 使用新的时间工具
           metadata: {
             source: 'manual_trigger',
             user_initiated: true,
