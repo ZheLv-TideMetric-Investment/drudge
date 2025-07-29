@@ -59,6 +59,7 @@ class AiService {
 
       // 切换到模拟模式
       this.model = { provider: 'mock' };
+      this.simpleModel = { provider: 'mock' }; // 同时设置简单模型
       this.initialized = true;
       this.mockMode = true;
 
@@ -85,8 +86,7 @@ class AiService {
         }
         // 设置环境变量给DeepSeek SDK使用
         process.env.DEEPSEEK_API_KEY = config.ai.deepseek.apiKey;
-        this.model = deepseek(config.ai.deepseek.model);
-        break;
+        return deepseek(config.ai.deepseek.model);
 
       case 'google':
         if (!config.ai.google.apiKey) {
@@ -94,8 +94,7 @@ class AiService {
         }
         // 设置环境变量给Google SDK使用
         process.env.GOOGLE_GENERATIVE_AI_API_KEY = config.ai.google.apiKey;
-        this.model = google(config.ai.google.model);
-        break;
+        return google(config.ai.google.model);
 
       case 'qwen':
         if (!config.ai.qwen.apiKey) {
@@ -106,8 +105,7 @@ class AiService {
           apiKey: config.ai.qwen.apiKey,
           baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         });
-        this.model = qwen(config.ai.qwen.model);
-        break;
+        return qwen(config.ai.qwen.model);
 
       default:
         throw new Error(`不支持的AI提供商: ${providerName}`);
