@@ -52,39 +52,26 @@ class SummaryService {
       // 2. 获取新闻对应的实体，并聚合去重
       const allEntities = await this.extractEntitiesFromNews(newsData.news_items);
 
-      let newsContent: string;
-      let enhanced = false;
-      let entitySummaries: Record<string, string> = {};
-      let allHistoricalNews: any[] = [];
+      console.log('找到有效实体，使用增强模式生成总结');
+      // 增强模式：构建包含历史的新闻内容
 
-      if (allEntities.length === 0) {
-        console.log('没有找到有效实体，使用基础模式生成总结');
-        // 基础模式：只构建基础新闻内容
-        newsContent = this.buildBasicNewsContent(newsData.news_items);
-        enhanced = false;
-      } else {
-        console.log('找到有效实体，使用增强模式生成总结');
-        // 增强模式：构建包含历史的新闻内容
+      // 3. 查询出每个实体对应的历史新闻
+      const allHistoricalNews = await this.getHistoricalNewsForEntities(allEntities, start);
 
-        // 3. 查询出每个实体对应的历史新闻
-        allHistoricalNews = await this.getHistoricalNewsForEntities(allEntities, start);
+      // 4. 对每个实体对应的历史新闻进行总结
+      const entitySummaries = await this.generateEntitySummaries(allEntities, allHistoricalNews);
 
-        // 4. 对每个实体对应的历史新闻进行总结
-        entitySummaries = await this.generateEntitySummaries(allEntities, allHistoricalNews);
+      // 5. 对指定时间的新闻，按照实体关联历史新闻总结（按level分组）
+      const levelContents = await this.enrichNewsWithHistoricalContext(
+        newsData.news_items,
+        allEntities,
+        entitySummaries
+      );
 
-        // 5. 对指定时间的新闻，按照实体关联历史新闻总结
-        newsContent = await this.enrichNewsWithHistoricalContext(
-          newsData.news_items,
-          allEntities,
-          entitySummaries
-        );
-        enhanced = true;
-      }
+      // 6. 按level分批生成总结
+      const finalSummary = await this.generateLevelSummaries(levelContents);
 
-      // 6. 统一生成总结
-      const finalSummary = await this.generateAISummary(newsContent, enhanced);
-
-      // 统计和通知
+      // 7. 统计和通知
       const stats = await this.calculateStats(
         newsData,
         allEntities,
@@ -93,15 +80,7 @@ class SummaryService {
       );
       await this.handleNotification(sendNotification, finalSummary, start, end, newsData);
 
-      return this.createSuccessResult(
-        timeRangeDesc,
-        start,
-        end,
-        newsData,
-        finalSummary,
-        stats,
-        enhanced
-      );
+      return this.createSuccessResult(timeRangeDesc, start, end, newsData, finalSummary, stats);
     } catch (error: any) {
       console.error('生成总结失败:', error);
       const timeRangeDesc = this.formatPeriod(moment(startTime), moment(endTime));
@@ -177,25 +156,6 @@ class SummaryService {
 
     console.log(`收集到 ${allEntities.length} 个去重后的有效实体(已过滤Location类型)`);
     return allEntities;
-  }
-
-  /**
-   * 构建基础新闻内容（无实体增强）
-   */
-  private buildBasicNewsContent(newsItems: any[]): string {
-    const groupedNews = this.groupNewsByLevel(newsItems);
-    return Object.entries(groupedNews)
-      .map(([level, news]) => {
-        const levelContent = news
-          .map(item => {
-            return `标题：${item.title}\n内容：${item.content}\n时间：${moment(item.time * 1000)
-              .tz('Asia/Shanghai')
-              .format('YYYY-MM-DD HH:mm:ss')}\n`;
-          })
-          .join('\n');
-        return `【${level}级新闻】\n${levelContent}`;
-      })
-      .join('\n\n');
   }
 
   /**
@@ -357,18 +317,21 @@ class SummaryService {
   }
 
   /**
-   * 5. 为新闻关联历史新闻
+   * 5. 为新闻关联历史新闻（按level分组返回）
    */
   private async enrichNewsWithHistoricalContext(
     newsItems: any[],
     allEntities: any[],
     entitySummaries: Record<string, string>
-  ): Promise<string> {
-    console.log(`📝 开始为 ${newsItems.length} 条新闻关联历史新闻...`);
+  ): Promise<Record<string, string>> {
+    console.log(`📝 开始为 ${newsItems.length} 条新闻关联历史新闻（按level分组）...`);
 
     const groupedNews = this.groupNewsByLevel(newsItems);
+    const levelContents: Record<string, string> = {};
 
     const newsContentPromises = Object.entries(groupedNews).map(async ([level, news]) => {
+      console.log(`📝 处理 ${level}级新闻，共 ${news.length} 条`);
+
       const levelContentPromises = news.map(async (item: any) => {
         // 获取该新闻的实体
         const newsEntities = await this.getNewsEntities(item.newsId)
@@ -401,18 +364,126 @@ class SummaryService {
       });
 
       const levelContent = (await Promise.all(levelContentPromises)).join('\n');
-      return `【${level}级新闻】\n${levelContent}`;
+      return { level, content: `【${level}级新闻】\n${levelContent}` };
     });
 
-    return (await Promise.all(newsContentPromises)).join('\n\n');
+    const results = await Promise.all(newsContentPromises);
+
+    // 转换为Record格式
+    results.forEach(({ level, content }) => {
+      levelContents[level] = content;
+    });
+
+    console.log(`📝 新闻关联完成，生成了 ${Object.keys(levelContents).length} 个level的内容`);
+    return levelContents;
   }
 
   /**
-   * 6. 统一的总结生成方法
+   * 6. 按level分批生成总结（并发调用）
    */
-  private async generateAISummary(newsContent: string, enhanced: boolean = false): Promise<string> {
-    const mode = enhanced ? '增强模式' : '基础模式';
-    console.log(`🎯 开始生成新闻总结 (${mode})...`);
+  private async generateLevelSummaries(levelContents: Record<string, string>): Promise<string> {
+    console.log(`🎯 开始并发生成新闻总结，共 ${Object.keys(levelContents).length} 个level...`);
+
+    const levelEntries = Object.entries(levelContents);
+
+    // 按level顺序排序（数字越小优先级越高）
+    levelEntries.sort(([a], [b]) => {
+      const levelA = this.parseLevelNumber(a);
+      const levelB = this.parseLevelNumber(b);
+      return levelA - levelB;
+    });
+
+    // 并发为每个level生成总结
+    const summaryPromises = levelEntries.map(async ([level, content]) => {
+      try {
+        console.log(`🎯 正在为 ${level}级新闻生成总结...`);
+        const levelSummary = await this.generateAISummary(content);
+        console.log(`✅ ${level}级新闻总结生成完成`);
+        return { level, summary: levelSummary, success: true };
+      } catch (error: any) {
+        console.error(`❌ ${level}级新闻总结生成失败:`, error);
+        return {
+          level,
+          summary: `${level}级新闻总结生成失败：${error.message}`,
+          success: false,
+        };
+      }
+    });
+
+    // 等待所有level的总结完成
+    const results = await Promise.allSettled(summaryPromises);
+
+    // 收集成功和失败的结果
+    const levelSummaries: Record<string, string> = {};
+    let successCount = 0;
+    let failureCount = 0;
+
+    results.forEach((result, index) => {
+      const [level] = levelEntries[index];
+
+      if (result.status === 'fulfilled') {
+        levelSummaries[level] = result.value.summary;
+        if (result.value.success) {
+          successCount++;
+        } else {
+          failureCount++;
+        }
+      } else {
+        console.error(`❌ ${level}级新闻处理异常:`, result.reason);
+        levelSummaries[level] = `${level}级新闻处理异常：${result.reason?.message || '未知错误'}`;
+        failureCount++;
+      }
+    });
+
+    console.log(`🎯 并发生成完成: 成功 ${successCount} 个, 失败 ${failureCount} 个`);
+
+    // 合并所有level的总结
+    const finalSummary = this.mergeLevelSummaries(levelSummaries);
+    console.log(`✅ 所有level总结生成完成并合并`);
+
+    return finalSummary;
+  }
+
+  /**
+   * 解析level编号
+   */
+  private parseLevelNumber(level: string): number {
+    // 提取数字，如果没有数字则返回999（放在最后）
+    const match = level.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 999;
+  }
+
+  /**
+   * 合并多个level的总结
+   */
+  private mergeLevelSummaries(levelSummaries: Record<string, string>): string {
+    console.log(`🔗 合并 ${Object.keys(levelSummaries).length} 个level的总结...`);
+
+    const levelEntries = Object.entries(levelSummaries);
+
+    // 按level顺序排序
+    levelEntries.sort(([a], [b]) => {
+      const levelA = this.parseLevelNumber(a);
+      const levelB = this.parseLevelNumber(b);
+      return levelA - levelB;
+    });
+
+    // 合并总结，保持各level的独立性
+    const mergedSummary = levelEntries
+      .map(([level, summary]) => {
+        // 为每个level添加标题分隔
+        return `## ${level}级新闻总结\n\n${summary}`;
+      })
+      .join('\n\n---\n\n');
+
+    return mergedSummary;
+  }
+
+  /**
+   * 7. 单个内容的AI总结生成方法
+   */
+  private async generateAISummary(newsContent: string): Promise<string> {
+    console.log(`🎯 开始生成新闻总结...`);
 
     const systemPrompt = this.getSystemPrompt();
     const userPrompt = `新闻内容：\n\n${newsContent}`;
@@ -424,12 +495,12 @@ class SummaryService {
       throw new Error(result.error || 'AI生成的内容为空');
     }
 
-    console.log(`✅ ${mode}总结生成完成`);
+    console.log(`✅ 总结生成完成`);
     return result.data;
   }
 
   /**
-   * 计算统计信息
+   * 8. 计算统计信息
    */
   private async calculateStats(
     newsData: any,
@@ -478,7 +549,7 @@ class SummaryService {
   }
 
   /**
-   * 处理通知发送
+   * 9. 处理通知发送
    */
   private async handleNotification(
     sendNotification: boolean,
@@ -493,7 +564,7 @@ class SummaryService {
   }
 
   /**
-   * 创建成功结果
+   * 10. 创建成功结果
    */
   private createSuccessResult(
     timeRangeDesc: string,
@@ -501,13 +572,11 @@ class SummaryService {
     end: moment.Moment,
     newsData: any,
     summaryContent: string,
-    stats: any,
-    enhanced: boolean = false
+    stats: any
   ): SummaryResult {
-    const mode = enhanced ? '增强模式' : '基础模式';
     return {
       success: true,
-      message: `新闻总结生成完成（${mode}）`,
+      message: `新闻总结生成完成`,
       period: timeRangeDesc,
       timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
       data: {
