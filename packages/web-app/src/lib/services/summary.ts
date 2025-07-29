@@ -41,7 +41,7 @@ class SummaryService {
 
       const timeRangeDesc = this.formatPeriod(start, end);
       console.log(`开始生成新闻总结: ${timeRangeDesc}`);
-      console.log(`🚀 启用实体增强功能: 图谱关联分析 + 历史新闻背景`);
+      console.log(`🚀 启用实体增强功能: 图谱关联分析 + 历史新闻`);
 
       // 1. 获取指定时间的新闻
       const newsData = await this.getNewsInTimeRange(start, end);
@@ -64,7 +64,7 @@ class SummaryService {
         enhanced = false;
       } else {
         console.log('找到有效实体，使用增强模式生成总结');
-        // 增强模式：构建包含历史背景的新闻内容
+        // 增强模式：构建包含历史的新闻内容
 
         // 3. 查询出每个实体对应的历史新闻
         allHistoricalNews = await this.getHistoricalNewsForEntities(allEntities, start);
@@ -327,7 +327,7 @@ class SummaryService {
       return {};
     }
 
-    console.log(`🤖 开始为 ${entities.length} 个实体生成历史背景总结...`);
+    console.log(`🤖 开始为 ${entities.length} 个实体生成历史新闻总结...`);
 
     // 按实体分组历史新闻
     const entityHistoricalNews: Record<string, any[]> = {};
@@ -352,19 +352,19 @@ class SummaryService {
       entities
     );
 
-    console.log(`实体总结完成，成功生成 ${Object.keys(entitySummaries).length} 个实体的历史背景`);
+    console.log(`实体总结完成，成功生成 ${Object.keys(entitySummaries).length} 个实体的历史新闻`);
     return entitySummaries;
   }
 
   /**
-   * 5. 为新闻关联历史背景
+   * 5. 为新闻关联历史新闻
    */
   private async enrichNewsWithHistoricalContext(
     newsItems: any[],
     allEntities: any[],
     entitySummaries: Record<string, string>
   ): Promise<string> {
-    console.log(`📝 开始为 ${newsItems.length} 条新闻关联历史背景...`);
+    console.log(`📝 开始为 ${newsItems.length} 条新闻关联历史新闻...`);
 
     const groupedNews = this.groupNewsByLevel(newsItems);
 
@@ -383,7 +383,7 @@ class SummaryService {
           const entityList = newsEntities.map((e: any) => `${e.name}(${e.type})`).join('、');
           newsText += `\n关联实体：${entityList}`;
 
-          // 获取相关的历史背景
+          // 获取相关的历史新闻
           const relatedSummaries = newsEntities
             .map((entity: any) => entitySummaries[entity.name])
             .filter(Boolean);
@@ -393,7 +393,7 @@ class SummaryService {
               .filter((entity: any) => entitySummaries[entity.name])
               .map((entity: any) => `${entity.name}: ${entitySummaries[entity.name]}`)
               .join('；');
-            newsText += `\n历史背景：${historicalSummary}`;
+            newsText += `\n[历史：${historicalSummary}]`;
           }
         }
 
@@ -414,7 +414,7 @@ class SummaryService {
     const mode = enhanced ? '增强模式' : '基础模式';
     console.log(`🎯 开始生成新闻总结 (${mode})...`);
 
-    const systemPrompt = this.getSystemPrompt(enhanced);
+    const systemPrompt = this.getSystemPrompt();
     const userPrompt = `新闻内容：\n\n${newsContent}`;
     const messages = createMessages(systemPrompt, userPrompt);
 
@@ -471,7 +471,7 @@ class SummaryService {
     };
 
     console.log(
-      `📊 统计完成: ${stats.total_entities_found}个实体, ${stats.total_historical_news}条历史新闻, ${stats.news_with_entities}条新闻有实体, ${stats.news_with_historical_context}条新闻有历史背景`
+      `📊 统计完成: ${stats.total_entities_found}个实体, ${stats.total_historical_news}条历史新闻, ${stats.news_with_entities}条新闻有实体, ${stats.news_with_historical_context}条新闻有历史新闻`
     );
 
     return stats;
@@ -524,9 +524,9 @@ class SummaryService {
   }
 
   /**
-   * 获取统一的系统提示词
+   * 获取统一的系统提示词（历史背景信息改为“行内 [历史：……]”写法）
    */
-  private getSystemPrompt(enhanced: boolean = false): string {
+  private getSystemPrompt(): string {
     const basePrompt = `You are "宏观‑量化快讯引擎", an LLM that converts raw multilingual financial headlines into an actionable Markdown briefing for global portfolio managers and economists.
 
 ############################################################
@@ -538,106 +538,71 @@ class SummaryService {
 | Scope Tier | 定义 | 典型示例 |
 |------------|------|----------|
 | **宏观政策/系统风险** | 任一央行/财政部决议、主权违约、G‑20 / IMF / 世行决策，或关键宏观指标（GDP、CPI、PMI、失业率等） | 欧央行加息；土耳其通胀爆表 |
-| **跨市场价格冲击** | 股、债、汇、期货、商品等当日波动 ≥ ±1 σ 或异常成交/资金流 | 原油⏫5%、比特币⏬8% |
+| **跨市场价格冲击** | 股、债、汇、期货、商品等当日波动 ≥ ±1 σ 或异常成交/资金流 | 原油⏫5%、比特币⏬8% |
 | **行业／主题驱动** | 行业政策、供需冲击、跨国监管文件、重大并购、集体涨跌 | 全球半导体补贴法案 |
-| **大型主体事件** | 全球前 100 市值公司、G‑SIB、AAA/AA 主权或机构债信变动、IPO > 10 亿美元 | 台积电财报；沙特阿美配股 |
+| **大型主体事件** | 全球前 100 市值公司、G‑SIB、AAA/AA 主权或机构债信变动、IPO > 10 亿美元 | 台积电财报；沙特阿美配股 |
 | **一般公司／区域新闻** | 中小市值公司、地方经济、社会/科技/民生资讯 | 手机品牌新品发布 |
 
 > **同级别不同国家事件一律平等排序**。
 
 ############################################################
 ◆ 二、聚合与去重  
-- 同主题多条 → 合并，保留最大冲击数字 & 最新时间，用 *(截至 HH:MM)*。  
+- 同主题多条 → 合并，保留最大冲击数字 & 最新时间，用 *(截至 HH:MM)*。  
 - 删除无新增数据的纯重复。  
 
 ############################################################
 ◆ 三、着重与标记规则  
 - **加粗**：所有数字、指数/品种、机构/公司/人名。  
-- Emoji 方向：▲ 涨；▼ 跌；⏫ 创新高；⏬ 创新低。  
+- Emoji 方向：▲ 涨；▼ 跌；⏫ 创新高；⏬ 创新低。  
 - 颜色：  
   • ⬆︎涨幅 / 利好 → <span style="color:#16a34a">…</span>  
   • ⬇︎跌幅 / 利空 → <span style="color:#dc2626">…</span>  
   (宏观中性或日期、时间无需上色)`;
 
-    const historicalSection = enhanced
-      ? `
-
-############################################################
-◆ 四、历史背景关联处理
-每条新闻都包含"历史背景"信息，请：
-1. 根据历史背景信息判断当前事件的重要性
-2. 在分类时考虑历史发展趋势
-3. 在"### 历史背景"部分总结关键脉络
-4. 历史背景信息格式：实体名称: 相关历史事件`
-      : '';
-
     const outputTemplate = `
 
 ############################################################
-◆ ${enhanced ? '五' : '四'}、Markdown 输出模板  
+◆ 四、Markdown 输出模板  
 ### 概览  
-一句 ≤ 25 字，高亮 **方向 + 关键数字/事件**。  
+一句 ≤ 25 字，高亮 **方向 + 关键数字/事件**。  
 
 ### N级新闻(N数值大的排最前；若存在)  
-- **…** *(HH:MM)*  
+- **…** *(HH:MM)* [历史：…]  
 - …  
 
 ### 宏观政策 / 系统风险  
-- **…** *(HH:MM)*  
+- **…** *(HH:MM)* [历史：…]  
 - …  
 
 ### 跨市场价格冲击  
-- **…** *(HH:MM)*  
+- **…** *(HH:MM)* [历史：…]  
 - …  
 
 ### 行业 / 主题  
-- **…** *(HH:MM)*  
+- **…** *(HH:MM)* [历史：…]  
 - …  
 
 ### 大型主体事件  
-- **…** *(HH:MM)*  
+- **…** *(HH:MM)* [历史：…]  
 - …  
 
 ### 其他  
-- **…** *(HH:MM)*  
-- …  ${
-      enhanced
-        ? `
+- **…** *(HH:MM)* [历史：…]  
+- …  `;
 
-### 历史背景
-- **实体名称**关键发展脉络或趋势变化
-- **相关主体**重要历史节点或背景信息`
-        : ''
-    }
+    const hardRules = `
 
 ############################################################
-◆ ${enhanced ? '六' : '五'}、硬性排版规范
+◆ 五、硬性排版规范
 
-* 列表符统一 - ；每条 ≤ 40 字，仅陈述事实。
-* 时间统一用 *斜体(HH:MM)*；跨日则 *YYYY‑MM‑DD HH:MM*。
-* **数字原样输出**（不转中文大写、不加千位分隔符）。
-* 若某分段无内容，则整段省略。${
-      enhanced
-        ? `
-* **历史背景部分**：每条 ≤ 30 字，突出关键发展脉络，不需要时间标记。`
-        : ''
-    }
+* 列表符统一 - ；每条 ≤ 40 字，仅陈述事实。  
+* 时间统一用 *斜体(HH:MM)*；跨日则 *YYYY‑MM‑DD HH:MM*。  
+* **数字原样输出**（不转中文大写、不加千位分隔符）。  
+* 若某分段无内容，则整段省略。  
+* **若该条新闻含历史背景，则正文后紧跟 [历史：关键脉络 ≤ 30 字]；无历史信息时省略方括号。**  
 * 全文中文；除模板 Emoji 与标、颜色签外不加其他装饰；禁止评论、预测或情绪化字眼。`;
 
-    const enhancedRequirements = enhanced
-      ? `
-
-############################################################
-◆ 七、历史背景输出要求
-
-1. 从输入的新闻历史背景信息中提取关键脉络
-2. 按实体类型归类相关历史信息
-3. 突出与当前新闻最相关的历史发展趋势
-4. 每条历史背景信息控制在30字以内
-5. 使用格式：**实体名称**相关历史发展描述`
-      : '';
-
-    return basePrompt + historicalSection + outputTemplate + enhancedRequirements;
+    return basePrompt + outputTemplate + hardRules;
   }
 
   /**
