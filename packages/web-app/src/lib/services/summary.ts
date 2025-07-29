@@ -1,4 +1,5 @@
 import moment from 'moment-timezone';
+import { TimeZoneUtils } from '../utils/timezone';
 import { queryService } from './query';
 import { notificationService } from './notification';
 import { neo4jNewsService } from '../neo4j';
@@ -74,7 +75,8 @@ class SummaryService {
           const entities = await this.getNewsEntities(newsItem.newsId);
 
           // 3.2 查询实体相关的历史新闻
-          const newsTimestamp = moment(newsItem.timestamp * 1000);
+          // newsItem.timestamp 是 ISO 字符串格式，如 '2025-07-29T07:00:53.000Z'
+          const newsTimestamp = moment(newsItem.timestamp);
           const historicalNews = await this.getEntityHistoricalNews(entities, newsTimestamp);
 
           // 3.3 对历史新闻进行总结
@@ -259,7 +261,7 @@ class SummaryService {
 
       const historicalContent = sortedNews
         .map(news => {
-          const timeStr = moment(news.timestamp).tz('Asia/Shanghai').format('MM-DD HH:mm');
+          const timeStr = TimeZoneUtils.formatBeijingTime(news.timestamp, 'MM-DD HH:mm');
           return `[${timeStr}] ${news.title}\n${news.content || ''}\n`;
         })
         .join('\n');
@@ -507,55 +509,6 @@ ${historicalContext}
     }
 
     return basePrompt;
-  }
-
-  /**
-   * 测试增强功能 - 获取单条新闻的实体和历史背景
-   */
-  async testEnhancedFeatures(newsId: string): Promise<any> {
-    try {
-      console.log(`🧪 测试新闻 ${newsId} 的增强功能`);
-
-      // 获取实体
-      const entities = await this.getNewsEntities(newsId);
-      console.log(
-        `发现 ${entities.length} 个实体:`,
-        entities.map(e => `${e.name}(${e.type})`)
-      );
-
-      if (entities.length > 0) {
-        // 查询历史新闻
-        const currentTime = moment();
-        const historicalNews = await this.getEntityHistoricalNews(entities, currentTime);
-        console.log(`找到 ${historicalNews.length} 条历史相关新闻`);
-
-        // 生成历史总结
-        const historicalSummary = await this.summarizeHistoricalNews(historicalNews);
-        console.log('历史总结:', historicalSummary);
-
-        return {
-          success: true,
-          newsId,
-          entities,
-          historicalNewsCount: historicalNews.length,
-          historicalSummary,
-          historicalNews: historicalNews.slice(0, 5), // 返回前5条作为示例
-        };
-      } else {
-        return {
-          success: true,
-          newsId,
-          message: '该新闻没有找到关联实体',
-        };
-      }
-    } catch (error: any) {
-      console.error('测试增强功能失败:', error);
-      return {
-        success: false,
-        error: error.message,
-        newsId,
-      };
-    }
   }
 }
 
