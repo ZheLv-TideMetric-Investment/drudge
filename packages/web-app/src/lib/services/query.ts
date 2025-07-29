@@ -1,590 +1,63 @@
-import { neo4jService } from './neo4j';
-import moment from 'moment-timezone';
-import { 
-  EventLevel, 
-  NodeType, 
-  SystemRelationshipType, 
-  RelationshipType,
-  UrgencyLevel 
-} from '../../../constants/enums';
+import { tzNews, tzEntities, tzGraph } from '../neo4j/timezone-wrapper';
+import { TimeZoneUtils } from '../utils/timezone';
 
 /**
- * 将北京时间转换为UTC时间用于数据库查询
- * @param beijingTime 北京时间字符串（ISO格式或moment对象）
- * @returns UTC时间字符串
- */
-function convertBeijingToUTC(beijingTime: string | moment.Moment): string {
-  let time: moment.Moment;
-  
-  if (typeof beijingTime === 'string') {
-    // 如果输入是字符串，先解析为moment对象
-    // 如果包含时区信息就直接解析，否则假定为北京时间
-    if (beijingTime.includes('+') || beijingTime.includes('Z')) {
-      time = moment(beijingTime);
-    } else {
-      time = moment.tz(beijingTime, 'Asia/Shanghai');
-    }
-  } else {
-    time = beijingTime;
-  }
-  
-  // 转换为UTC时间
-  return time.utc().toISOString();
-}
-
-/**
- * 查询服务
- * 提供从 Neo4j 数据库查询数据的方法
+ * 查询服务 - 使用时区感知的Neo4j服务
+ * 提供高级查询功能，自动处理时区转换
  */
 class QueryService {
-  neo4j = neo4jService;
-
   /**
-   * 获取时间范围内的新闻数据（通用方法）
-   */
-  private async getNewsInTimeRange(startTime: string, endTime: string): Promise<any> {
-    try {
-      // 转换北京时间为UTC时间查询数据库
-      const utcStartTime = convertBeijingToUTC(startTime);
-      const utcEndTime = convertBeijingToUTC(endTime);
-      
-      console.log(`[QueryService] 时间查询: 输入时间 ${startTime} - ${endTime} -> 数据库查询 ${utcStartTime} - ${utcEndTime}`);
-      
-      const cypher = `
-        MATCH (n:${NodeType.NEWS})
-        WHERE n.timestamp >= $startTime AND n.timestamp <= $endTime
-        OPTIONAL MATCH (n)-[:${SystemRelationshipType.DESCRIBES}]->(e:${NodeType.EVENT})
-        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(c:${NodeType.COMPANY})
-        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(p:${NodeType.PERSON})
-        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(o:${NodeType.ORGANIZATION})
-        OPTIONAL MATCH (e)-[:${SystemRelationshipType.LOCATED_AT}]->(l:${NodeType.LOCATION})
-        
-        RETURN 
-          count(DISTINCT n) as news_count,
-          count(DISTINCT e) as event_count,
-          sum(CASE WHEN n.news_level = '${EventLevel.LEVEL_1}' THEN 1 ELSE 0 END) as high_level_count,
-          sum(CASE WHEN n.news_level = '${EventLevel.LEVEL_1}' THEN 1 ELSE 0 END) as critical_count,
-          collect(DISTINCT c.company_name) as companies,
-          collect(DISTINCT p.person_name) as persons,
-          collect(DISTINCT o.organization_name) as organizations,
-          collect(DISTINCT l.location_name) as locations,
-          collect({
-            newsId: n.id,
-            title: n.title,
-            content: n.content,
-            level: n.news_level,
-            timestamp: n.timestamp
-          }) as news_items
-      `;
-
-      const result = await this.neo4j.executeQuery(cypher, {
-        startTime: utcStartTime,
-        endTime: utcEndTime
-      });
-
-      if (result.records.length === 0) {
-        return {
-          news_count: 0,
-          event_count: 0,
-          high_level_count: 0,
-          critical_count: 0,
-          companies: [],
-          persons: [],
-          organizations: [],
-          locations: [],
-          news_items: []
-        };
-      }
-
-      const record = result.records[0];
-      return {
-        news_count: record.get('news_count').toNumber(),
-        event_count: record.get('event_count').toNumber(),
-        high_level_count: record.get('high_level_count').toNumber(),
-        critical_count: record.get('critical_count').toNumber(),
-        companies: record.get('companies').filter(Boolean),
-        persons: record.get('persons').filter(Boolean),
-        organizations: record.get('organizations').filter(Boolean),
-        locations: record.get('locations').filter(Boolean),
-        news_items: record.get('news_items').filter((item: any) => item.title)
-      };
-    } catch (error: any) {
-      console.error('获取新闻数据失败:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * 获取小时总结数据
+   * 获取时间段总结数据
+   * @param startTime 开始时间（北京时间）
+   * @param endTime 结束时间（北京时间）
    */
   async getHourlySummary(startTime: string, endTime: string): Promise<any> {
-    return this.getNewsInTimeRange(startTime, endTime);
+    return await tzNews.getNewsInTimeRange(startTime, endTime);
   }
 
   /**
-   * 获取 Level 1 新闻
+   * 获取高级别新闻
+   * @param startTime 开始时间（北京时间）
+   * @param endTime 结束时间（北京时间）
    */
   async getHighLevelNews(startTime: string, endTime: string): Promise<any[]> {
-    try {
-      // 转换北京时间为UTC时间查询数据库
-      const utcStartTime = convertBeijingToUTC(startTime);
-      const utcEndTime = convertBeijingToUTC(endTime);
-      
-      console.log(`[QueryService] Level 1 新闻查询: 输入时间 ${startTime} - ${endTime} -> 数据库查询 ${utcStartTime} - ${utcEndTime}`);
-      
-      const cypher = `
-        MATCH (n:${NodeType.NEWS})
-        WHERE n.timestamp >= $startTime 
-          AND n.timestamp <= $endTime
-          AND n.news_level = '${EventLevel.LEVEL_1}'
-        OPTIONAL MATCH (n)-[:${SystemRelationshipType.DESCRIBES}]->(e:${NodeType.EVENT})
-        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(c:${NodeType.COMPANY})
-        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(p:${NodeType.PERSON})
-        OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(o:${NodeType.ORGANIZATION})
-        RETURN 
-          n.id as newsId,
-          n.title as title,
-          n.content as content,
-          n.news_level as level,
-          n.timestamp as timestamp,
-          n.source as source,
-          n.url as url,
-          collect(DISTINCT c.company_name) as companies,
-          collect(DISTINCT p.person_name) as persons,
-          collect(DISTINCT o.organization_name) as organizations,
-          collect(DISTINCT e.event_name) as events,
-          collect(DISTINCT e.event_level) as event_levels
-        ORDER BY n.timestamp DESC
-      `;
-
-      const result = await this.neo4j.executeQuery(cypher, {
-        startTime: utcStartTime,
-        endTime: utcEndTime
-      });
-
-      return result.records.map((record: any) => {
-        const eventLevels = record.get('event_levels').filter(Boolean);
-        const hasUrgentEvent = eventLevels.includes(EventLevel.LEVEL_1);
-        
-        return {
-          newsId: record.get('newsId'),
-          title: record.get('title'),
-          content: record.get('content'),
-          level: record.get('level'),
-          timestamp: record.get('timestamp'),
-          source: record.get('source'),
-          url: record.get('url'),
-          companies: record.get('companies').filter(Boolean),
-          persons: record.get('persons').filter(Boolean),
-          organizations: record.get('organizations').filter(Boolean),
-          events: record.get('events').filter(Boolean),
-          event_levels: eventLevels,
-          urgency: hasUrgentEvent ? UrgencyLevel.CRITICAL : record.get('level') === EventLevel.LEVEL_1 ? UrgencyLevel.HIGH : UrgencyLevel.MEDIUM
-        };
-      });
-    } catch (error: any) {
-      console.error('获取 Level 1 新闻失败:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * 获取每日新闻数据
-   */
-  async getDailyNewsData(startTime: string, endTime: string): Promise<any> {
-    return this.getNewsInTimeRange(startTime, endTime);
+    return await tzNews.getHighLevelNews(startTime, endTime);
   }
 
   /**
    * 搜索实体
+   * @param searchTerm 搜索词
+   * @param nodeType 节点类型
+   * @param limit 限制数量
    */
   async searchEntities(searchTerm: string, nodeType?: string, limit: number = 20): Promise<any[]> {
-    try {
-      const hasSearchTerm = searchTerm && searchTerm.trim() !== '';
-      
-      // 如果指定了节点类型，只搜索该类型
-      if (nodeType) {
-        let cypher: string;
-        
-        switch (nodeType.toLowerCase()) {
-          case 'company':
-            cypher = hasSearchTerm ? `
-              MATCH (c:Company)
-              WHERE c.company_name CONTAINS $searchTerm
-              OPTIONAL MATCH (c)-[r]-()
-              RETURN c as entity, 'Company' as type, c.company_name as name, count(r) as connections
-              ORDER BY connections DESC, c.company_name
-              LIMIT $limit
-            ` : `
-              MATCH (c:Company)
-              OPTIONAL MATCH (c)-[r]-()
-              RETURN c as entity, 'Company' as type, c.company_name as name, count(r) as connections
-              ORDER BY connections DESC, c.company_name
-              LIMIT $limit
-            `;
-            break;
-            
-          case 'organization':
-            cypher = hasSearchTerm ? `
-              MATCH (o:Organization)
-              WHERE o.organization_name CONTAINS $searchTerm
-              OPTIONAL MATCH (o)-[r]-()
-              RETURN o as entity, 'Organization' as type, o.organization_name as name, count(r) as connections
-              ORDER BY connections DESC, o.organization_name
-              LIMIT $limit
-            ` : `
-              MATCH (o:Organization)
-              OPTIONAL MATCH (o)-[r]-()
-              RETURN o as entity, 'Organization' as type, o.organization_name as name, count(r) as connections
-              ORDER BY connections DESC, o.organization_name
-              LIMIT $limit
-            `;
-            break;
-            
-          case 'person':
-            cypher = hasSearchTerm ? `
-              MATCH (p:Person)
-              WHERE p.person_name CONTAINS $searchTerm
-              OPTIONAL MATCH (p)-[r]-()
-              RETURN p as entity, 'Person' as type, p.person_name as name, count(r) as connections
-              ORDER BY connections DESC, p.person_name
-              LIMIT $limit
-            ` : `
-              MATCH (p:Person)
-              OPTIONAL MATCH (p)-[r]-()
-              RETURN p as entity, 'Person' as type, p.person_name as name, count(r) as connections
-              ORDER BY connections DESC, p.person_name
-              LIMIT $limit
-            `;
-            break;
-            
-          case 'location':
-            cypher = hasSearchTerm ? `
-              MATCH (l:Location)
-              WHERE l.location_name CONTAINS $searchTerm
-              OPTIONAL MATCH (l)-[r]-()
-              RETURN l as entity, 'Location' as type, l.location_name as name, count(r) as connections
-              ORDER BY connections DESC, l.location_name
-              LIMIT $limit
-            ` : `
-              MATCH (l:Location)
-              OPTIONAL MATCH (l)-[r]-()
-              RETURN l as entity, 'Location' as type, l.location_name as name, count(r) as connections
-              ORDER BY connections DESC, l.location_name
-              LIMIT $limit
-            `;
-            break;
-            
-          case 'event':
-            cypher = hasSearchTerm ? `
-              MATCH (e:Event)
-              WHERE e.event_name CONTAINS $searchTerm OR e.event_description CONTAINS $searchTerm
-              OPTIONAL MATCH (e)-[r]-()
-              RETURN e as entity, 'Event' as type, e.event_name as name, count(r) as connections
-              ORDER BY connections DESC, e.event_name
-              LIMIT $limit
-            ` : `
-              MATCH (e:Event)
-              OPTIONAL MATCH (e)-[r]-()
-              RETURN e as entity, 'Event' as type, e.event_name as name, count(r) as connections
-              ORDER BY connections DESC, e.event_name
-              LIMIT $limit
-            `;
-            break;
-            
-          default:
-            throw new Error(`不支持的节点类型: ${nodeType}`);
-        }
-        
-        const queryParams = hasSearchTerm ? { searchTerm, limit } : { limit };
-        
-        const result = await this.neo4j.executeQuery(cypher, queryParams);
-        
-        const mappedResults = result.records.map((record: { get: (key: string) => any }) => {
-          const entityNode = record.get('entity');
-          return {
-            entity: {
-              id: entityNode.identity.toString(),
-              name: record.get('name'),
-              type: record.get('type'),
-              properties: entityNode.properties,
-              connections: record.get('connections').toNumber()
-            },
-            type: record.get('type'),
-            name: record.get('name'),
-            connections: record.get('connections').toNumber()
-          };
-        });
-        
-
-        
-        return mappedResults;
-      }
-      
-      // 没有指定节点类型，搜索所有类型
-      const results: any[] = [];
-      
-      // 搜索公司
-      const companyCypher = hasSearchTerm ? `
-        MATCH (c:Company)
-        WHERE c.company_name CONTAINS $searchTerm
-        OPTIONAL MATCH (c)-[r]-()
-        RETURN c as entity, 'Company' as type, c.company_name as name, count(r) as connections
-        ORDER BY connections DESC, c.company_name
-        LIMIT $limit
-      ` : `
-        MATCH (c:Company)
-        OPTIONAL MATCH (c)-[r]-()
-        RETURN c as entity, 'Company' as type, c.company_name as name, count(r) as connections
-        ORDER BY connections DESC, c.company_name
-        LIMIT $limit
-      `;
-      
-      // 搜索组织
-      const orgCypher = hasSearchTerm ? `
-        MATCH (o:Organization)
-        WHERE o.organization_name CONTAINS $searchTerm
-        OPTIONAL MATCH (o)-[r]-()
-        RETURN o as entity, 'Organization' as type, o.organization_name as name, count(r) as connections
-        ORDER BY connections DESC, o.organization_name
-        LIMIT $limit
-      ` : `
-        MATCH (o:Organization)
-        OPTIONAL MATCH (o)-[r]-()
-        RETURN o as entity, 'Organization' as type, o.organization_name as name, count(r) as connections
-        ORDER BY connections DESC, o.organization_name
-        LIMIT $limit
-      `;
-      
-      // 搜索人物
-      const personCypher = hasSearchTerm ? `
-        MATCH (p:Person)
-        WHERE p.person_name CONTAINS $searchTerm
-        OPTIONAL MATCH (p)-[r]-()
-        RETURN p as entity, 'Person' as type, p.person_name as name, count(r) as connections
-        ORDER BY connections DESC, p.person_name
-        LIMIT $limit
-      ` : `
-        MATCH (p:Person)
-        OPTIONAL MATCH (p)-[r]-()
-        RETURN p as entity, 'Person' as type, p.person_name as name, count(r) as connections
-        ORDER BY connections DESC, p.person_name
-        LIMIT $limit
-      `;
-      
-      // 搜索地点
-      const locationCypher = hasSearchTerm ? `
-        MATCH (l:Location)
-        WHERE l.location_name CONTAINS $searchTerm
-        OPTIONAL MATCH (l)-[r]-()
-        RETURN l as entity, 'Location' as type, l.location_name as name, count(r) as connections
-        ORDER BY connections DESC, l.location_name
-        LIMIT $limit
-      ` : `
-        MATCH (l:Location)
-        OPTIONAL MATCH (l)-[r]-()
-        RETURN l as entity, 'Location' as type, l.location_name as name, count(r) as connections
-        ORDER BY connections DESC, l.location_name
-        LIMIT $limit
-      `;
-      
-      // 搜索事件
-      const eventCypher = hasSearchTerm ? `
-        MATCH (e:Event)
-        WHERE e.event_name CONTAINS $searchTerm OR e.event_description CONTAINS $searchTerm
-        OPTIONAL MATCH (e)-[r]-()
-        RETURN e as entity, 'Event' as type, e.event_name as name, count(r) as connections
-        ORDER BY connections DESC, e.event_name
-        LIMIT $limit
-      ` : `
-        MATCH (e:Event)
-        OPTIONAL MATCH (e)-[r]-()
-        RETURN e as entity, 'Event' as type, e.event_name as name, count(r) as connections
-        ORDER BY connections DESC, e.event_name
-        LIMIT $limit
-      `;
-
-      const queryParams = hasSearchTerm ? { searchTerm, limit } : { limit };
-      
-      // 逐个执行查询并处理错误
-      const queries = [
-        { name: 'company', cypher: companyCypher },
-        { name: 'organization', cypher: orgCypher },
-        { name: 'person', cypher: personCypher },
-        { name: 'location', cypher: locationCypher },
-        { name: 'event', cypher: eventCypher }
-      ];
-      
-      for (const query of queries) {
-        try {
-          const result = await this.neo4j.executeQuery(query.cypher, queryParams);
-          result.records.forEach((record: { get: (key: string) => any }) => {
-            const entityNode = record.get('entity');
-            results.push({
-              entity: {
-                id: entityNode.identity.toString(),
-                name: record.get('name'),
-                type: record.get('type'),
-                properties: entityNode.properties,
-                connections: record.get('connections').toNumber()
-              },
-              type: record.get('type'),
-              name: record.get('name'),
-              connections: record.get('connections').toNumber()
-            });
-          });
-        } catch (error) {
-          console.error(`查询 ${query.name} 失败:`, error);
-          // 继续执行其他查询
-        }
-      }
-      
-      // 按连接数排序并限制结果数量
-      return results
-        .sort((a, b) => b.connections - a.connections)
-        .slice(0, limit);
-        
-    } catch (error: any) {
-      console.error('搜索实体失败:', error);
-      throw error;
-    }
+    return await tzEntities.searchEntities(searchTerm, nodeType, limit);
   }
 
   /**
    * 获取图谱数据
+   * @param query 查询条件
+   * @param limit 限制数量
    */
   async getGraphData(query?: string, limit: number = 100): Promise<any> {
-    try {
-      let cypher: string;
-      let parameters: any = { limit };
-
-      if (query) {
-        // 有查询条件时，搜索相关节点和关系
-        cypher = `
-          CALL {
-            MATCH (n)
-            WHERE ANY(prop IN keys(n) WHERE toString(n[prop]) CONTAINS $query)
-            RETURN n
-            UNION
-            MATCH (n)-[r]->(m)
-            WHERE ANY(prop IN keys(r) WHERE toString(r[prop]) CONTAINS $query)
-            RETURN n
-            UNION
-            MATCH (n)<-[r]-(m)
-            WHERE ANY(prop IN keys(r) WHERE toString(r[prop]) CONTAINS $query)
-            RETURN n
-          }
-          WITH DISTINCT n
-          MATCH (n)-[r]-(m)
-          RETURN n, r, m
-          LIMIT $limit
-        `;
-        parameters.query = query;
-      } else {
-        // 无查询条件时，返回基本的图谱概览
-        cypher = `
-          MATCH (n)-[r]-(m)
-          RETURN n, r, m
-          ORDER BY rand()
-          LIMIT $limit
-        `;
-      }
-
-      const result = await this.neo4j.executeQuery(cypher, parameters);
-
-      const nodes = new Map();
-      const edges: any[] = [];
-
-      result.records.forEach((record: any) => {
-        const n = record.get('n');
-        const r = record.get('r');
-        const m = record.get('m');
-
-        // 添加节点
-        if (!nodes.has(n.identity.toString())) {
-          nodes.set(n.identity.toString(), {
-            id: n.identity.toString(),
-            name: this.getNodeName(n),
-            type: n.labels[0],
-            properties: n.properties
-          });
-        }
-
-        if (!nodes.has(m.identity.toString())) {
-          nodes.set(m.identity.toString(), {
-            id: m.identity.toString(),
-            name: this.getNodeName(m),
-            type: m.labels[0],
-            properties: m.properties
-          });
-        }
-
-        // 添加边
-        edges.push({
-          id: r.identity.toString(),
-          source: r.start.toString(),
-          target: r.end.toString(),
-          type: r.type,
-          properties: r.properties
-        });
-      });
-
-      return {
-        nodes: Array.from(nodes.values()),
-        edges
-      };
-    } catch (error: any) {
-      console.error('获取图谱数据失败:', error);
-      throw error;
-    }
+    return await tzGraph.getGraphStats();
   }
-
-  /**
-   * 获取节点名称
-   */
-  private getNodeName(node: any): string {
-    const props = node.properties;
-    if (props.company_name) return props.company_name;
-    if (props.person_name) return props.person_name;
-    if (props.organization_name) return props.organization_name;
-    if (props.location_name) return props.location_name;
-    if (props.event_name) return props.event_name;
-    if (props.title) return props.title;
-    if (props.name) return props.name;
-    return node.labels[0] || 'Unknown';
-  }
-
-
 }
 
-// 导出查询服务实例
-export const queryService = new QueryService();
+/**
+ * 时间转换工具函数（使用新的TimeZoneUtils）
+ * @deprecated 建议直接使用 TimeZoneUtils 中的方法
+ */
+export function convertBeijingToUTC(beijingTimeStr: string): string {
+  return TimeZoneUtils.toUTC(beijingTimeStr);
+}
 
 /**
- * 时区转换测试函数（开发调试用）
+ * @deprecated 建议直接使用 TimeZoneUtils 中的方法
  */
-export function testTimezoneConversion() {
-  console.log('=== 时区转换测试 ===');
-  
-  // 测试1: 北京时间字符串（包含时区）
-  const beijingTimeWithTz = '2025-01-16T14:00:00.000+08:00';
-  const utc1 = convertBeijingToUTC(beijingTimeWithTz);
-  console.log(`北京时间 ${beijingTimeWithTz} -> UTC ${utc1}`);
-  
-  // 测试2: UTC时间字符串
-  const utcTime = '2025-01-16T06:00:00.000Z';
-  const utc2 = convertBeijingToUTC(utcTime);
-  console.log(`UTC时间 ${utcTime} -> UTC ${utc2}`);
-  
-  // 测试3: 无时区信息的字符串（假定北京时间）
-  const noTzTime = '2025-01-16T14:00:00.000';
-  const utc3 = convertBeijingToUTC(noTzTime);
-  console.log(`无时区时间 ${noTzTime} -> UTC ${utc3}`);
-  
-  // 测试4: moment对象
-  const momentObj = moment.tz('2025-01-16T14:00:00', 'Asia/Shanghai');
-  const utc4 = convertBeijingToUTC(momentObj);
-  console.log(`Moment对象 ${momentObj.toISOString()} -> UTC ${utc4}`);
-  
-  console.log('=== 测试完成 ===');
-} 
+export function convertUTCToBeijing(utcTimeStr: string): string {
+  return TimeZoneUtils.toBeijing(utcTimeStr).toISOString();
+}
+
+export const queryService = new QueryService();
+export { QueryService }; 

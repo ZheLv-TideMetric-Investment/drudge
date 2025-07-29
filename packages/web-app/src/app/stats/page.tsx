@@ -77,9 +77,11 @@ interface GraphStatsData {
     organizations: number;
     locations: number;
     events: number;
+    connected: boolean;
   };
   relationshipDistribution: Record<string, number>;
   timeStats: TimeStatsData;
+  timestamp: string;
 }
 
 export default function StatsPage() {
@@ -365,6 +367,64 @@ export default function StatsPage() {
               border: '2px solid var(--newspaper-red)'
             }}
           />
+        </div>
+      </Layout>
+    );
+  }
+
+  // 如果没有数据或数据不完整，显示加载状态
+  if (!data || !data.overview) {
+    return (
+      <Layout>
+        <div className="newspaper-page" style={{ padding: '24px' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '50vh' 
+          }}>
+            <Spin size="large" tip="正在加载统计数据..." />
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // 如果有错误，显示错误状态
+  if (error) {
+    return (
+      <Layout>
+        <div className="newspaper-page" style={{ padding: '24px' }}>
+          <div style={{ 
+            display: 'flex', 
+            flexDirection: 'column',
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '50vh' 
+          }}>
+            <div className="newspaper-title" style={{ 
+              fontSize: '24px', 
+              color: 'var(--newspaper-red)',
+              marginBottom: '16px'
+            }}>
+              ❌ 加载失败
+            </div>
+            <div className="newspaper-body" style={{ 
+              fontSize: '14px',
+              color: 'var(--newspaper-gray)',
+              marginBottom: '24px',
+              textAlign: 'center'
+            }}>
+              {error}
+            </div>
+            <Button 
+              className="newspaper-button"
+              icon={<ReloadOutlined />} 
+              onClick={fetchStats}
+            >
+              重试
+            </Button>
+          </div>
         </div>
       </Layout>
     );

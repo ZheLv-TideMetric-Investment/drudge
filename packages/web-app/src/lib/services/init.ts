@@ -1,4 +1,4 @@
-import { neo4jService } from './neo4j';
+import { neo4jConnection } from '../neo4j';
 import { notificationService } from './notification';
 
 /**
@@ -46,7 +46,7 @@ async function performInitialization(): Promise<void> {
   try {
     // 1. 初始化Neo4j连接
     console.log('正在连接Neo4j数据库...');
-    await neo4jService.connect();
+    await neo4jConnection.connect();
     
     // 2. 初始化通知服务
     console.log('正在初始化通知服务...');
@@ -67,7 +67,7 @@ export async function shutdownServices(): Promise<void> {
   
   try {
     // 关闭Neo4j连接
-    await neo4jService.disconnect();
+    await neo4jConnection.disconnect();
     
     // 注意：通知服务通常不需要特别的关闭操作
     
@@ -103,8 +103,8 @@ export async function healthCheckServices(): Promise<{
   };
 
   try {
-    // 检查Neo4j
-    results.neo4j = await neo4jService.healthCheck();
+    // 检查Neo4j连接状态
+    results.neo4j = neo4jConnection.isConnected();
     
     // 检查通知服务（假设它有健康检查方法，如果没有就默认为true）
     results.notification = true; // 通知服务通常没有复杂的健康检查

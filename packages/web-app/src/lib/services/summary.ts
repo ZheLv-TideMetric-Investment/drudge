@@ -1,6 +1,7 @@
 import moment from 'moment-timezone';
 import { queryService } from './query';
 import { notificationService } from './notification';
+import { neo4jNewsService } from '../neo4j';
 import { SummaryResult } from '../../types/scheduler';
 import { aiService, createMessages } from '../utils/llm';
 import { EventLevel } from '../../../constants/enums';
@@ -8,13 +9,15 @@ import { EventLevel } from '../../../constants/enums';
 /**
  * 总结服务
  * 提供通用的时间区间新闻总结功能（不落库）
+ * 增强功能：基于图谱实体的历史新闻关联分析
  */
 class SummaryService {
+  private newsService = neo4jNewsService;
+
   /**
    * 生成新闻总结
    * @param startTime 开始时间（ISO字符串或moment对象）
    * @param endTime 结束时间（ISO字符串或moment对象）
-   * @param source 调用来源
    * @param sendNotification 是否发送通知，默认为false
    */
   async generateSummary(
@@ -37,6 +40,7 @@ class SummaryService {
 
       const timeRangeDesc = this.formatPeriod(start, end);
       console.log(`开始生成新闻总结: ${timeRangeDesc}`);
+      console.log(`🚀 启用实体增强功能: 图谱关联分析 + 历史新闻背景`);
 
       // 1. 从Neo4j获取时间范围内的新闻数据
       const newsData = await this.getNewsData(start, end);
@@ -60,21 +64,323 @@ class SummaryService {
       // 2. 按级别分组新闻
       const groupedNews = this.groupNewsByLevel(newsData.news_items);
 
-      // 3. 使用AI生成总结
+      // 3. 增强功能：获取新闻的实体信息和历史新闻背景
+      let historicalContext = '';
+      const enhancedNewsItems: any[] = [];
+
+      for (const newsItem of newsData.news_items) {
+        try {
+          // 3.1 获取新闻的关联实体
+          const entities = await this.getNewsEntities(newsItem.newsId);
+
+          // 3.2 查询实体相关的历史新闻
+          const newsTimestamp = moment(newsItem.timestamp * 1000);
+          const historicalNews = await this.getEntityHistoricalNews(entities, newsTimestamp);
+
+          // 3.3 对历史新闻进行总结
+          const historicalSummary = await this.summarizeHistoricalNews(historicalNews);
+
+          enhancedNewsItems.push({
+            ...newsItem,
+            entities: entities.map((e: any) => ({ name: e.name, type: e.type })),
+            entityCount: entities.length,
+            historicalNewsCount: historicalNews.length,
+            historicalContext: historicalSummary,
+          });
+
+          // 收集所有历史背景信息
+          if (historicalSummary) {
+            historicalContext += `\n【${newsItem.title}】相关历史背景：\n${historicalSummary}\n`;
+          }
+        } catch (error) {
+          console.error(`处理新闻 ${newsItem.newsId} 的实体信息失败:`, error);
+          // 如果处理实体失败，仍然保留原始新闻信息
+          enhancedNewsItems.push(newsItem);
+        }
+      }
+
+      // 4. 使用AI生成增强的总结（包含历史背景）
       const newsContent = Object.entries(groupedNews)
         .map(([level, news]) => {
           const levelContent = news
             .map(item => {
-              return `标题：${item.title}\n内容：${item.content}\n时间：${moment(item.time * 1000)
+              // 查找对应的增强信息
+              const enhancedItem = enhancedNewsItems.find(ei => ei.newsId === item.newsId);
+              let newsText = `标题：${item.title}\n内容：${item.content}\n时间：${moment(
+                item.time * 1000
+              )
                 .tz('Asia/Shanghai')
-                .format('YYYY-MM-DD HH:mm:ss')}\n`;
+                .format('YYYY-MM-DD HH:mm:ss')}`;
+
+              // 添加实体信息
+              if (enhancedItem && enhancedItem.entities && enhancedItem.entities.length > 0) {
+                const entityList = enhancedItem.entities
+                  .map((e: any) => `${e.name}(${e.type})`)
+                  .join('、');
+                newsText += `\n关联实体：${entityList}`;
+              }
+
+              return newsText + '\n';
             })
             .join('\n');
           return `【${level}级新闻】\n${levelContent}`;
         })
         .join('\n\n');
 
-      const systemPrompt = `You are "宏观‑量化快讯引擎", an LLM that converts raw multilingual financial headlines into an actionable Markdown briefing for global portfolio managers and economists.
+      const systemPrompt = this.getEnhancedSystemPrompt(historicalContext);
+
+      const userPrompt = `新闻内容：\n\n${newsContent}`;
+      const messages = createMessages(systemPrompt, userPrompt);
+
+      const result = await aiService.callLLM(messages, {
+        temperature: 0.7,
+      });
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || 'AI生成的内容为空');
+      }
+
+      const summaryContent = result.data;
+
+      // 输出增强功能统计
+      const totalEntities = enhancedNewsItems.reduce(
+        (sum, item) => sum + (item.entityCount || 0),
+        0
+      );
+      const totalHistoricalNews = enhancedNewsItems.reduce(
+        (sum, item) => sum + (item.historicalNewsCount || 0),
+        0
+      );
+      const newsWithContext = enhancedNewsItems.filter(item => item.historicalContext).length;
+
+      console.log(
+        `📊 增强分析完成: 发现${totalEntities}个实体, 关联${totalHistoricalNews}条历史新闻, ${newsWithContext}条新闻有历史背景`
+      );
+
+      // 5. 发送通知（如果需要）
+      if (sendNotification) {
+        await this.sendNotification(summaryContent, start, end, newsData);
+      }
+
+      return {
+        success: true,
+        message: `新闻总结生成完成`,
+        period: timeRangeDesc,
+        timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
+        data: {
+          news_count: newsData.news_count,
+          high_level_count: this.getHighLevelCount(newsData),
+          summary: summaryContent,
+          time_range: {
+            start: start.toISOString(),
+            end: end.toISOString(),
+          },
+          // 增强数据统计
+          enhanced_stats: {
+            total_entities_found: enhancedNewsItems.reduce(
+              (sum, item) => sum + (item.entityCount || 0),
+              0
+            ),
+            total_historical_news: enhancedNewsItems.reduce(
+              (sum, item) => sum + (item.historicalNewsCount || 0),
+              0
+            ),
+            news_with_entities: enhancedNewsItems.filter(item => item.entityCount > 0).length,
+            news_with_historical_context: enhancedNewsItems.filter(item => item.historicalContext)
+              .length,
+            has_historical_context: !!historicalContext.trim(),
+          },
+        },
+      };
+    } catch (error: any) {
+      console.error('生成总结失败:', error);
+      const timeRangeDesc = this.formatPeriod(moment(startTime), moment(endTime));
+      return {
+        success: false,
+        message: `生成新闻总结失败`,
+        period: timeRangeDesc,
+        error: error.message,
+        timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
+      };
+    }
+  }
+
+  /**
+   * 获取新闻数据
+   */
+  private async getNewsData(start: moment.Moment, end: moment.Moment): Promise<any> {
+    // 传递UTC时间给查询服务
+    return await queryService.getHourlySummary(start.toISOString(), end.toISOString());
+  }
+
+  /**
+   * 获取新闻的所有关联实体
+   */
+  private async getNewsEntities(newsId: string): Promise<any[]> {
+    return await this.newsService.getNewsEntities(newsId);
+  }
+
+  /**
+   * 根据实体查询过去一个月的相关新闻
+   */
+  private async getEntityHistoricalNews(
+    entities: any[],
+    currentNewsTimestamp: moment.Moment
+  ): Promise<any[]> {
+    if (entities.length === 0) {
+      return [];
+    }
+
+    // 计算一个月前的时间
+    const oneMonthAgo = moment(currentNewsTimestamp).subtract(1, 'month');
+
+    return await this.newsService.getHistoricalNewsByEntities(
+      entities,
+      oneMonthAgo.toISOString(),
+      currentNewsTimestamp.toISOString()
+    );
+  }
+
+  /**
+   * 使用AI对历史新闻进行总结提取
+   */
+  private async summarizeHistoricalNews(historicalNews: any[]): Promise<string> {
+    try {
+      if (historicalNews.length === 0) {
+        return '';
+      }
+
+      console.log(`开始总结 ${historicalNews.length} 条历史新闻`);
+
+      // 按时间排序并格式化历史新闻
+      const sortedNews = historicalNews
+        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+        .slice(0, 15); // 限制数量避免token过多
+
+      const historicalContent = sortedNews
+        .map(news => {
+          const timeStr = moment(news.timestamp).tz('Asia/Shanghai').format('MM-DD HH:mm');
+          return `[${timeStr}] ${news.title}\n${news.content || ''}\n`;
+        })
+        .join('\n');
+
+      const systemPrompt = `你是一个专业的金融新闻分析师。请对以下历史新闻进行简洁的主题总结，重点关注：
+
+1. 主要事件和趋势的发展脉络
+2. 关键实体（公司、人物、机构）的重要动态
+3. 市场影响和政策变化
+4. 时间线上的重要节点
+
+要求：
+- 用中文回答
+- 按主题分类总结，不要逐条列举
+- 每个主题不超过2-3句话
+- 突出对当前新闻有参考价值的背景信息
+- 总篇幅控制在200字以内`;
+
+      const userPrompt = `历史新闻内容：\n\n${historicalContent}`;
+      const messages = createMessages(systemPrompt, userPrompt);
+
+      const result = await aiService.callLLM(messages, {
+        temperature: 0.7,
+      });
+
+      if (!result.success || !result.data) {
+        console.error('历史新闻总结失败:', result.error);
+        return '';
+      }
+
+      console.log('历史新闻总结完成');
+      return result.data;
+    } catch (error: any) {
+      console.error('总结历史新闻失败:', error);
+      return '';
+    }
+  }
+
+  /**
+   * 按级别分组新闻
+   */
+  private groupNewsByLevel(newsItems: any[]): Record<string, any[]> {
+    const grouped: Record<string, any[]> = {};
+
+    newsItems.forEach(item => {
+      const level = item.level || 'Unknown';
+      if (!grouped[level]) {
+        grouped[level] = [];
+      }
+
+      // 转换时间戳格式
+      const timeValue =
+        typeof item.timestamp === 'number' ? item.timestamp : moment(item.timestamp).unix();
+
+      grouped[level].push({
+        newsId: item.newsId,
+        title: item.title,
+        content: item.content || '',
+        time: timeValue,
+      });
+    });
+
+    return grouped;
+  }
+
+  /**
+   * 发送通知
+   */
+  private async sendNotification(
+    summaryData: string,
+    start: moment.Moment,
+    end: moment.Moment,
+    newsData: any
+  ): Promise<void> {
+    try {
+      // 检查是否有高级别新闻（仅 Level 1）
+      const highLevelNews =
+        newsData.news_items?.filter((item: any) => item.level === EventLevel.LEVEL_1) || [];
+
+      // 有高级别新闻时发送通知
+      await notificationService.sendNormalSummaryNotification(
+        { summary: summaryData },
+        start.toISOString(),
+        end.toISOString(),
+        highLevelNews
+      );
+    } catch (error) {
+      console.error('发送通知失败:', error);
+      // 通知失败不影响总结生成，只记录错误
+    }
+  }
+
+  /**
+   * 获取高级别新闻数量
+   */
+  private getHighLevelCount(newsData: any): number {
+    return (
+      newsData.news_items?.filter((item: any) => item.level === EventLevel.LEVEL_1).length || 0
+    );
+  }
+
+  /**
+   * 格式化时间段 - 显示北京时间
+   */
+  private formatPeriod(start: moment.Moment, end: moment.Moment): string {
+    // 转换为北京时间显示
+    const beijingStart = start.clone().tz('Asia/Shanghai');
+    const beijingEnd = end.clone().tz('Asia/Shanghai');
+
+    if (beijingStart.isSame(beijingEnd, 'day')) {
+      return `${beijingStart.format('MM-DD HH:mm')}-${beijingEnd.format('HH:mm')}`;
+    } else {
+      return `${beijingStart.format('MM-DD HH:mm')}-${beijingEnd.format('MM-DD HH:mm')}`;
+    }
+  }
+
+  /**
+   * 获取增强的系统提示词
+   */
+  private getEnhancedSystemPrompt(historicalContext: string): string {
+    const basePrompt = `You are "宏观‑量化快讯引擎", an LLM that converts raw multilingual financial headlines into an actionable Markdown briefing for global portfolio managers and economists.
 
 ############################################################
 ◆ 一、重要级映射与无地域偏好  
@@ -178,134 +484,77 @@ class SummaryService {
 
 * **京东外卖**午间部分地区出现无人接单 *(13:08)*`;
 
-      const userPrompt = `新闻内容：\n\n${newsContent}`;
-      const messages = createMessages(systemPrompt, userPrompt);
+    // 如果有历史背景信息，则在提示词中加入增强指导
+    if (historicalContext.trim()) {
+      return (
+        basePrompt +
+        `
 
-      const result = await aiService.callLLM(messages, {
-        temperature: 0.7,
-      });
+############################################################
+◆ 七、历史背景信息增强
 
-      if (!result.success || !result.data) {
-        throw new Error(result.error || 'AI生成的内容为空');
+基于图谱分析，以下是相关实体的历史背景信息，请在生成总结时参考这些信息来：
+1. 更好地理解当前新闻的意义和影响
+2. 识别事件发展的趋势和脉络
+3. 突出关键变化和转折点
+4. 提供更准确的市场影响判断
+
+**历史背景参考：**
+${historicalContext}
+
+注意：历史背景仅作为理解参考，不要在最终输出中直接引用或重复历史内容，而是要结合历史信息更准确地分析当前新闻的重要性和影响。`
+      );
+    }
+
+    return basePrompt;
+  }
+
+  /**
+   * 测试增强功能 - 获取单条新闻的实体和历史背景
+   */
+  async testEnhancedFeatures(newsId: string): Promise<any> {
+    try {
+      console.log(`🧪 测试新闻 ${newsId} 的增强功能`);
+
+      // 获取实体
+      const entities = await this.getNewsEntities(newsId);
+      console.log(
+        `发现 ${entities.length} 个实体:`,
+        entities.map(e => `${e.name}(${e.type})`)
+      );
+
+      if (entities.length > 0) {
+        // 查询历史新闻
+        const currentTime = moment();
+        const historicalNews = await this.getEntityHistoricalNews(entities, currentTime);
+        console.log(`找到 ${historicalNews.length} 条历史相关新闻`);
+
+        // 生成历史总结
+        const historicalSummary = await this.summarizeHistoricalNews(historicalNews);
+        console.log('历史总结:', historicalSummary);
+
+        return {
+          success: true,
+          newsId,
+          entities,
+          historicalNewsCount: historicalNews.length,
+          historicalSummary,
+          historicalNews: historicalNews.slice(0, 5), // 返回前5条作为示例
+        };
+      } else {
+        return {
+          success: true,
+          newsId,
+          message: '该新闻没有找到关联实体',
+        };
       }
-
-      const summaryContent = result.data;
-
-      // 4. 发送通知（如果需要）
-      if (sendNotification) {
-        await this.sendNotification(summaryContent, start, end, newsData);
-      }
-
-      return {
-        success: true,
-        message: `新闻总结生成完成`,
-        period: timeRangeDesc,
-        timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
-        data: {
-          news_count: newsData.news_count,
-          high_level_count: this.getHighLevelCount(newsData),
-          summary: summaryContent,
-          time_range: {
-            start: start.toISOString(),
-            end: end.toISOString(),
-          },
-        },
-      };
     } catch (error: any) {
-      console.error('生成总结失败:', error);
-      const timeRangeDesc = this.formatPeriod(moment(startTime), moment(endTime));
+      console.error('测试增强功能失败:', error);
       return {
         success: false,
-        message: `生成新闻总结失败`,
-        period: timeRangeDesc,
         error: error.message,
-        timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
+        newsId,
       };
-    }
-  }
-
-  /**
-   * 获取新闻数据
-   */
-  private async getNewsData(start: moment.Moment, end: moment.Moment): Promise<any> {
-    // 传递UTC时间给查询服务
-    return await queryService.getHourlySummary(start.toISOString(), end.toISOString());
-  }
-
-  /**
-   * 按级别分组新闻
-   */
-  private groupNewsByLevel(newsItems: any[]): Record<string, any[]> {
-    const grouped: Record<string, any[]> = {};
-
-    newsItems.forEach(item => {
-      const level = item.level || 'Unknown';
-      if (!grouped[level]) {
-        grouped[level] = [];
-      }
-
-      // 转换时间戳格式
-      const timeValue =
-        typeof item.timestamp === 'number' ? item.timestamp : moment(item.timestamp).unix();
-
-      grouped[level].push({
-        title: item.title,
-        content: item.content || '',
-        time: timeValue,
-      });
-    });
-
-    return grouped;
-  }
-
-  /**
-   * 发送通知
-   */
-  private async sendNotification(
-    summaryData: string,
-    start: moment.Moment,
-    end: moment.Moment,
-    newsData: any
-  ): Promise<void> {
-    try {
-      // 检查是否有高级别新闻（仅 Level 1）
-      const highLevelNews =
-        newsData.news_items?.filter((item: any) => item.level === EventLevel.LEVEL_1) || [];
-
-      // 有高级别新闻时发送通知
-      await notificationService.sendNormalSummaryNotification(
-        { summary: summaryData },
-        start.toISOString(),
-        end.toISOString(),
-        highLevelNews
-      );
-    } catch (error) {
-      console.error('发送通知失败:', error);
-      // 通知失败不影响总结生成，只记录错误
-    }
-  }
-
-  /**
-   * 获取高级别新闻数量
-   */
-  private getHighLevelCount(newsData: any): number {
-    return (
-      newsData.news_items?.filter((item: any) => item.level === EventLevel.LEVEL_1).length || 0
-    );
-  }
-
-  /**
-   * 格式化时间段 - 显示北京时间
-   */
-  private formatPeriod(start: moment.Moment, end: moment.Moment): string {
-    // 转换为北京时间显示
-    const beijingStart = start.clone().tz('Asia/Shanghai');
-    const beijingEnd = end.clone().tz('Asia/Shanghai');
-
-    if (beijingStart.isSame(beijingEnd, 'day')) {
-      return `${beijingStart.format('MM-DD HH:mm')}-${beijingEnd.format('HH:mm')}`;
-    } else {
-      return `${beijingStart.format('MM-DD HH:mm')}-${beijingEnd.format('MM-DD HH:mm')}`;
     }
   }
 }
