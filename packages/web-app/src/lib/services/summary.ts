@@ -131,8 +131,9 @@ class SummaryService {
   private async extractEntitiesFromNews(newsItems: any[]): Promise<any[]> {
     console.log(`🔍 开始获取 ${newsItems.length} 条新闻的实体信息...`);
 
-    const newsWithEntities = await Promise.allSettled(
-      newsItems.map(async (newsItem: any) => {
+    // 创建任务数组
+    const tasks = newsItems.map((newsItem: any) => {
+      return async () => {
         try {
           const entities = await this.getNewsEntities(newsItem.newsId);
           // 过滤掉 Location 类型的实体（区域类型）
@@ -141,13 +142,17 @@ class SummaryService {
           console.error(`获取新闻 ${newsItem.newsId} 的实体信息失败:`, error);
           return [];
         }
-      })
-    );
+      };
+    });
+
+    // 使用并发控制执行任务
+    const concurrency = 5; // 数据库查询的并发数设为5
+    console.log(`🔍 使用并发数 ${concurrency} 获取新闻实体信息`);
+    const results = await this.executeWithConcurrency(tasks, concurrency);
 
     // 收集所有实体并去重
-    const allEntities = newsWithEntities
-      .filter(result => result.status === 'fulfilled')
-      .flatMap(result => result.value)
+    const allEntities = results
+      .flatMap(result => result)
       .filter(
         (entity, index, self) =>
           // 去重：根据实体名称和类型去重
@@ -168,15 +173,47 @@ class SummaryService {
   /**
    * 按实体分组对历史新闻进行总结
    */
+  /**
+   * 控制并发执行任务
+   * @param tasks 任务数组
+   * @param concurrency 并发数
+   * @returns Promise数组结果
+   */
+  private async executeWithConcurrency<T>(
+    tasks: (() => Promise<T>)[],
+    concurrency: number = 3
+  ): Promise<T[]> {
+    const results: T[] = [];
+    const executing: Promise<void>[] = [];
+
+    for (const task of tasks) {
+      const promise = task().then(result => {
+        results.push(result);
+      });
+      executing.push(promise);
+
+      if (executing.length >= concurrency) {
+        await Promise.race(executing);
+        executing.splice(executing.findIndex(p => p === promise), 1);
+      }
+    }
+
+    await Promise.all(executing);
+    return results;
+  }
+
   private async summarizeHistoricalNewsByEntities(
     entityHistoricalNews: Record<string, any[]>,
     newsEntities: any[]
   ): Promise<Record<string, string>> {
     const entitySummaries: Record<string, string> = {};
+    const concurrency = 3; // 控制并发数为3
 
-    // 为每个实体并行生成总结
-    const summaryPromises = Object.entries(entityHistoricalNews).map(
-      async ([entityName, historicalNews]) => {
+    console.log(`开始总结 ${Object.keys(entityHistoricalNews).length} 个实体的历史新闻，并发数: ${concurrency}`);
+
+    // 创建任务数组
+    const tasks = Object.entries(entityHistoricalNews).map(([entityName, historicalNews]) => {
+      return async () => {
         try {
           const entity = newsEntities.find((e: any) => e.name === entityName);
           const entityType = entity?.type || 'Unknown';
@@ -218,15 +255,16 @@ class SummaryService {
           console.error(`总结 ${entityName} 历史新闻失败:`, error);
           return null;
         }
-      }
-    );
+      };
+    });
 
-    const results = await Promise.allSettled(summaryPromises);
+    // 使用并发控制执行任务
+    const results = await this.executeWithConcurrency(tasks, concurrency);
 
     // 收集成功的总结结果
     results.forEach(result => {
-      if (result.status === 'fulfilled' && result.value) {
-        entitySummaries[result.value.entityName] = result.value.summary;
+      if (result) {
+        entitySummaries[result.entityName] = result.summary;
       }
     });
 
@@ -329,45 +367,58 @@ class SummaryService {
     const groupedNews = this.groupNewsByLevel(newsItems);
     const levelContents: Record<string, string> = {};
 
-    const newsContentPromises = Object.entries(groupedNews).map(async ([level, news]) => {
-      console.log(`📝 处理 ${level}级新闻，共 ${news.length} 条`);
+    // 创建level处理任务
+    const levelTasks = Object.entries(groupedNews).map(([level, news]) => {
+      return async () => {
+        console.log(`📝 处理 ${level}级新闻，共 ${news.length} 条`);
 
-      const levelContentPromises = news.map(async (item: any) => {
-        // 获取该新闻的实体
-        const newsEntities = await this.getNewsEntities(item.newsId)
-          .then(entities => entities.filter((e: any) => e.type !== 'Location'))
-          .catch(() => []);
+        // 创建新闻处理任务
+        const newsTasks = news.map((item: any) => {
+          return async () => {
+            // 获取该新闻的实体
+            const newsEntities = await this.getNewsEntities(item.newsId)
+              .then(entities => entities.filter((e: any) => e.type !== 'Location'))
+              .catch(() => []);
 
-        let newsText = `标题：${item.title}\n内容：${item.content}\n时间：${moment(item.time * 1000)
-          .tz('Asia/Shanghai')
-          .format('YYYY-MM-DD HH:mm:ss')}`;
+            let newsText = `标题：${item.title}\n内容：${item.content}\n时间：${moment(item.time * 1000)
+              .tz('Asia/Shanghai')
+              .format('YYYY-MM-DD HH:mm:ss')}`;
 
-        if (newsEntities.length > 0) {
-          const entityList = newsEntities.map((e: any) => `${e.name}(${e.type})`).join('、');
-          newsText += `\n关联实体：${entityList}`;
+            if (newsEntities.length > 0) {
+              const entityList = newsEntities.map((e: any) => `${e.name}(${e.type})`).join('、');
+              newsText += `\n关联实体：${entityList}`;
 
-          // 获取相关的历史新闻
-          const relatedSummaries = newsEntities
-            .map((entity: any) => entitySummaries[entity.name])
-            .filter(Boolean);
+              // 获取相关的历史新闻
+              const relatedSummaries = newsEntities
+                .map((entity: any) => entitySummaries[entity.name])
+                .filter(Boolean);
 
-          if (relatedSummaries.length > 0) {
-            const historicalSummary = newsEntities
-              .filter((entity: any) => entitySummaries[entity.name])
-              .map((entity: any) => `${entity.name}: ${entitySummaries[entity.name]}`)
-              .join('；');
-            newsText += `\n[历史：${historicalSummary}]`;
-          }
-        }
+              if (relatedSummaries.length > 0) {
+                const historicalSummary = newsEntities
+                  .filter((entity: any) => entitySummaries[entity.name])
+                  .map((entity: any) => `${entity.name}: ${entitySummaries[entity.name]}`)
+                  .join('；');
+                newsText += `\n[历史：${historicalSummary}]`;
+              }
+            }
 
-        return newsText + '\n';
-      });
+            return newsText + '\n';
+          };
+        });
 
-      const levelContent = (await Promise.all(levelContentPromises)).join('\n');
-      return { level, content: `【${level}级新闻】\n${levelContent}` };
+        // 使用并发控制处理新闻
+        const newsConcurrency = 3; // 新闻处理的并发数
+        const newsResults = await this.executeWithConcurrency(newsTasks, newsConcurrency);
+        const levelContent = newsResults.join('\n');
+        
+        return { level, content: `【${level}级新闻】\n${levelContent}` };
+      };
     });
 
-    const results = await Promise.all(newsContentPromises);
+    // 使用并发控制处理level
+    const levelConcurrency = 2; // level处理的并发数
+    console.log(`📝 使用并发数 ${levelConcurrency} 处理level，新闻处理并发数 ${3}`);
+    const results = await this.executeWithConcurrency(levelTasks, levelConcurrency);
 
     // 转换为Record格式
     results.forEach(({ level, content }) => {
@@ -393,45 +444,43 @@ class SummaryService {
       return levelA - levelB;
     });
 
-    // 并发为每个level生成总结
-    const summaryPromises = levelEntries.map(async ([level, content]) => {
-      try {
-        console.log(`🎯 正在为 ${level}级新闻生成总结...`);
-        const levelSummary = await this.generateAISummary(content);
-        console.log(`✅ ${level}级新闻总结生成完成`);
-        return { level, summary: levelSummary, success: true };
-      } catch (error: any) {
-        console.error(`❌ ${level}级新闻总结生成失败:`, error);
-        return {
-          level,
-          summary: `${level}级新闻总结生成失败：${error.message}`,
-          success: false,
-        };
-      }
+    // 创建任务数组，使用并发控制
+    const tasks = levelEntries.map(([level, content]) => {
+      return async () => {
+        try {
+          console.log(`🎯 正在为 ${level}级新闻生成总结...`);
+          const levelSummary = await this.generateAISummary(content);
+          console.log(`✅ ${level}级新闻总结生成完成`);
+          return { level, summary: levelSummary, success: true };
+        } catch (error: any) {
+          console.error(`❌ ${level}级新闻总结生成失败:`, error);
+          return {
+            level,
+            summary: `${level}级新闻总结生成失败：${error.message}`,
+            success: false,
+          };
+        }
+      };
     });
 
-    // 等待所有level的总结完成
-    const results = await Promise.allSettled(summaryPromises);
+    // 使用并发控制执行任务
+    const concurrency = 2; // level总结的并发数设为2
+    console.log(`🎯 使用并发数 ${concurrency} 生成level总结`);
+    const results = await this.executeWithConcurrency(tasks, concurrency);
 
     // 收集成功和失败的结果
     const levelSummaries: Record<string, string> = {};
     let successCount = 0;
     let failureCount = 0;
 
-    results.forEach((result, index) => {
-      const [level] = levelEntries[index];
-
-      if (result.status === 'fulfilled') {
-        levelSummaries[level] = result.value.summary;
-        if (result.value.success) {
+    results.forEach((result) => {
+      if (result) {
+        levelSummaries[result.level] = result.summary;
+        if (result.success) {
           successCount++;
         } else {
           failureCount++;
         }
-      } else {
-        console.error(`❌ ${level}级新闻处理异常:`, result.reason);
-        levelSummaries[level] = `${level}级新闻处理异常：${result.reason?.message || '未知错误'}`;
-        failureCount++;
       }
     });
 
