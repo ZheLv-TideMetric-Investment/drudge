@@ -123,22 +123,32 @@ async function callJinaService(message: string, serviceType: ServiceType): Promi
 }
 
 // 发送webhook响应
-async function sendWebhookResponse(webhookUrl: string, senderNick: string, content: string): Promise<void> {
-  if (!webhookUrl) {
+async function sendWebhookResponse(webhookUrls: string[], senderNick: string, content: string): Promise<void> {
+  if (!webhookUrls || webhookUrls.length === 0) {
     return;
   }
   
-  try {
-    await axios.post(webhookUrl, {
-      msgtype: 'markdown',
-      markdown: {
-        title: '[tide] 婷子',
-        text: `@${senderNick} \n${content}`,
+  const payload = {
+    msgtype: 'markdown',
+    markdown: {
+      title: '[tide] 婷子',
+      text: `@${senderNick} \n${content}`,
+    }
+  };
+
+  const results = await Promise.allSettled(
+    webhookUrls.map(async (webhookUrl) => {
+      try {
+        await axios.post(webhookUrl, payload);
+        console.log('婷子webhook发送成功:', webhookUrl);
+      } catch (error) {
+        console.error('发送webhook失败:', error, 'URL:', webhookUrl);
       }
-    });
-  } catch (error) {
-    console.error('发送webhook失败:', error);
-  }
+    })
+  );
+
+  const successCount = results.filter(result => result.status === 'fulfilled').length;
+  console.log(`婷子webhook发送完成: ${successCount}/${webhookUrls.length} 成功`);
 }
 
 // 处理tingzi消息
@@ -166,7 +176,7 @@ export async function processTingziMessage(body: TingziRequestBody): Promise<Tin
   }
   
   // 发送webhook响应
-  await sendWebhookResponse(sessionWebhook, senderNick, responseText);
+  await sendWebhookResponse([sessionWebhook], senderNick, responseText);
   
   return {
     received: body,

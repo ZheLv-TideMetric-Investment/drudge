@@ -21,11 +21,11 @@ export interface NotificationPayload {
  * Webhook 通知服务
  */
 class WebhookService {
-  private webhookUrl: string;
+  private webhookUrls: string[];
   private enabled: boolean;
 
   constructor() {
-    this.webhookUrl = config.notification.webhookUrl;
+    this.webhookUrls = config.notification.webhookUrls;
     this.enabled = config.notification.enableWebhookNotification;
   }
 
@@ -38,51 +38,61 @@ class WebhookService {
       return false;
     }
 
-    if (!this.webhookUrl) {
-      console.warn('Webhook URL 未配置');
+    if (!this.webhookUrls || this.webhookUrls.length === 0) {
+      console.warn('Webhook URLs 未配置');
       return false;
     }
 
-    try {
-      // 构建markdown格式的消息
-      const markdownTitle = title ? `[tide] Web App - ${title}` : '[tide] Web App - 系统通知';
+    const markdownTitle = title ? `[tide] Web App - ${title}` : '[tide] Web App - 系统通知';
 
-      const payload: NotificationPayload = {
-        msgtype: 'markdown',
-        markdown: {
-          title: markdownTitle,
-          text: message,
-        },
-        at: {
-          isAtAll: false,
-        },
-      };
+    const payload: NotificationPayload = {
+      msgtype: 'markdown',
+      markdown: {
+        title: markdownTitle,
+        text: message,
+      },
+      at: {
+        isAtAll: false,
+      },
+    };
 
-      const response = await axios.post(this.webhookUrl, payload, {
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Web-App-Webhook/2.0',
-        },
-      });
+    const results = await Promise.allSettled(
+      this.webhookUrls.map(async (webhookUrl) => {
+        try {
+          const response = await axios.post(webhookUrl, payload, {
+            timeout: 10000,
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'Web-App-Webhook/2.0',
+            },
+          });
 
-      if (response.status >= 200 && response.status < 300) {
-        console.log('Webhook 消息发送成功', {
-          title: markdownTitle,
-          status: response.status,
-        });
-        return true;
-      } else {
-        console.warn('Webhook 消息发送失败，状态码:', response.status, response.data);
-        return false;
-      }
-    } catch (error: any) {
-      console.error('Webhook 消息发送异常:', {
-        error: error.message,
-        url: this.webhookUrl,
-      });
-      return false;
-    }
+          if (response.status >= 200 && response.status < 300) {
+            console.log('Webhook 消息发送成功', {
+              title: markdownTitle,
+              status: response.status,
+              url: webhookUrl,
+            });
+            return true;
+          } else {
+            console.warn('Webhook 消息发送失败，状态码:', response.status, response.data, 'URL:', webhookUrl);
+            return false;
+          }
+        } catch (error: any) {
+          console.error('Webhook 消息发送异常:', {
+            error: error.message,
+            url: webhookUrl,
+          });
+          return false;
+        }
+      })
+    );
+
+    const successCount = results.filter(result => 
+      result.status === 'fulfilled' && result.value === true
+    ).length;
+
+    return successCount > 0;
   }
 
   /**
@@ -93,7 +103,7 @@ class WebhookService {
     message: string,
     details?: string
   ): Promise<boolean> {
-    if (!this.enabled || !this.webhookUrl) {
+    if (!this.enabled || !this.webhookUrls || this.webhookUrls.length === 0) {
       return false;
     }
 
@@ -129,27 +139,37 @@ class WebhookService {
       },
     };
 
-    try {
-      const response = await axios.post(this.webhookUrl, payload, {
-        timeout: 10000,
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Web-App-Webhook/2.0',
-        },
-      });
+    const results = await Promise.allSettled(
+      this.webhookUrls.map(async (webhookUrl) => {
+        try {
+          const response = await axios.post(webhookUrl, payload, {
+            timeout: 10000,
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': 'Web-App-Webhook/2.0',
+            },
+          });
 
-      return response.status >= 200 && response.status < 300;
-    } catch (error: any) {
-      console.error('系统状态通知发送失败:', error.message);
-      return false;
-    }
+          return response.status >= 200 && response.status < 300;
+        } catch (error: any) {
+          console.error('系统状态通知发送失败:', error.message, 'URL:', webhookUrl);
+          return false;
+        }
+      })
+    );
+
+    const successCount = results.filter(result => 
+      result.status === 'fulfilled' && result.value === true
+    ).length;
+
+    return successCount > 0;
   }
 
   /**
    * 测试连接
    */
   async testConnection(): Promise<boolean> {
-    if (!this.enabled || !this.webhookUrl) {
+    if (!this.enabled || !this.webhookUrls || this.webhookUrls.length === 0) {
       return false;
     }
 
@@ -168,7 +188,8 @@ class WebhookService {
   getStatus(): any {
     return {
       enabled: this.enabled,
-      webhookUrl: this.webhookUrl ? '已配置' : '未配置',
+      webhookUrls: this.webhookUrls.length > 0 ? `已配置 ${this.webhookUrls.length} 个URL` : '未配置',
+      urlCount: this.webhookUrls.length,
       timestamp: new Date().toISOString(),
     };
   }
