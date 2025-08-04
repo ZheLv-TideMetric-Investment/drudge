@@ -8,12 +8,78 @@ import { aiService, createMessages, callSimpleAIText } from '../utils/llm';
 import { EventLevel } from '../../../constants/enums';
 
 /**
+ * 平滑启动配置 - 用于降低峰值QPS
+ */
+interface SmoothStartConfig {
+  // AI调用配置
+  ai: {
+    batchSize: number;    // 每批启动任务数量
+    batchInterval: number; // 批次启动间隔（毫秒）
+  };
+  // 数据库查询配置
+  database: {
+    batchSize: number;    // 每批启动任务数量
+    batchInterval: number; // 批次启动间隔（毫秒）
+  };
+}
+
+/**
  * 总结服务
  * 提供通用的时间区间新闻总结功能（不落库）
  * 增强功能：基于图谱实体的历史新闻关联分析
  */
 class SummaryService {
   private newsService = neo4jNewsService;
+
+  // 平滑启动配置
+  private smoothStartConfig: SmoothStartConfig = {
+    ai: {
+      batchSize: 10,       // AI调用每批启动10个任务
+      batchInterval: 100,  // 每100ms启动一批，QPS=100
+    },
+    database: {
+      batchSize: 20,       // 数据库查询每批启动20个任务
+      batchInterval: 100,  // 每100ms启动一批，QPS=200
+    },
+  };
+
+  /**
+   * 更新平滑启动配置
+   * @param config 新的平滑启动配置
+   * 
+   * 使用示例：
+   * // 降低AI调用QPS到50：每100ms启动5个任务
+   * summaryService.updateSmoothStartConfig({
+   *   ai: { batchSize: 5, batchInterval: 100 }
+   * });
+   * 
+   * // 设置QPS=80：每125ms启动10个任务 (10 * 1000 / 125 = 80)
+   * summaryService.updateSmoothStartConfig({
+   *   ai: { batchSize: 10, batchInterval: 125 }
+   * });
+   */
+  updateSmoothStartConfig(config: Partial<SmoothStartConfig>): void {
+    if (config.ai) {
+      this.smoothStartConfig.ai = { ...this.smoothStartConfig.ai, ...config.ai };
+    }
+    if (config.database) {
+      this.smoothStartConfig.database = { ...this.smoothStartConfig.database, ...config.database };
+    }
+    
+    // 显示更新后的QPS信息
+    const aiQPS = (this.smoothStartConfig.ai.batchSize * 1000) / this.smoothStartConfig.ai.batchInterval;
+    const dbQPS = (this.smoothStartConfig.database.batchSize * 1000) / this.smoothStartConfig.database.batchInterval;
+    
+    console.log('🔧 平滑启动配置已更新:', this.smoothStartConfig);
+    console.log(`📊 QPS设置 - AI: ${aiQPS.toFixed(1)}, 数据库: ${dbQPS.toFixed(1)}`);
+  }
+
+  /**
+   * 获取当前平滑启动配置
+   */
+  getSmoothStartConfig(): SmoothStartConfig {
+    return { ...this.smoothStartConfig };
+  }
 
   /**
    * 生成新闻总结
@@ -131,8 +197,9 @@ class SummaryService {
   private async extractEntitiesFromNews(newsItems: any[]): Promise<any[]> {
     console.log(`🔍 开始获取 ${newsItems.length} 条新闻的实体信息...`);
 
-    const newsWithEntities = await Promise.allSettled(
-      newsItems.map(async (newsItem: any) => {
+    // 创建任务数组
+    const tasks = newsItems.map((newsItem: any) => {
+      return async () => {
         try {
           const entities = await this.getNewsEntities(newsItem.newsId);
           // 过滤掉 Location 类型的实体（区域类型）
@@ -141,13 +208,20 @@ class SummaryService {
           console.error(`获取新闻 ${newsItem.newsId} 的实体信息失败:`, error);
           return [];
         }
-      })
+      };
+    });
+
+    // 使用平滑启动控制任务
+    console.log(`🔍 使用平滑启动获取新闻实体信息`);
+    const results = await this.executeSmoothStart(
+      tasks, 
+      this.smoothStartConfig.database.batchSize, 
+      this.smoothStartConfig.database.batchInterval
     );
 
     // 收集所有实体并去重
-    const allEntities = newsWithEntities
-      .filter(result => result.status === 'fulfilled')
-      .flatMap(result => result.value)
+    const allEntities = results
+      .flatMap(result => result)
       .filter(
         (entity, index, self) =>
           // 去重：根据实体名称和类型去重
@@ -168,15 +242,82 @@ class SummaryService {
   /**
    * 按实体分组对历史新闻进行总结
    */
+  /**
+   * 平滑启动任务 - 降低峰值QPS（不等待任务完成）
+   * @param tasks 任务数组
+   * @param batchSize 每批启动的任务数量，默认10
+   * @param batchInterval 批次启动间隔（毫秒），默认100ms
+   * @returns Promise数组结果
+   */
+  private async executeSmoothStart<T>(
+    tasks: (() => Promise<T>)[],
+    batchSize: number = 10,
+    batchInterval: number = 100
+  ): Promise<T[]> {
+    const results: T[] = [];
+    const allPromises: Promise<T | null>[] = [];
+    
+    const totalBatches = Math.ceil(tasks.length / batchSize);
+    const estimatedQPS = (batchSize * 1000) / batchInterval;
+    
+    console.log(`🚀 开始平滑启动 ${tasks.length} 个任务`);
+    console.log(`📊 配置: 每批 ${batchSize} 个，间隔 ${batchInterval}ms，预估QPS: ${estimatedQPS.toFixed(1)}`);
+    console.log(`⏱️ 预计启动完成时间: ${(totalBatches * batchInterval / 1000).toFixed(1)} 秒`);
+    
+    // 分批启动任务，不等待完成
+    for (let i = 0; i < tasks.length; i += batchSize) {
+      const batch = tasks.slice(i, i + batchSize);
+      const batchNum = Math.floor(i / batchSize) + 1;
+      
+      console.log(`🚀 启动第 ${batchNum}/${totalBatches} 批 ${batch.length} 个任务`);
+      
+      // 启动当前批次的所有任务，但不等待完成
+      const batchPromises = batch.map(async (task, index) => {
+        try {
+          const result = await task();
+          return result;
+        } catch (error) {
+          console.error(`❌ 批次 ${batchNum} 任务 ${index + 1} 失败:`, error);
+          return null;
+        }
+      });
+      
+      // 将当前批次的Promise添加到总列表
+      allPromises.push(...batchPromises);
+      
+      // 如果不是最后一批，等待间隔后继续启动下一批
+      if (i + batchSize < tasks.length) {
+        await new Promise(resolve => setTimeout(resolve, batchInterval));
+      }
+    }
+    
+    console.log(`🎯 所有任务已启动，等待执行完成...`);
+    
+    // 等待所有任务完成
+    const allResults = await Promise.allSettled(allPromises);
+    
+    // 收集结果
+    allResults.forEach(result => {
+      if (result.status === 'fulfilled' && result.value !== null) {
+        results.push(result.value);
+      }
+    });
+    
+    console.log(`✅ 所有任务执行完成，成功 ${results.length}/${tasks.length} 个`);
+    return results;
+  }
+
   private async summarizeHistoricalNewsByEntities(
     entityHistoricalNews: Record<string, any[]>,
     newsEntities: any[]
   ): Promise<Record<string, string>> {
     const entitySummaries: Record<string, string> = {};
 
-    // 为每个实体并行生成总结
-    const summaryPromises = Object.entries(entityHistoricalNews).map(
-      async ([entityName, historicalNews]) => {
+    console.log(`开始总结 ${Object.keys(entityHistoricalNews).length} 个实体的历史新闻，使用平滑启动模式`);
+
+    // 创建任务数组
+    const tasks = Object.entries(entityHistoricalNews).map(([entityName, historicalNews]) => {
+      return async () => {
         try {
           const entity = newsEntities.find((e: any) => e.name === entityName);
           const entityType = entity?.type || 'Unknown';
@@ -218,15 +359,20 @@ class SummaryService {
           console.error(`总结 ${entityName} 历史新闻失败:`, error);
           return null;
         }
-      }
-    );
+      };
+    });
 
-    const results = await Promise.allSettled(summaryPromises);
+    // 使用平滑启动控制AI任务，降低QPS峰值
+    const results = await this.executeSmoothStart(
+      tasks, 
+      this.smoothStartConfig.ai.batchSize, 
+      this.smoothStartConfig.ai.batchInterval
+    );
 
     // 收集成功的总结结果
     results.forEach(result => {
-      if (result.status === 'fulfilled' && result.value) {
-        entitySummaries[result.value.entityName] = result.value.summary;
+      if (result) {
+        entitySummaries[result.entityName] = result.summary;
       }
     });
 
@@ -329,45 +475,64 @@ class SummaryService {
     const groupedNews = this.groupNewsByLevel(newsItems);
     const levelContents: Record<string, string> = {};
 
-    const newsContentPromises = Object.entries(groupedNews).map(async ([level, news]) => {
-      console.log(`📝 处理 ${level}级新闻，共 ${news.length} 条`);
+    // 创建level处理任务
+    const levelTasks = Object.entries(groupedNews).map(([level, news]) => {
+      return async () => {
+        console.log(`📝 处理 ${level}级新闻，共 ${news.length} 条`);
 
-      const levelContentPromises = news.map(async (item: any) => {
-        // 获取该新闻的实体
-        const newsEntities = await this.getNewsEntities(item.newsId)
-          .then(entities => entities.filter((e: any) => e.type !== 'Location'))
-          .catch(() => []);
+        // 创建新闻处理任务
+        const newsTasks = news.map((item: any) => {
+          return async () => {
+            // 获取该新闻的实体
+            const newsEntities = await this.getNewsEntities(item.newsId)
+              .then(entities => entities.filter((e: any) => e.type !== 'Location'))
+              .catch(() => []);
 
-        let newsText = `标题：${item.title}\n内容：${item.content}\n时间：${moment(item.time * 1000)
-          .tz('Asia/Shanghai')
-          .format('YYYY-MM-DD HH:mm:ss')}`;
+            let newsText = `标题：${item.title}\n内容：${item.content}\n时间：${moment(item.time * 1000)
+              .tz('Asia/Shanghai')
+              .format('YYYY-MM-DD HH:mm:ss')}`;
 
-        if (newsEntities.length > 0) {
-          const entityList = newsEntities.map((e: any) => `${e.name}(${e.type})`).join('、');
-          newsText += `\n关联实体：${entityList}`;
+            if (newsEntities.length > 0) {
+              const entityList = newsEntities.map((e: any) => `${e.name}(${e.type})`).join('、');
+              newsText += `\n关联实体：${entityList}`;
 
-          // 获取相关的历史新闻
-          const relatedSummaries = newsEntities
-            .map((entity: any) => entitySummaries[entity.name])
-            .filter(Boolean);
+              // 获取相关的历史新闻
+              const relatedSummaries = newsEntities
+                .map((entity: any) => entitySummaries[entity.name])
+                .filter(Boolean);
 
-          if (relatedSummaries.length > 0) {
-            const historicalSummary = newsEntities
-              .filter((entity: any) => entitySummaries[entity.name])
-              .map((entity: any) => `${entity.name}: ${entitySummaries[entity.name]}`)
-              .join('；');
-            newsText += `\n[历史：${historicalSummary}]`;
-          }
-        }
+              if (relatedSummaries.length > 0) {
+                const historicalSummary = newsEntities
+                  .filter((entity: any) => entitySummaries[entity.name])
+                  .map((entity: any) => `${entity.name}: ${entitySummaries[entity.name]}`)
+                  .join('；');
+                newsText += `\n[历史：${historicalSummary}]`;
+              }
+            }
 
-        return newsText + '\n';
-      });
+            return newsText + '\n';
+          };
+        });
 
-      const levelContent = (await Promise.all(levelContentPromises)).join('\n');
-      return { level, content: `【${level}级新闻】\n${levelContent}` };
+         // 使用平滑启动处理新闻
+         const newsResults = await this.executeSmoothStart(
+           newsTasks, 
+           this.smoothStartConfig.database.batchSize, 
+           this.smoothStartConfig.database.batchInterval
+         );
+        const levelContent = newsResults.join('\n');
+        
+        return { level, content: `【${level}级新闻】\n${levelContent}` };
+      };
     });
 
-    const results = await Promise.all(newsContentPromises);
+    // 使用平滑启动处理level
+    console.log(`📝 使用平滑启动处理level`);
+    const results = await this.executeSmoothStart(
+      levelTasks, 
+      this.smoothStartConfig.database.batchSize, 
+      this.smoothStartConfig.database.batchInterval
+    );
 
     // 转换为Record格式
     results.forEach(({ level, content }) => {
@@ -393,45 +558,46 @@ class SummaryService {
       return levelA - levelB;
     });
 
-    // 并发为每个level生成总结
-    const summaryPromises = levelEntries.map(async ([level, content]) => {
-      try {
-        console.log(`🎯 正在为 ${level}级新闻生成总结...`);
-        const levelSummary = await this.generateAISummary(content);
-        console.log(`✅ ${level}级新闻总结生成完成`);
-        return { level, summary: levelSummary, success: true };
-      } catch (error: any) {
-        console.error(`❌ ${level}级新闻总结生成失败:`, error);
-        return {
-          level,
-          summary: `${level}级新闻总结生成失败：${error.message}`,
-          success: false,
-        };
-      }
+    // 创建任务数组，使用并发控制
+    const tasks = levelEntries.map(([level, content]) => {
+      return async () => {
+        try {
+          console.log(`🎯 正在为 ${level}级新闻生成总结...`);
+          const levelSummary = await this.generateAISummary(content);
+          console.log(`✅ ${level}级新闻总结生成完成`);
+          return { level, summary: levelSummary, success: true };
+        } catch (error: any) {
+          console.error(`❌ ${level}级新闻总结生成失败:`, error);
+          return {
+            level,
+            summary: `${level}级新闻总结生成失败：${error.message}`,
+            success: false,
+          };
+        }
+      };
     });
 
-    // 等待所有level的总结完成
-    const results = await Promise.allSettled(summaryPromises);
+    // 使用平滑启动生成level总结
+    console.log(`🎯 使用平滑启动生成level总结`);
+    const results = await this.executeSmoothStart(
+      tasks, 
+      this.smoothStartConfig.ai.batchSize, 
+      this.smoothStartConfig.ai.batchInterval
+    );
 
     // 收集成功和失败的结果
     const levelSummaries: Record<string, string> = {};
     let successCount = 0;
     let failureCount = 0;
 
-    results.forEach((result, index) => {
-      const [level] = levelEntries[index];
-
-      if (result.status === 'fulfilled') {
-        levelSummaries[level] = result.value.summary;
-        if (result.value.success) {
+    results.forEach((result) => {
+      if (result) {
+        levelSummaries[result.level] = result.summary;
+        if (result.success) {
           successCount++;
         } else {
           failureCount++;
         }
-      } else {
-        console.error(`❌ ${level}级新闻处理异常:`, result.reason);
-        levelSummaries[level] = `${level}级新闻处理异常：${result.reason?.message || '未知错误'}`;
-        failureCount++;
       }
     });
 
@@ -712,3 +878,4 @@ into an actionable Markdown briefing for global portfolio managers and economist
 
 export const summaryService = new SummaryService();
 export { SummaryService };
+
