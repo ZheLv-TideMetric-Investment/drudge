@@ -35,7 +35,7 @@ export const config = {
   // 通知配置
   notification: {
     enableWebhookNotification: process.env.ENABLE_WEBHOOK_NOTIFICATION === 'true',
-    webhookUrl: process.env.WEBHOOK_URL || ''
+    webhookUrls: process.env.WEBHOOK_URLS ? process.env.WEBHOOK_URLS.split(',').map(url => url.trim()).filter(url => url) : []
   },
   
   // 定时任务配置
