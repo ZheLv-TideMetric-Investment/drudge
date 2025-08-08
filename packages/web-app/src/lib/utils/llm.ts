@@ -40,6 +40,11 @@ export class ModelWrapper {
       return this.getMockTextResponse(messages, options);
     }
 
+    // 如果是xAI且使用代理，直接调用代理API
+    if (this.providerName === 'xai' && config.ai.xai?.proxyUrl) {
+      return await this.callXAIProxyText(messages, options);
+    }
+
     try {
       // 构建消息格式
       const formattedMessages = messages.map(msg => ({
@@ -85,6 +90,11 @@ export class ModelWrapper {
   ): Promise<LLMResponse<T>> {
     if (this.mockMode) {
       return this.getMockJsonResponse<T>(messages, options);
+    }
+
+    // 如果是xAI且使用代理，直接调用代理API
+    if (this.providerName === 'xai' && config.ai.xai?.proxyUrl) {
+      return await this.callXAIProxyJson<T>(messages, options);
     }
 
     try {
@@ -180,6 +190,256 @@ export class ModelWrapper {
    */
   isMockMode(): boolean {
     return this.mockMode;
+  }
+
+  /**
+   * 直接调用xAI代理服务 - 文本响应
+   */
+  private async callXAIProxyText(
+    messages: LLMMessage[],
+    options: LLMCallOptions = {}
+  ): Promise<LLMResponse<string>> {
+    const {
+      temperature = 0.7,
+      timeout = 10 * 60 * 1000,
+    } = options;
+
+    const proxyUrl = `${config.ai.xai!.proxyUrl}/v1/chat/completions`;
+    
+    console.log('调用xAI代理 (文本):', {
+      url: proxyUrl,
+      messageCount: messages.length,
+      model: config.ai.xai!.model,
+    });
+
+    const requestBody = {
+      model: config.ai.xai!.model,
+      messages: messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      })),
+      temperature,
+    };
+
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      abortController.abort();
+    }, timeout);
+
+    try {
+      const response = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-xai-api-key': config.ai.xai!.apiKey,
+        },
+        body: JSON.stringify(requestBody),
+        signal: abortController.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('xAI代理请求失败:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText
+        });
+        return {
+          success: false,
+          error: `xAI代理返回错误: ${response.status} ${response.statusText} - ${errorText}`,
+        };
+      }
+
+      const responseData = await response.json() as {
+        choices?: Array<{
+          message?: {
+            content?: string;
+          };
+        }>;
+        model?: string;
+        usage?: {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          total_tokens?: number;
+        };
+      };
+      
+      console.log('xAI代理响应成功 (文本):', {
+        model: responseData.model,
+        usage: responseData.usage
+      });
+
+      // 提取消息内容
+      const content = responseData.choices?.[0]?.message?.content;
+      if (!content) {
+        return {
+          success: false,
+          error: 'xAI代理响应格式错误: 没有找到消息内容',
+        };
+      }
+
+      return {
+        success: true,
+        data: content,
+        usage: responseData.usage ? {
+          promptTokens: responseData.usage.prompt_tokens || 0,
+          completionTokens: responseData.usage.completion_tokens || 0,
+          totalTokens: responseData.usage.total_tokens || 0,
+        } : undefined,
+      };
+
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        return {
+          success: false,
+          error: `xAI代理请求超时 (${timeout}ms)`,
+        };
+      }
+      
+      return {
+        success: false,
+        error: error.message || 'xAI代理调用失败',
+      };
+    }
+  }
+
+  /**
+   * 直接调用xAI代理服务 - JSON响应
+   */
+  private async callXAIProxyJson<T = any>(
+    messages: LLMMessage[],
+    options: LLMCallOptions = {}
+  ): Promise<LLMResponse<T>> {
+    const {
+      temperature = 0.7,
+      timeout = 10 * 60 * 1000,
+    } = options;
+
+    const proxyUrl = `${config.ai.xai!.proxyUrl}/v1/chat/completions`;
+    
+    console.log('调用xAI代理 (JSON):', {
+      url: proxyUrl,
+      messageCount: messages.length,
+      model: config.ai.xai!.model,
+    });
+
+    const requestBody = {
+      model: config.ai.xai!.model,
+      messages: messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      })),
+      temperature,
+      response_format: { type: "json_object" }
+    };
+
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => {
+      abortController.abort();
+    }, timeout);
+
+    try {
+      const response = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-xai-api-key': config.ai.xai!.apiKey,
+        },
+        body: JSON.stringify(requestBody),
+        signal: abortController.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('xAI代理请求失败:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText
+        });
+        return {
+          success: false,
+          error: `xAI代理返回错误: ${response.status} ${response.statusText} - ${errorText}`,
+        };
+      }
+
+      const responseData = await response.json() as {
+        choices?: Array<{
+          message?: {
+            content?: string;
+          };
+        }>;
+        model?: string;
+        usage?: {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          total_tokens?: number;
+        };
+      };
+      
+      console.log('xAI代理响应成功 (JSON):', {
+        model: responseData.model,
+        usage: responseData.usage
+      });
+
+      // 提取消息内容
+      const content = responseData.choices?.[0]?.message?.content;
+      if (!content) {
+        return {
+          success: false,
+          error: 'xAI代理响应格式错误: 没有找到消息内容',
+        };
+      }
+
+      // 解析结果 - 与AiService.ts保持一致的逻辑
+      let parsedData: T;
+      try {
+        // 如果content是字符串，尝试解析为JSON
+        if (typeof content === 'string') {
+          parsedData = JSON.parse(content) as T;
+        } else {
+          parsedData = content as T;
+        }
+      } catch (parseError) {
+        // 如果解析失败，返回原始对象或创建包含内容的对象
+        if (typeof content === 'string') {
+          // 尝试创建一个包含原始内容的对象
+          parsedData = { message: content } as T;
+        } else {
+          parsedData = content as T;
+        }
+      }
+
+      return {
+        success: true,
+        data: parsedData,
+        usage: responseData.usage ? {
+          promptTokens: responseData.usage.prompt_tokens || 0,
+          completionTokens: responseData.usage.completion_tokens || 0,
+          totalTokens: responseData.usage.total_tokens || 0,
+        } : undefined,
+      };
+
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      
+      if (error.name === 'AbortError') {
+        return {
+          success: false,
+          error: `xAI代理请求超时 (${timeout}ms)`,
+        };
+      }
+      
+      return {
+        success: false,
+        error: error.message || 'xAI代理调用失败',
+      };
+    }
   }
 
   /**
@@ -305,6 +565,9 @@ class AiService {
         const xai = createOpenAI({
           apiKey: config.ai.xai.apiKey,
           baseURL: config.ai.xai.proxyUrl,
+          headers: {
+            'x-xai-api-key': config.ai.xai.apiKey,
+          }
         });
         return xai(config.ai.xai.model);
 
