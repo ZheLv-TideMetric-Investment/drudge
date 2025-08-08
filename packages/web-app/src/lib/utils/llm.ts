@@ -199,13 +199,10 @@ export class ModelWrapper {
     messages: LLMMessage[],
     options: LLMCallOptions = {}
   ): Promise<LLMResponse<string>> {
-    const {
-      temperature = 0.7,
-      timeout = 10 * 60 * 1000,
-    } = options;
+    const { temperature = 0.7, timeout = 10 * 60 * 1000 } = options;
 
     const proxyUrl = `${config.ai.xai!.proxyUrl}/v1/chat/completions`;
-    
+
     console.log('调用xAI代理 (文本):', {
       url: proxyUrl,
       messageCount: messages.length,
@@ -216,9 +213,44 @@ export class ModelWrapper {
       model: config.ai.xai!.model,
       messages: messages.map(msg => ({
         role: msg.role,
-        content: msg.content
+        content: msg.content,
       })),
+      // 基础性能参数 - 最强配置
+      // max_completion_tokens: 32768, // 最大输出token数
       temperature,
+      // top_p: 0.95, // 核采样，保持创造性和准确性的平衡
+
+      // // 日志概率 - 获取模型置信度信息
+      // logprobs: true,
+      // top_logprobs: 8, // 最大值，获得最详细的概率信息
+
+      // 工具调用支持
+      // parallel_tool_calls: true, // 支持并行工具调用
+      // tool_choice: 'auto', // 自动选择是否使用工具
+
+      // 搜索参数 - 最强搜索配置
+      search_parameters: {
+        max_search_results: 30, // 最大搜索结果数
+        mode: 'on', // 始终搜索，获得最强搜索能力
+        return_citations: true, // 返回引用信息
+        sources: [
+          {
+            type: 'web',
+            safe_search: false, // 不限制内容以获得更全面的结果
+            country: null, // 不限制国家，获得全球信息
+          },
+          {
+            type: 'news',
+            safe_search: false, // 不限制内容
+            country: null, // 不限制国家
+          },
+          {
+            type: 'x',
+            post_favorite_count: null, // 不限制收藏数，获得更多内容
+            post_view_count: null, // 不限制查看数
+          },
+        ],
+      },
     };
 
     const abortController = new AbortController();
@@ -244,7 +276,7 @@ export class ModelWrapper {
         console.error('xAI代理请求失败:', {
           status: response.status,
           statusText: response.statusText,
-          errorText
+          errorText,
         });
         return {
           success: false,
@@ -252,7 +284,7 @@ export class ModelWrapper {
         };
       }
 
-      const responseData = await response.json() as {
+      const responseData = (await response.json()) as {
         choices?: Array<{
           message?: {
             content?: string;
@@ -265,10 +297,10 @@ export class ModelWrapper {
           total_tokens?: number;
         };
       };
-      
+
       console.log('xAI代理响应成功 (文本):', {
         model: responseData.model,
-        usage: responseData.usage
+        usage: responseData.usage,
       });
 
       // 提取消息内容
@@ -283,23 +315,24 @@ export class ModelWrapper {
       return {
         success: true,
         data: content,
-        usage: responseData.usage ? {
-          promptTokens: responseData.usage.prompt_tokens || 0,
-          completionTokens: responseData.usage.completion_tokens || 0,
-          totalTokens: responseData.usage.total_tokens || 0,
-        } : undefined,
+        usage: responseData.usage
+          ? {
+              promptTokens: responseData.usage.prompt_tokens || 0,
+              completionTokens: responseData.usage.completion_tokens || 0,
+              totalTokens: responseData.usage.total_tokens || 0,
+            }
+          : undefined,
       };
-
     } catch (error: any) {
       clearTimeout(timeoutId);
-      
+
       if (error.name === 'AbortError') {
         return {
           success: false,
           error: `xAI代理请求超时 (${timeout}ms)`,
         };
       }
-      
+
       return {
         success: false,
         error: error.message || 'xAI代理调用失败',
@@ -314,13 +347,10 @@ export class ModelWrapper {
     messages: LLMMessage[],
     options: LLMCallOptions = {}
   ): Promise<LLMResponse<T>> {
-    const {
-      temperature = 0.7,
-      timeout = 10 * 60 * 1000,
-    } = options;
+    const { temperature = 0.7, timeout = 10 * 60 * 1000 } = options;
 
     const proxyUrl = `${config.ai.xai!.proxyUrl}/v1/chat/completions`;
-    
+
     console.log('调用xAI代理 (JSON):', {
       url: proxyUrl,
       messageCount: messages.length,
@@ -331,10 +361,49 @@ export class ModelWrapper {
       model: config.ai.xai!.model,
       messages: messages.map(msg => ({
         role: msg.role,
-        content: msg.content
+        content: msg.content,
       })),
+      // 基础性能参数 - 最强配置
+      // max_completion_tokens: 32768, // 最大输出token数
       temperature,
-      response_format: { type: "json_object" }
+      // top_p: 0.95, // 核采样，保持创造性和准确性的平衡
+
+      // 日志概率 - 获取模型置信度信息
+      // logprobs: true,
+      // top_logprobs: 8, // 最大值，获得最详细的概率信息
+
+      // 工具调用支持
+      // parallel_tool_calls: true, // 支持并行工具调用
+      // tool_choice: 'auto', // 自动选择是否使用工具
+
+      // JSON响应格式 - 强制JSON输出
+      response_format: {
+        type: 'json_object', // 确保返回有效的JSON格式
+      },
+
+      // 搜索参数 - 最强搜索配置
+      search_parameters: {
+        max_search_results: 30, // 最大搜索结果数
+        mode: 'on', // 始终搜索，获得最强搜索能力
+        return_citations: true, // 返回引用信息
+        sources: [
+          {
+            type: 'web',
+            safe_search: false, // 不限制内容以获得更全面的结果
+            country: null, // 不限制国家，获得全球信息
+          },
+          {
+            type: 'news',
+            safe_search: false, // 不限制内容
+            country: null, // 不限制国家
+          },
+          {
+            type: 'x',
+            post_favorite_count: null, // 不限制收藏数，获得更多内容
+            post_view_count: null, // 不限制查看数
+          },
+        ],
+      },
     };
 
     const abortController = new AbortController();
@@ -360,7 +429,7 @@ export class ModelWrapper {
         console.error('xAI代理请求失败:', {
           status: response.status,
           statusText: response.statusText,
-          errorText
+          errorText,
         });
         return {
           success: false,
@@ -368,7 +437,7 @@ export class ModelWrapper {
         };
       }
 
-      const responseData = await response.json() as {
+      const responseData = (await response.json()) as {
         choices?: Array<{
           message?: {
             content?: string;
@@ -381,10 +450,10 @@ export class ModelWrapper {
           total_tokens?: number;
         };
       };
-      
+
       console.log('xAI代理响应成功 (JSON):', {
         model: responseData.model,
-        usage: responseData.usage
+        usage: responseData.usage,
       });
 
       // 提取消息内容
@@ -418,23 +487,24 @@ export class ModelWrapper {
       return {
         success: true,
         data: parsedData,
-        usage: responseData.usage ? {
-          promptTokens: responseData.usage.prompt_tokens || 0,
-          completionTokens: responseData.usage.completion_tokens || 0,
-          totalTokens: responseData.usage.total_tokens || 0,
-        } : undefined,
+        usage: responseData.usage
+          ? {
+              promptTokens: responseData.usage.prompt_tokens || 0,
+              completionTokens: responseData.usage.completion_tokens || 0,
+              totalTokens: responseData.usage.total_tokens || 0,
+            }
+          : undefined,
       };
-
     } catch (error: any) {
       clearTimeout(timeoutId);
-      
+
       if (error.name === 'AbortError') {
         return {
           success: false,
           error: `xAI代理请求超时 (${timeout}ms)`,
         };
       }
-      
+
       return {
         success: false,
         error: error.message || 'xAI代理调用失败',
@@ -567,7 +637,7 @@ class AiService {
           baseURL: config.ai.xai.proxyUrl,
           headers: {
             'x-xai-api-key': config.ai.xai.apiKey,
-          }
+          },
         });
         return xai(config.ai.xai.model);
 
