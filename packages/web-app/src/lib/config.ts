@@ -29,6 +29,10 @@ export const config = {
     qwen: {
       model: process.env.QWEN_MODEL || 'qwen-max',
       apiKey: process.env.QWEN_API_KEY || ''
+    },
+    xai: {
+      model: process.env.XAI_MODEL || 'grok-4',
+      apiKey: process.env.XAI_API_KEY || ''
     }
   },
   

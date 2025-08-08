@@ -3,6 +3,7 @@ import { generateObject, generateText } from 'ai';
 import { deepseek } from '@ai-sdk/deepseek';
 import { google } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
+import { xai } from '@ai-sdk/xai';
 import { z } from 'zod';
 import { config } from '../config';
 import { notificationService } from '../services/notification';
@@ -78,7 +79,7 @@ class AiService {
   /**
    * 创建指定provider的模型
    */
-  private async createModel(providerName: string): Promise<any> {
+  async createModel(providerName: string): Promise<any> {
     switch (providerName) {
       case 'deepseek':
         if (!config.ai.deepseek.apiKey) {
@@ -107,6 +108,14 @@ class AiService {
         });
         return qwen(config.ai.qwen.model);
 
+      case 'xai':
+        if (!config.ai.xai.apiKey) {
+          throw new Error('xAI API Key 未配置');
+        }
+        // 设置环境变量给xAI SDK使用
+        process.env.XAI_API_KEY = config.ai.xai.apiKey;
+        return xai(config.ai.xai.model);
+
       default:
         throw new Error(`不支持的AI提供商: ${providerName}`);
     }
@@ -126,6 +135,8 @@ class AiService {
         return config.ai.google.model;
       case 'qwen':
         return config.ai.qwen.model;
+      case 'xai':
+        return config.ai.xai.model;
       default:
         return 'unknown';
     }
@@ -145,6 +156,8 @@ class AiService {
         return config.ai.google.model;
       case 'qwen':
         return config.ai.qwen.model;
+      case 'xai':
+        return config.ai.xai.model;
       default:
         return 'unknown';
     }
