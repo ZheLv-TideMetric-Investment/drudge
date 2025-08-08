@@ -32,7 +32,8 @@ export const config = {
     },
     xai: {
       model: process.env.XAI_MODEL || 'grok-4',
-      apiKey: process.env.XAI_API_KEY || ''
+      apiKey: process.env.XAI_API_KEY || '',
+      proxyUrl: process.env.XAI_PROXY_URL || '',
     }
   },
   

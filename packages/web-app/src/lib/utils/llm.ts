@@ -3,7 +3,6 @@ import { generateObject, generateText } from 'ai';
 import { deepseek } from '@ai-sdk/deepseek';
 import { google } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
-import { xai } from '@ai-sdk/xai';
 import { z } from 'zod';
 import { config } from '../config';
 import { notificationService } from '../services/notification';
@@ -20,12 +19,184 @@ export function createMessages(systemPrompt: string, userPrompt: string): LLMMes
 }
 
 /**
+ * 模型包装器类 - 提供统一的call接口
+ */
+export class ModelWrapper {
+  private rawModel: any;
+  private providerName: string;
+  private mockMode: boolean;
+
+  constructor(rawModel: any, providerName: string, mockMode: boolean = false) {
+    this.rawModel = rawModel;
+    this.providerName = providerName;
+    this.mockMode = mockMode;
+  }
+
+  /**
+   * 统一的call接口 - 返回文本响应
+   */
+  async call(messages: LLMMessage[], options: LLMCallOptions = {}): Promise<LLMResponse<string>> {
+    if (this.mockMode) {
+      return this.getMockTextResponse(messages, options);
+    }
+
+    try {
+      // 构建消息格式
+      const formattedMessages = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      // 调用AI生成文本
+      const result = await generateText({
+        model: this.rawModel,
+        messages: formattedMessages,
+        temperature: options.temperature || 0.7,
+      });
+
+      console.log(`✅ ${this.providerName} 模型调用成功`);
+
+      return {
+        success: true,
+        data: result.text,
+        usage: result.usage
+          ? {
+              promptTokens: result.usage.promptTokens,
+              completionTokens: result.usage.completionTokens,
+              totalTokens: result.usage.totalTokens,
+            }
+          : undefined,
+      };
+    } catch (error: any) {
+      console.error(`❌ ${this.providerName} 模型调用失败:`, error);
+      return {
+        success: false,
+        error: error.message || `${this.providerName} 模型调用失败`,
+      };
+    }
+  }
+
+  /**
+   * JSON响应调用接口
+   */
+  async callWithJson<T = any>(
+    messages: LLMMessage[],
+    options: LLMCallOptions = {}
+  ): Promise<LLMResponse<T>> {
+    if (this.mockMode) {
+      return this.getMockJsonResponse<T>(messages, options);
+    }
+
+    try {
+      // 构建消息格式
+      const formattedMessages = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
+
+      // 设置默认schema
+      const schema = options.schema || z.object({});
+
+      // 调用AI生成对象
+      const result = await generateObject({
+        model: this.rawModel,
+        messages: formattedMessages,
+        schema: schema,
+        temperature: options.temperature || 0.7,
+      });
+
+      console.log(`✅ ${this.providerName} 模型JSON调用成功`);
+
+      return {
+        success: true,
+        data: result.object as T,
+        usage: result.usage
+          ? {
+              promptTokens: result.usage.promptTokens,
+              completionTokens: result.usage.completionTokens,
+              totalTokens: result.usage.totalTokens,
+            }
+          : undefined,
+      };
+    } catch (error: any) {
+      console.error(`❌ ${this.providerName} 模型JSON调用失败:`, error);
+      return {
+        success: false,
+        error: error.message || `${this.providerName} 模型JSON调用失败`,
+      };
+    }
+  }
+
+  /**
+   * 获取模拟文本响应
+   */
+  private getMockTextResponse(
+    messages: LLMMessage[],
+    options: LLMCallOptions
+  ): LLMResponse<string> {
+    console.warn(`⚠️ 使用${this.providerName}模拟文本响应`);
+    return {
+      success: true,
+      data: `这是${this.providerName}的模拟响应：基于您的问题，我提供了一个模拟回答。`,
+      usage: {
+        promptTokens: 100,
+        completionTokens: 50,
+        totalTokens: 150,
+      },
+    };
+  }
+
+  /**
+   * 获取模拟JSON响应
+   */
+  private getMockJsonResponse<T>(messages: LLMMessage[], options: LLMCallOptions): LLMResponse<T> {
+    console.warn(`⚠️ 使用${this.providerName}模拟JSON响应`);
+    const mockResponse = {
+      message: `这是${this.providerName}的模拟JSON响应`,
+      provider: this.providerName,
+      timestamp: new Date().toISOString(),
+    };
+
+    return {
+      success: true,
+      data: mockResponse as T,
+      usage: {
+        promptTokens: 100,
+        completionTokens: 50,
+        totalTokens: 150,
+      },
+    };
+  }
+
+  /**
+   * 获取提供商信息
+   */
+  getProviderName(): string {
+    return this.providerName;
+  }
+
+  /**
+   * 检查是否为模拟模式
+   */
+  isMockMode(): boolean {
+    return this.mockMode;
+  }
+
+  /**
+   * 获取原始模型（用于高级用法）
+   */
+  getRawModel(): any {
+    return this.rawModel;
+  }
+}
+
+/**
  * AI 服务类
  * 负责通用的AI模型调用功能
  */
 class AiService {
-  private model: any;
-  private simpleModel: any;
+  private model: ModelWrapper | null = null;
+  private simpleModel: ModelWrapper | null = null;
   private initialized: boolean = false;
   private mockMode: boolean = false;
 
@@ -53,14 +224,18 @@ class AiService {
       }
 
       this.initialized = true;
-      this.mockMode = false;
+      this.mockMode = this.model?.isMockMode() || false;
       console.log('✅ AI服务完全初始化完成');
     } catch (error: any) {
       console.error('❌ AI服务初始化失败，切换到模拟模式:', error);
 
       // 切换到模拟模式
-      this.model = { provider: 'mock' };
-      this.simpleModel = { provider: 'mock' }; // 同时设置简单模型
+      this.model = new ModelWrapper({ provider: 'mock' }, config?.ai?.provider || 'unknown', true);
+      this.simpleModel = new ModelWrapper(
+        { provider: 'mock' },
+        config?.ai?.simpleProvider || 'unknown',
+        true
+      );
       this.initialized = true;
       this.mockMode = true;
 
@@ -77,9 +252,23 @@ class AiService {
   }
 
   /**
-   * 创建指定provider的模型
+   * 创建指定provider的模型包装器
    */
-  async createModel(providerName: string): Promise<any> {
+  async createModel(providerName: string): Promise<ModelWrapper> {
+    try {
+      const rawModel = await this.createRawModel(providerName);
+      return new ModelWrapper(rawModel, providerName, this.mockMode);
+    } catch (error: any) {
+      console.warn(`⚠️ 创建${providerName}模型失败，返回模拟模型:`, error.message);
+      // 如果创建失败，返回模拟模式的ModelWrapper
+      return new ModelWrapper({ provider: 'mock' }, providerName, true);
+    }
+  }
+
+  /**
+   * 创建原始AI SDK模型（内部方法）
+   */
+  private async createRawModel(providerName: string): Promise<any> {
     switch (providerName) {
       case 'deepseek':
         if (!config.ai.deepseek.apiKey) {
@@ -112,8 +301,11 @@ class AiService {
         if (!config.ai.xai.apiKey) {
           throw new Error('xAI API Key 未配置');
         }
-        // 设置环境变量给xAI SDK使用
-        process.env.XAI_API_KEY = config.ai.xai.apiKey;
+        // 使用代理服务访问 xAI
+        const xai = createOpenAI({
+          apiKey: config.ai.xai.apiKey,
+          baseURL: config.ai.xai.proxyUrl,
+        });
         return xai(config.ai.xai.model);
 
       default:
@@ -125,7 +317,7 @@ class AiService {
    * 获取当前模型名称
    */
   private getModelName(): string {
-    if (this.mockMode) return 'mock';
+    if (this.model?.isMockMode()) return 'mock';
 
     const provider = config.ai.provider;
     switch (provider) {
@@ -146,7 +338,7 @@ class AiService {
    * 获取简单模型名称
    */
   private getSimpleModelName(): string {
-    if (this.mockMode) return 'mock';
+    if (this.simpleModel?.isMockMode()) return 'mock';
 
     const provider = config.ai.simpleProvider;
     switch (provider) {
@@ -174,42 +366,12 @@ class AiService {
         await this.initialize();
       }
 
-      // 如果是模拟模式，返回模拟响应
-      if (this.mockMode) {
-        return this.getMockResponse<string>(messages, options);
+      if (!this.model) {
+        throw new Error('主模型未初始化');
       }
 
-      // 真实AI调用
-      console.log(`🤖 调用AI: ${config.ai.provider} - ${this.getModelName()}`);
-      console.log('消息数量:', messages.length);
-
-      // 构建消息格式
-      const formattedMessages = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
-      // 调用AI生成对象
-      const result = await generateText({
-        model: this.model,
-        messages: formattedMessages,
-        temperature: options.temperature || 0.7,
-        // timeout: options.timeout || 30000, // 30秒超时
-      });
-
-      console.log('✅ AI调用成功');
-
-      return {
-        success: true,
-        data: result.text,
-        usage: result.usage
-          ? {
-              promptTokens: result.usage.promptTokens,
-              completionTokens: result.usage.completionTokens,
-              totalTokens: result.usage.totalTokens,
-            }
-          : undefined,
-      };
+      // 使用ModelWrapper的call方法
+      return await this.model.call(messages, options);
     } catch (error: any) {
       console.error('❌ LLM调用失败:', error);
 
@@ -221,12 +383,6 @@ class AiService {
         );
       } catch (notifyError) {
         console.error('发送AI服务调用失败通知失败:', notifyError);
-      }
-
-      // 如果真实调用失败，尝试返回模拟响应
-      if (!this.mockMode) {
-        console.warn('真实AI调用失败，返回模拟响应');
-        return this.getMockResponse<string>(messages, options);
       }
 
       return {
@@ -250,68 +406,28 @@ class AiService {
         await this.initialize();
       }
 
-      // 如果是模拟模式，返回模拟响应
-      if (this.mockMode) {
-        return this.getMockResponse<T>(messages, options);
+      if (!this.model) {
+        throw new Error('主模型未初始化');
       }
 
-      // 真实AI调用
-      console.log(`🤖 调用AI: ${config.ai.provider} - ${this.getModelName()}`);
-      console.log('消息数量:', messages.length);
-
-      // 构建消息格式
-      const formattedMessages = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
-      // 设置默认schema
-      const schema = options.schema || z.object({});
-
-      // 调用AI生成对象
-      const result = await generateObject({
-        model: this.model,
-        messages: formattedMessages,
-        schema: schema,
-        temperature: options.temperature || 0.7,
-        // timeout: options.timeout || 30000, // 30秒超时
-      });
-
-      console.log('✅ AI调用成功');
-
-      return {
-        success: true,
-        data: result.object as T,
-        usage: result.usage
-          ? {
-              promptTokens: result.usage.promptTokens,
-              completionTokens: result.usage.completionTokens,
-              totalTokens: result.usage.totalTokens,
-            }
-          : undefined,
-      };
+      // 使用ModelWrapper的callWithJson方法
+      return await this.model.callWithJson<T>(messages, options);
     } catch (error: any) {
-      console.error('❌ LLM调用失败:', error);
+      console.error('❌ LLM JSON调用失败:', error);
 
       // 发送AI服务调用失败通知
       try {
         await notificationService.sendSystemAlert(
           `AI服务调用失败: ${config?.ai?.provider || 'unknown'}`,
-          `模型: ${this.getModelName()}\n错误: ${error.message || 'LLM调用失败'}`
+          `模型: ${this.getModelName()}\n错误: ${error.message || 'LLM JSON调用失败'}`
         );
       } catch (notifyError) {
         console.error('发送AI服务调用失败通知失败:', notifyError);
       }
 
-      // 如果真实调用失败，尝试返回模拟响应
-      if (!this.mockMode) {
-        console.warn('真实AI调用失败，返回模拟响应');
-        return this.getMockResponse<T>(messages, options);
-      }
-
       return {
         success: false,
-        error: error.message || 'LLM调用失败',
+        error: error.message || 'LLM JSON调用失败',
       };
     }
   }
@@ -330,63 +446,19 @@ class AiService {
         await this.initialize();
       }
 
-      // 如果是模拟模式，返回模拟响应
-      if (this.mockMode) {
-        return this.getMockResponse<T>(messages, options);
+      if (!this.simpleModel) {
+        throw new Error('简单模型未初始化');
       }
 
-      // 使用简单AI模型调用
-      console.log(`🚀 调用简单AI: ${config.ai.simpleProvider} - ${this.getSimpleModelName()}`);
-      console.log('消息数量:', messages.length);
+      // 使用较低的温度进行简单任务
+      const simpleOptions = { ...options, temperature: options.temperature || 0.3 };
 
-      // 构建消息格式
-      const formattedMessages = messages.map(msg => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
-      let result;
-
-      // 根据是否需要JSON响应来选择生成方法
+      // 根据是否需要JSON响应来选择调用方法
       if (options.schema) {
-        // 使用 generateObject 生成结构化响应
-        result = await generateObject({
-          model: this.simpleModel,
-          messages: formattedMessages,
-          schema: options.schema,
-          temperature: options.temperature || 0.3, // 简单任务使用较低温度
-        });
-
-        return {
-          success: true,
-          data: result.object as T,
-          usage: result.usage
-            ? {
-                promptTokens: result.usage.promptTokens,
-                completionTokens: result.usage.completionTokens,
-                totalTokens: result.usage.totalTokens,
-              }
-            : undefined,
-        };
+        return await this.simpleModel.callWithJson<T>(messages, simpleOptions);
       } else {
-        // 使用 generateText 生成文本响应
-        result = await generateText({
-          model: this.simpleModel,
-          messages: formattedMessages,
-          temperature: options.temperature || 0.3, // 简单任务使用较低温度
-        });
-
-        return {
-          success: true,
-          data: result.text as T,
-          usage: result.usage
-            ? {
-                promptTokens: result.usage.promptTokens,
-                completionTokens: result.usage.completionTokens,
-                totalTokens: result.usage.totalTokens,
-              }
-            : undefined,
-        };
+        const result = await this.simpleModel.call(messages, simpleOptions);
+        return result as LLMResponse<T>;
       }
     } catch (error: any) {
       console.error('❌ 简单AI调用失败:', error);
@@ -402,7 +474,7 @@ class AiService {
       }
 
       // 如果简单AI调用失败，尝试使用主AI
-      if (!this.mockMode) {
+      if (this.model) {
         console.warn('简单AI调用失败，尝试使用主AI');
         if (options.schema) {
           return this.callLLMWithJsonResponse<T>(messages, options);
@@ -416,39 +488,6 @@ class AiService {
         error: error.message || '简单AI调用失败',
       };
     }
-  }
-
-  /**
-   * 获取模拟响应
-   */
-  private getMockResponse<T>(messages: LLMMessage[], options: LLMCallOptions): LLMResponse<T> {
-    console.warn('⚠️  使用AI模拟响应');
-    console.log('模拟AI调用:', {
-      messageCount: messages.length,
-      firstMessage: messages[0]?.content?.substring(0, 100) + '...',
-      options: { ...options, schema: options.schema ? 'provided' : 'default' },
-      modelProvider: 'mock',
-    });
-
-    // 模拟响应结构
-    const mockResponse = {
-      overall_summary: '本时段新闻情况正常（模拟响应）',
-      key_highlights: ['重要事件1（模拟）', '重要事件2（模拟）'],
-      market_impact: '市场影响较小（模拟）',
-      focus_areas: ['关注点1（模拟）', '关注点2（模拟）'],
-      severity_assessment: 'low' as const,
-      confidence: 0.8,
-    };
-
-    return {
-      success: true,
-      data: mockResponse as T,
-      usage: {
-        promptTokens: 100,
-        completionTokens: 50,
-        totalTokens: 150,
-      },
-    };
   }
 
   /**
@@ -498,29 +537,6 @@ class AiService {
 
 // 创建单例实例
 const aiService = new AiService();
-
-/**
- * 验证 JSON 响应
- */
-export function validateJsonResponse(
-  data: unknown,
-  schema: z.ZodSchema<unknown>
-): { success: boolean; data?: unknown; error?: string } {
-  try {
-    const validated = schema.parse(data);
-    return {
-      success: true,
-      data: validated,
-    };
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error('JSON 响应验证失败:', error);
-    return {
-      success: false,
-      error: errorMessage,
-    };
-  }
-}
 
 // 导出AI服务实例
 export { aiService };

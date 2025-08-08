@@ -140,8 +140,10 @@ async function callXaiService(
   }
 
   const messages = createMessages(systemPrompt, actualMessage);
-  const model = await aiService.createModel('xai');
-  const response = await model.call(messages);
+  
+  // 使用新的解耦架构 - 自定义创建xAI模型
+  const xaiModel = await aiService.createModel('xai');
+  const response = await xaiModel.call(messages);
 
   if (!response.success) {
     throw new Error(response.error || 'xAI 调用失败');
