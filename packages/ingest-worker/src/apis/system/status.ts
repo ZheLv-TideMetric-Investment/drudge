@@ -1,6 +1,7 @@
 import { logger } from '../../utils/logger';
 import { formatReadable } from '../../utils/time';
 import futuLiveService from '../../services/FutuLiveService';
+import awtmtLiveService from '../../services/AwtmtLiveService';
 import fileStorage from '../../storage/FileStorage';
 
 /**
@@ -11,21 +12,29 @@ export async function getSystemStatus(): Promise<any> {
     // 获取新闻统计
     const stats = await fileStorage.getNewsStats();
     
-    // 检查富途API状态
-    const apiHealthy = await futuLiveService.healthCheck();
+    // 并行检查两个API状态
+    const [futuApiHealthy, awtmtApiHealthy] = await Promise.all([
+      futuLiveService.healthCheck(),
+      awtmtLiveService.healthCheck()
+    ]);
     
     // 获取服务状态
-    const serviceStatus = futuLiveService.getStatus();
+    const futuServiceStatus = futuLiveService.getStatus();
+    const awtmtServiceStatus = awtmtLiveService.getStatus();
 
     return {
       success: true,
       service: 'ingest-worker',
-      source: 'futu_live',
+      sources: ['futu_live', 'awtmt_live'],
       stats,
       connections: {
-        futuLiveApi: apiHealthy ? '✅ 正常' : '❌ 异常'
+        futuLiveApi: futuApiHealthy ? '✅ 正常' : '❌ 异常',
+        awtmtLiveApi: awtmtApiHealthy ? '✅ 正常' : '❌ 异常'
       },
-      serviceStatus,
+      serviceStatus: {
+        futu: futuServiceStatus,
+        awtmt: awtmtServiceStatus
+      },
       timestamp: formatReadable()
     };
   } catch (error: any) {
@@ -45,7 +54,7 @@ export async function healthCheck(): Promise<any> {
   return {
     status: 'ok',
     service: 'ingest-worker',
-    source: 'futu_live',
+    sources: ['futu_live', 'awtmt_live'],
     timestamp: new Date().toISOString(),
     port: process.env.PORT || 39110
   };

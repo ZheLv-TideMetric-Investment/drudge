@@ -7,7 +7,7 @@ import cliHandler from './cli';
 async function initializeCli(): Promise<void> {
   try {
     logger.info('🚀 正在初始化ingest-worker服务...');
-    logger.info('📊 数据源: futu_live');
+    logger.info('📊 数据源: futu_live, awtmt_live');
     logger.info('✅ ingest-worker服务初始化完成');
   } catch (error: any) {
     logger.error('❌ 服务初始化失败:', error);
