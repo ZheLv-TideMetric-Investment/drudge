@@ -45,7 +45,7 @@ const config = {
   dataSource: {
     newsDirectory: process.env.NEWS_DIRECTORY || '../../data/news',
     // 支持的新闻文件前缀
-    supportedPrefixes: ['futu_live']
+    supportedPrefixes: ['futu_live', 'awtmt_live']
   },
   
   // 处理配置 - 优化内存使用

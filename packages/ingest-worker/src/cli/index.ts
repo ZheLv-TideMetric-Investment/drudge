@@ -79,7 +79,7 @@ export class CliHandler {
    */
   private showHelp(): void {
     console.log(`
-📰 ingest-worker CLI 工具 (futu_live数据源)
+📰 ingest-worker CLI 工具 (futu_live, awtmt_live数据源)
 
 用法: npm run cli <command> [options]
 

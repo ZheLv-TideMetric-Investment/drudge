@@ -248,7 +248,7 @@ function convertSingleNewsItem(item: any, fileInfo: FileInfo): NewsItem | null {
       title,
       description,
       content,
-      source: item.source || 'futu_live',
+      source: item.source || 'unknown',
       url: item.url || item.link || item.detailUrl || '',
       timestamp,
       raw_time: rawTime,
