@@ -1,6 +1,7 @@
 import { logger } from './utils/logger';
 import scheduler from './scheduler';
 import { startHttpServer } from './http';
+import { logErrorWithDetails } from './utils/error';
 
 /**
  * 初始化服务
@@ -11,7 +12,7 @@ async function initialize(): Promise<void> {
     logger.info('📊 数据源: futu_live');
     logger.info('✅ ingest-worker服务初始化完成');
   } catch (error: any) {
-    logger.error('❌ 服务初始化失败:', error);
+    logErrorWithDetails('❌ 服务初始化失败:', error);
     process.exit(1);
   }
 }
@@ -34,7 +35,7 @@ async function startMainService(): Promise<void> {
     logger.info('🌐 HTTP API: 端口 39110');
     
   } catch (error: any) {
-    logger.error('❌ 启动主服务失败:', error);
+    logErrorWithDetails('❌ 启动主服务失败:', error);
     process.exit(1);
   }
 }
@@ -69,6 +70,6 @@ async function main(): Promise<void> {
 
 // 启动应用
 main().catch((error) => {
-  logger.error('应用启动失败:', error);
+  logErrorWithDetails('应用启动失败:', error);
   process.exit(1);
-}); 
+});

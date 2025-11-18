@@ -4,6 +4,7 @@ import { logger } from '../utils/logger';
 import { formatForFilename, parseTime, startOfToday, daysAgo } from '../utils/time';
 import config from '../config/config';
 import notificationService from '../services/NotificationService';
+import { buildErrorDetails, logErrorWithDetails } from '../utils/error';
 
 /**
  * 新闻数据接口
@@ -42,7 +43,7 @@ export class FileStorage {
     try {
       await fs.promises.mkdir(this.dataPath, { recursive: true });
     } catch (error: any) {
-      logger.error('创建数据目录失败:', error);
+      logErrorWithDetails('创建数据目录失败:', error, { dataPath: this.dataPath });
     }
   }
 
@@ -73,14 +74,18 @@ export class FileStorage {
         logger.info(`✅ 保存新闻到文件: ${filename} (${sourceNews.length}条)`);
         savedFiles.push(filename);
       } catch (error: any) {
-        logger.error(`❌ 保存新闻文件失败: ${filename}`, error);
+        const errorDetails = logErrorWithDetails(`❌ 保存新闻文件失败: ${filename}`, error, {
+          source,
+          count: sourceNews.length,
+          filePath
+        });
         
         // 发送文件保存失败通知
         try {
           await notificationService.sendFileSaveFailureNotification(
             filename,
             sourceNews.length,
-            error.message || '文件写入失败'
+            errorDetails.message || '文件写入失败'
           );
         } catch (notifyError) {
           logger.error('发送文件保存失败通知失败:', notifyError);
@@ -108,7 +113,8 @@ export class FileStorage {
       
       return news.length > 0 ? news[0].id : null;
     } catch (error: any) {
-      logger.warn(`获取最新新闻ID失败 (source: ${source}):`, error);
+      const errorDetails = buildErrorDetails(error, { source });
+      logger.warn(`获取最新新闻ID失败 (source: ${source}):`, errorDetails);
       return null;
     }
   }
@@ -145,13 +151,14 @@ export class FileStorage {
           const news: NewsItem[] = JSON.parse(content);
           allNews.push(...news);
         } catch (error: any) {
-          logger.warn(`读取文件失败: ${file}`, error.message);
+          const errorDetails = buildErrorDetails(error, { file });
+          logger.warn(`读取文件失败: ${file}`, errorDetails);
         }
       }
       
       return allNews.sort((a, b) => b.time - a.time);
     } catch (error: any) {
-      logger.error('获取所有新闻失败:', error);
+      logErrorWithDetails('获取所有新闻失败:', error);
       return [];
     }
   }
@@ -185,7 +192,8 @@ export class FileStorage {
           
           allNews.push(...filteredNews);
         } catch (error: any) {
-          logger.warn(`读取文件失败: ${file}`, error.message);
+          const errorDetails = buildErrorDetails(error, { file });
+          logger.warn(`读取文件失败: ${file}`, errorDetails);
         }
       }
       
@@ -239,7 +247,8 @@ export class FileStorage {
           recentCount += recentNews.length;
           
         } catch (error: any) {
-          logger.warn(`读取文件失败: ${file}`, error.message);
+          const errorDetails = buildErrorDetails(error, { file });
+          logger.warn(`读取文件失败: ${file}`, errorDetails);
         }
       }
       
@@ -288,7 +297,8 @@ export class FileStorage {
             remainingCount++;
           }
         } catch (error: any) {
-          logger.warn(`处理文件失败: ${file}`, error.message);
+          const errorDetails = buildErrorDetails(error, { file });
+          logger.warn(`处理文件失败: ${file}`, errorDetails);
         }
       }
       
@@ -298,7 +308,7 @@ export class FileStorage {
         message: `清理完成: 删除 ${deletedCount} 个文件，保留 ${remainingCount} 个文件`
       };
     } catch (error: any) {
-      logger.error('清理旧文件失败:', error);
+      logErrorWithDetails('清理旧文件失败:', error);
       throw error;
     }
   }

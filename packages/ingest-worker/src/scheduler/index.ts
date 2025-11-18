@@ -1,6 +1,7 @@
 import * as cron from 'node-cron';
 import { logger } from '../utils/logger';
 import { fetchLatestNews } from '../apis/news/fetch';
+import { logErrorWithDetails } from '../utils/error';
 
 /**
  * 定时任务调度器
@@ -46,11 +47,16 @@ export class Scheduler {
         if (result.success) {
           logger.info(`✅ 定时任务：新闻获取完成，获取${result.count}条，耗时${duration}ms`);
         } else {
-          logger.error(`❌ 定时任务：新闻获取失败 - ${result.error}`);
+          logger.error(`❌ 定时任务：新闻获取失败 - ${result.error}`, {
+            details: result.details,
+            durationMs: duration
+          });
         }
       } catch (error: any) {
         const duration = Date.now() - startTime;
-        logger.error(`❌ 定时任务：新闻获取异常，耗时${duration}ms`, error);
+        logErrorWithDetails(`❌ 定时任务：新闻获取异常，耗时${duration}ms`, error, {
+          durationMs: duration
+        });
       }
     }, {
       timezone: 'Asia/Shanghai'

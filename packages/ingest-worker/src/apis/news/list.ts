@@ -1,6 +1,7 @@
 import { logger } from '../../utils/logger';
 import { formatReadable, parseTime } from '../../utils/time';
 import fileStorage from '../../storage/FileStorage';
+import { logErrorWithDetails } from '../../utils/error';
 
 /**
  * 获取新闻列表
@@ -23,11 +24,12 @@ export async function getNewsList(limit: number = 10): Promise<any> {
       timestamp: formatReadable()
     };
   } catch (error: any) {
-    logger.error('获取新闻列表失败:', error);
+    const errorDetails = logErrorWithDetails('获取新闻列表失败:', error);
     return {
       success: false,
       count: 0,
-      error: error.message,
+      error: errorDetails.message,
+      details: errorDetails,
       timestamp: formatReadable()
     };
   }
@@ -54,12 +56,13 @@ export async function getNewsByTimeRange(startTime: any, endTime: any): Promise<
       timestamp: formatReadable()
     };
   } catch (error: any) {
-    logger.error('按时间范围获取新闻失败:', error);
+    const errorDetails = logErrorWithDetails('按时间范围获取新闻失败:', error);
     return {
       success: false,
       count: 0,
-      error: error.message,
+      error: errorDetails.message,
+      details: errorDetails,
       timestamp: formatReadable()
     };
   }
-} 
+}

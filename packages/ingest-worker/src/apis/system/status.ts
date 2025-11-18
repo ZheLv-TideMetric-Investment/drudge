@@ -3,6 +3,7 @@ import { formatReadable } from '../../utils/time';
 import futuLiveService from '../../services/FutuLiveService';
 import awtmtLiveService from '../../services/AwtmtLiveService';
 import fileStorage from '../../storage/FileStorage';
+import { logErrorWithDetails } from '../../utils/error';
 
 /**
  * 获取系统状态
@@ -38,10 +39,11 @@ export async function getSystemStatus(): Promise<any> {
       timestamp: formatReadable()
     };
   } catch (error: any) {
-    logger.error('获取系统状态失败:', error);
+    const errorDetails = logErrorWithDetails('获取系统状态失败:', error);
     return {
       success: false,
-      error: error.message,
+      error: errorDetails.message,
+      details: errorDetails,
       timestamp: formatReadable()
     };
   }

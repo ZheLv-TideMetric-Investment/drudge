@@ -4,6 +4,7 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
 import config from '../config/config';
+import { logErrorWithDetails } from '../utils/error';
 
 export interface NotificationPayload {
   msgtype: string;
@@ -205,11 +206,12 @@ export class NotificationService {
         });
       }
     } catch (error: any) {
-      logger.error('发送Webhook通知失败', { 
+      const errorDetails = logErrorWithDetails('发送Webhook通知失败', error, {
         title: payload.markdown.title,
-        error: error.message,
-        url: this.config.webhookUrl 
+        url: this.config.webhookUrl
       });
+      // 额外记录在warn级别，避免漏掉序列化失败的情况
+      logger.warn('Webhook通知失败详情', errorDetails);
     }
   }
 
