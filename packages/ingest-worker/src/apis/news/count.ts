@@ -1,6 +1,7 @@
 import { logger } from '../../utils/logger';
 import { formatReadable } from '../../utils/time';
 import fileStorage from '../../storage/FileStorage';
+import { logErrorWithDetails } from '../../utils/error';
 
 /**
  * 获取新闻统计信息
@@ -15,11 +16,12 @@ export async function getNewsCount(): Promise<any> {
       timestamp: formatReadable()
     };
   } catch (error: any) {
-    logger.error('获取新闻统计失败:', error);
+    const errorDetails = logErrorWithDetails('获取新闻统计失败:', error);
     return {
       success: false,
-      error: error.message,
+      error: errorDetails.message,
+      details: errorDetails,
       timestamp: formatReadable()
     };
   }
-} 
+}

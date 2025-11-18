@@ -1,5 +1,6 @@
 import { logger } from '../../utils/logger';
 import { fetchLatestNews } from '../news/fetch';
+import { logErrorWithDetails } from '../../utils/error';
 
 /**
  * 获取调度器状态
@@ -23,10 +24,11 @@ export async function getSchedulerStatus(): Promise<any> {
       timestamp: new Date().toISOString()
     };
   } catch (error: any) {
-    logger.error('获取调度器状态失败:', error);
+    const errorDetails = logErrorWithDetails('获取调度器状态失败:', error);
     return {
       success: false,
-      error: error.message,
+      error: errorDetails.message,
+      details: errorDetails,
       timestamp: new Date().toISOString()
     };
   }
@@ -47,11 +49,12 @@ export async function triggerNewsTask(): Promise<any> {
       timestamp: new Date().toISOString()
     };
   } catch (error: any) {
-    logger.error('手动触发新闻获取任务失败:', error);
+    const errorDetails = logErrorWithDetails('手动触发新闻获取任务失败:', error);
     return {
       success: false,
-      error: error.message,
+      error: errorDetails.message,
+      details: errorDetails,
       timestamp: new Date().toISOString()
     };
   }
-} 
+}

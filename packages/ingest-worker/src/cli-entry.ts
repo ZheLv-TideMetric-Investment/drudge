@@ -1,5 +1,6 @@
 import { logger } from './utils/logger';
 import cliHandler from './cli';
+import { logErrorWithDetails } from './utils/error';
 
 /**
  * 初始化CLI环境
@@ -10,7 +11,7 @@ async function initializeCli(): Promise<void> {
     logger.info('📊 数据源: futu_live, awtmt_live');
     logger.info('✅ ingest-worker服务初始化完成');
   } catch (error: any) {
-    logger.error('❌ 服务初始化失败:', error);
+    logErrorWithDetails('❌ 服务初始化失败:', error);
     process.exit(1);
   }
 }
@@ -30,6 +31,6 @@ async function main(): Promise<void> {
 
 // 启动CLI
 main().catch((error) => {
-  logger.error('CLI启动失败:', error);
+  logErrorWithDetails('CLI启动失败:', error);
   process.exit(1);
-}); 
+});

@@ -5,6 +5,7 @@ import { getNewsCount } from '../apis/news/count';
 import { cleanOldNews } from '../apis/news/clean';
 import { getSystemStatus } from '../apis/system/status';
 import { daysAgo, parseTime } from '../utils/time';
+import { logErrorWithDetails } from '../utils/error';
 
 /**
  * CLI命令处理器
@@ -69,7 +70,7 @@ export class CliHandler {
           process.exit(1);
       }
     } catch (error: any) {
-      logger.error('CLI命令执行失败:', error);
+      logErrorWithDetails('CLI命令执行失败:', error, { command, args });
       process.exit(1);
     }
   }

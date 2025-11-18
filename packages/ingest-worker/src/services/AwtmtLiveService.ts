@@ -3,6 +3,7 @@ import { logger } from '../utils/logger';
 import config from '../config/config';
 import fileStorage, { NewsItem } from '../storage/FileStorage';
 import notificationService from './NotificationService';
+import { logErrorWithDetails } from '../utils/error';
 
 /**
  * 随机生成 User-Agent
@@ -88,6 +89,13 @@ export class AwtmtLiveService {
    * 发起HTTP请求
    */
   private async makeRequest(cursor?: string): Promise<any> {
+    const params: any = {
+      channel: 'global-channel',
+      client: 'pc',
+      limit: 20,
+      accept: 'live,vip-live'
+    };
+
     try {
       // 控制请求频率
       const now = Date.now();
@@ -97,13 +105,6 @@ export class AwtmtLiveService {
           setTimeout(resolve, this.minRequestInterval - timeSinceLastRequest)
         );
       }
-
-      const params: any = {
-        channel: 'global-channel',
-        client: 'pc',
-        limit: 20,
-        accept: 'live,vip-live'
-      };
 
       if (cursor) {
         params.cursor = cursor;
@@ -145,11 +146,14 @@ export class AwtmtLiveService {
       this.lastRequestTime = Date.now();
       return response;
     } catch (error: any) {
-      logger.error('[AWTMT] 请求AWTMT新闻API失败:', error.message);
+      const errorDetails = logErrorWithDetails('[AWTMT] 请求AWTMT新闻API失败:', error, {
+        params,
+        cursor
+      });
 
       // 发送API失败通知
       try {
-        await notificationService.sendNewsApiFailureNotification(`[AWTMT] ${error.message}`);
+        await notificationService.sendNewsApiFailureNotification(`[AWTMT] ${errorDetails.message}`);
       } catch (notifyError) {
         logger.error('[AWTMT] 发送API失败通知失败:', notifyError);
       }
@@ -252,13 +256,16 @@ export class AwtmtLiveService {
 
       return allNews;
     } catch (error: any) {
-      logger.error('❌ [AWTMT] 新闻获取失败:', error);
+      const errorDetails = logErrorWithDetails('❌ [AWTMT] 新闻获取失败:', error, {
+        isFirstRun: this.isFirstRun,
+        lastRequestTime: this.lastRequestTime
+      });
 
       // 发送服务异常通知
       try {
         await notificationService.sendServiceErrorNotification(
           'AwtmtLiveService',
-          error.message || '[AWTMT] 新闻获取失败',
+          errorDetails.message || '[AWTMT] 新闻获取失败',
           {
             isFirstRun: this.isFirstRun,
             lastRequestTime: this.lastRequestTime,
@@ -280,7 +287,7 @@ export class AwtmtLiveService {
       const response = await this.makeRequest();
       return response && response.status === 200 && response.data && response.data.code === 20000;
     } catch (error: any) {
-      logger.error('[AWTMT] 新闻API健康检查失败:', error);
+      logErrorWithDetails('[AWTMT] 新闻API健康检查失败:', error);
       return false;
     }
   }

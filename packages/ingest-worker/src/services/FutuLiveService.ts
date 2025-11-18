@@ -3,6 +3,7 @@ import { logger } from '../utils/logger';
 import config from '../config/config';
 import fileStorage, { NewsItem } from '../storage/FileStorage';
 import notificationService from './NotificationService';
+import { logErrorWithDetails } from '../utils/error';
 
 /**
  * 随机生成 User-Agent
@@ -87,6 +88,11 @@ export class FutuLiveService {
    * 发起HTTP请求
    */
   private async makeRequest(seqMark?: string): Promise<any> {
+    const params: any = {
+      pageSize: config.newsApi.pageSize,
+      lang: 'zh-cn',
+    };
+
     try {
       // 控制请求频率
       const now = Date.now();
@@ -97,11 +103,7 @@ export class FutuLiveService {
         );
       }
 
-      const params: any = {
-        pageSize: config.newsApi.pageSize,
-        _t: Date.now(),
-        lang: 'zh-cn',
-      };
+      params._t = Date.now();
 
       if (seqMark) {
         params.seqMark = seqMark;
@@ -140,11 +142,17 @@ export class FutuLiveService {
       this.lastRequestTime = Date.now();
       return response;
     } catch (error: any) {
-      logger.error('请求富途新闻API失败:', error.message);
+      const errorDetails = logErrorWithDetails('请求富途新闻API失败:', error, {
+        params,
+        seqMark
+      });
 
       // 发送API失败通知
       try {
-        await notificationService.sendNewsApiFailureNotification(error.message);
+        await notificationService.sendNewsApiFailureNotification(
+          errorDetails.message,
+          undefined
+        );
       } catch (notifyError) {
         logger.error('发送API失败通知失败:', notifyError);
       }
@@ -247,13 +255,16 @@ export class FutuLiveService {
 
       return allNews;
     } catch (error: any) {
-      logger.error('❌ 富途新闻获取失败:', error);
+      const errorDetails = logErrorWithDetails('❌ 富途新闻获取失败:', error, {
+        isFirstRun: this.isFirstRun,
+        lastRequestTime: this.lastRequestTime
+      });
 
       // 发送服务异常通知
       try {
         await notificationService.sendServiceErrorNotification(
           'FutuLiveService',
-          error.message || '富途新闻获取失败',
+          errorDetails.message || '富途新闻获取失败',
           {
             isFirstRun: this.isFirstRun,
             lastRequestTime: this.lastRequestTime,
@@ -275,7 +286,7 @@ export class FutuLiveService {
       const response = await this.makeRequest();
       return response && response.status === 200;
     } catch (error: any) {
-      logger.error('富途新闻API健康检查失败:', error);
+      logErrorWithDetails('富途新闻API健康检查失败:', error);
       return false;
     }
   }

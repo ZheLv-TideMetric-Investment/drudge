@@ -2,6 +2,7 @@ import { logger } from '../../utils/logger';
 import { formatReadable } from '../../utils/time';
 import futuLiveService from '../../services/FutuLiveService';
 import awtmtLiveService from '../../services/AwtmtLiveService';
+import { logErrorWithDetails } from '../../utils/error';
 
 /**
  * 获取最新新闻
@@ -42,12 +43,13 @@ export async function fetchLatestNews(): Promise<any> {
       news: allNews.slice(0, 5) // 返回前5条作为预览
     };
   } catch (error: any) {
-    logger.error('获取新闻失败:', error);
+    const errorDetails = logErrorWithDetails('获取新闻失败:', error);
     return {
       success: false,
       count: 0,
-      error: error.message,
+      error: errorDetails.message,
+      details: errorDetails,
       timestamp: formatReadable()
     };
   }
-} 
+}

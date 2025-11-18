@@ -1,6 +1,7 @@
 import express, { Request, Response, Express } from 'express';
 import { logger } from '../utils/logger';
 import config from '../config/config';
+import { logErrorWithDetails } from '../utils/error';
 
 // APIs
 import { fetchLatestNews } from '../apis/news/fetch';
@@ -23,7 +24,8 @@ app.get('/health', async (req: Request, res: Response) => {
     const result = await healthCheck();
     res.json(result);
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    const errorDetails = logErrorWithDetails('获取健康检查结果失败', error);
+    res.status(500).json({ error: errorDetails.message, details: errorDetails });
   }
 });
 
@@ -34,10 +36,11 @@ app.post('/trigger/fetch-news', async (req: Request, res: Response) => {
     const result = await fetchLatestNews();
     res.json(result);
   } catch (error: any) {
-    logger.error('新闻获取触发失败:', error);
+    const errorDetails = logErrorWithDetails('新闻获取触发失败:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: errorDetails.message,
+      details: errorDetails
     });
   }
 });
@@ -53,10 +56,11 @@ app.post('/trigger/fetch-batch', async (req: Request, res: Response) => {
     
     res.json(result);
   } catch (error: any) {
-    logger.error('批量新闻获取触发失败:', error);
+    const errorDetails = logErrorWithDetails('批量新闻获取触发失败:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: errorDetails.message,
+      details: errorDetails
     });
   }
 });
@@ -68,10 +72,11 @@ app.get('/api/news/list', async (req: Request, res: Response) => {
     const result = await getNewsList(parseInt(limit as string));
     res.json(result);
   } catch (error: any) {
-    logger.error('获取新闻列表失败:', error);
+    const errorDetails = logErrorWithDetails('获取新闻列表失败:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: errorDetails.message,
+      details: errorDetails
     });
   }
 });
@@ -81,10 +86,11 @@ app.get('/api/news/count', async (req: Request, res: Response) => {
     const result = await getNewsCount();
     res.json(result);
   } catch (error: any) {
-    logger.error('获取新闻统计失败:', error);
+    const errorDetails = logErrorWithDetails('获取新闻统计失败:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: errorDetails.message,
+      details: errorDetails
     });
   }
 });
@@ -94,10 +100,11 @@ app.get('/api/news/status', async (req: Request, res: Response) => {
     const result = await getSystemStatus();
     res.json(result);
   } catch (error: any) {
-    logger.error('获取服务状态失败:', error);
+    const errorDetails = logErrorWithDetails('获取服务状态失败:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: errorDetails.message,
+      details: errorDetails
     });
   }
 });
@@ -108,10 +115,11 @@ app.post('/api/news/clean', async (req: Request, res: Response) => {
     const result = await cleanOldNews(days);
     res.json(result);
   } catch (error: any) {
-    logger.error('清理旧新闻失败:', error);
+    const errorDetails = logErrorWithDetails('清理旧新闻失败:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: errorDetails.message,
+      details: errorDetails
     });
   }
 });
@@ -122,9 +130,11 @@ app.get('/api/scheduler/status', async (req: Request, res: Response) => {
     const result = await getSchedulerStatus();
     res.json(result);
   } catch (error: any) {
+    const errorDetails = logErrorWithDetails('获取调度器状态失败', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: errorDetails.message,
+      details: errorDetails 
     });
   }
 });
@@ -134,9 +144,11 @@ app.post('/api/scheduler/trigger', async (req: Request, res: Response) => {
     const result = await triggerNewsTask();
     res.json(result);
   } catch (error: any) {
+    const errorDetails = logErrorWithDetails('手动触发新闻获取任务失败', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message 
+      error: errorDetails.message,
+      details: errorDetails 
     });
   }
 });
