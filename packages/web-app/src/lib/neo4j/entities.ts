@@ -1,6 +1,4 @@
 import { neo4jConnection } from './connection';
-import { NodeType } from '../../../constants/enums';
-
 /**
  * 实体相关的数据库查询服务
  * 包含所有与实体节点相关的查询操作
@@ -291,7 +289,7 @@ class Neo4jEntitiesService {
     try {
       const cypher = `
         MATCH (entity {name: $entityName})<-[r]-(n:News)
-        RETURN n.id as id, n.title as title, n.level as level, 
+        RETURN n.id as id, n.title as title, n.news_level as level, 
                n.timestamp as timestamp, type(r) as relationType
         ORDER BY n.timestamp DESC
         LIMIT $limit

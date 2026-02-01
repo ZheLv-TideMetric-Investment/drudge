@@ -5,22 +5,27 @@ import config from '../config/config';
 const logFormat = winston.format.combine(
   winston.format.timestamp(),
   winston.format.errors({ stack: true }),
-  winston.format.printf(({ level, message, timestamp, ...meta }) => {
+  winston.format.printf(({ level, message, timestamp: _timestamp, ...meta }) => {
     // 安全地序列化meta，避免循环引用
-    const metaStr = Object.keys(meta).length ? 
-      JSON.stringify(meta, (key, value) => {
-        if (value instanceof Error) {
-          return value.message;
-        }
-        // 过滤掉可能的循环引用对象
-        if (typeof value === 'object' && value !== null) {
-          if (value.constructor && (value.constructor.name === 'ClientRequest' || value.constructor.name === 'IncomingMessage')) {
-            return '[CircularReference]';
+    const metaStr = Object.keys(meta).length
+      ? JSON.stringify(meta, (key, value) => {
+          if (value instanceof Error) {
+            return value.message;
           }
-        }
-        return value;
-      }) : '';
-    
+          // 过滤掉可能的循环引用对象
+          if (typeof value === 'object' && value !== null) {
+            if (
+              value.constructor &&
+              (value.constructor.name === 'ClientRequest' ||
+                value.constructor.name === 'IncomingMessage')
+            ) {
+              return '[CircularReference]';
+            }
+          }
+          return value;
+        })
+      : '';
+
     return `${level}: ${message} ${metaStr}`;
   })
 );
@@ -33,11 +38,8 @@ const logger = winston.createLogger({
   transports: [
     // 控制台输出
     new winston.transports.Console({
-      format: winston.format.combine(
-        winston.format.colorize(),
-        winston.format.simple()
-      )
-    })
+      format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
+    }),
   ],
 });
 
@@ -57,4 +59,4 @@ if (config.log.file) {
   logger.add(new winston.transports.File({ filename: config.log.file }));
 }
 
-export { logger }; 
+export { logger };

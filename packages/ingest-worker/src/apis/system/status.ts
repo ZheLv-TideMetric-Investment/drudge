@@ -1,4 +1,3 @@
-import { logger } from '../../utils/logger';
 import { formatReadable } from '../../utils/time';
 import futuLiveService from '../../services/FutuLiveService';
 import awtmtLiveService from '../../services/AwtmtLiveService';
@@ -12,13 +11,13 @@ export async function getSystemStatus(): Promise<any> {
   try {
     // 获取新闻统计
     const stats = await fileStorage.getNewsStats();
-    
+
     // 并行检查两个API状态
     const [futuApiHealthy, awtmtApiHealthy] = await Promise.all([
       futuLiveService.healthCheck(),
-      awtmtLiveService.healthCheck()
+      awtmtLiveService.healthCheck(),
     ]);
-    
+
     // 获取服务状态
     const futuServiceStatus = futuLiveService.getStatus();
     const awtmtServiceStatus = awtmtLiveService.getStatus();
@@ -30,13 +29,13 @@ export async function getSystemStatus(): Promise<any> {
       stats,
       connections: {
         futuLiveApi: futuApiHealthy ? '✅ 正常' : '❌ 异常',
-        awtmtLiveApi: awtmtApiHealthy ? '✅ 正常' : '❌ 异常'
+        awtmtLiveApi: awtmtApiHealthy ? '✅ 正常' : '❌ 异常',
       },
       serviceStatus: {
         futu: futuServiceStatus,
-        awtmt: awtmtServiceStatus
+        awtmt: awtmtServiceStatus,
       },
-      timestamp: formatReadable()
+      timestamp: formatReadable(),
     };
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('获取系统状态失败:', error);
@@ -44,7 +43,7 @@ export async function getSystemStatus(): Promise<any> {
       success: false,
       error: errorDetails.message,
       details: errorDetails,
-      timestamp: formatReadable()
+      timestamp: formatReadable(),
     };
   }
 }
@@ -58,6 +57,6 @@ export async function healthCheck(): Promise<any> {
     service: 'ingest-worker',
     sources: ['futu_live', 'awtmt_live'],
     timestamp: new Date().toISOString(),
-    port: process.env.PORT || 39110
+    port: process.env.PORT || 39110,
   };
-} 
+}

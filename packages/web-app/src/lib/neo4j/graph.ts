@@ -1,6 +1,6 @@
 import { neo4jConnection } from './connection';
 import { GraphData, Entity, Relationship } from '@/types';
-import { NodeType, SystemRelationshipType } from '../../../constants/enums';
+import { NodeType, SystemRelationshipType, EventLevel } from '../../../constants/enums';
 import { TimeZoneUtils } from '../utils/timezone';
 
 /**
@@ -139,8 +139,8 @@ class Neo4jGraphService {
         WHERE n.timestamp >= $startTime AND n.timestamp <= $endTime
         OPTIONAL MATCH (e)-[]-(entity)
         WITH n, e, count(DISTINCT entity) as entityCount, 
-             CASE WHEN n.news_level = '1' THEN 3 
-                  WHEN n.news_level = '2' THEN 2 
+             CASE WHEN n.news_level = '${EventLevel.LEVEL_1}' THEN 3 
+                  WHEN n.news_level = '${EventLevel.LEVEL_2}' THEN 2 
                   ELSE 1 END as levelWeight
         WITH n, e, entityCount, levelWeight, 
              (entityCount * levelWeight) as hotScore
@@ -343,7 +343,7 @@ class Neo4jGraphService {
   async getCompanyNetwork(companyName?: string, limit: number = 50): Promise<GraphData> {
     try {
       let cypher: string;
-      let parameters: any = { limit };
+      const parameters: any = { limit };
 
       if (companyName) {
         cypher = `
@@ -378,7 +378,7 @@ class Neo4jGraphService {
   async getGraphData(query?: string, limit: number = 100): Promise<any> {
     try {
       let cypher: string;
-      let parameters: any = { limit };
+      const parameters: any = { limit };
 
       if (query) {
         // 有查询条件时，搜索相关节点和关系

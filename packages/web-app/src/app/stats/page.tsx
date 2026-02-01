@@ -8,11 +8,9 @@ import {
   Col, 
   Spin, 
   Alert, 
-  Statistic, 
   Typography, 
   Space,
   Table,
-  Tag,
   Progress,
   Button
 } from 'antd';
@@ -30,20 +28,13 @@ import {
 } from '@ant-design/icons';
 import { Layout } from '../../components/Layout';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 interface NodeStatsRecord {
   key: string;
   nodeType: NodeType;
   count: number;
   name: string;
-  percentage: string;
-}
-
-interface RelationshipRecord {
-  key: string;
-  relationType: string;
-  count: number;
   percentage: string;
 }
 
@@ -177,7 +168,7 @@ export default function StatsPage() {
       title: '占比',
       dataIndex: 'percentage',
       key: 'percentage',
-      render: (percentage: string, record: NodeStatsRecord) => (
+      render: (percentage: string) => (
         <Space direction="vertical" size={2} style={{ width: '100%' }}>
           <div className="newspaper-body">{percentage}%</div>
           <Progress 
@@ -604,6 +595,7 @@ export default function StatsPage() {
                   pagination={false}
                   size="small"
                   scroll={{ y: 300 }}
+                  rowKey="time"
                 />
               </Card>
             </Col>
@@ -624,6 +616,7 @@ export default function StatsPage() {
                   pagination={false}
                   size="small"
                   scroll={{ y: 300 }}
+                  rowKey="date"
                 />
               </Card>
             </Col>

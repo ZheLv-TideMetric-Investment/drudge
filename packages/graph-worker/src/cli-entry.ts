@@ -6,7 +6,7 @@ async function main() {
     logger.info('🚀 正在初始化graph-worker CLI...');
     logger.info('📊 数据源: 本地新闻文件 (futu_live, awtmt_live)');
     logger.info('✅ graph-worker CLI初始化完成');
-    
+
     await runCLI();
 
     process.exit(0);
@@ -16,4 +16,4 @@ async function main() {
   }
 }
 
-main(); 
+main();

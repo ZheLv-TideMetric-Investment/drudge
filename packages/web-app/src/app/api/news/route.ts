@@ -1,12 +1,13 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { tzNews } from '../../../lib/neo4j/timezone-wrapper';
+import { neo4jNewsService } from '../../../lib/neo4j';
 import { 
   parsePaginationParams, 
   buildSuccessResponse, 
   buildErrorResponse,
   validateTimeRange 
 } from '../../../lib/utils/api-helpers';
+import { buildTimeRange, formatTimeFields } from '../../../lib/utils/timezone';
 
 // 请求参数验证模式
 const newsListSchema = z.object({
@@ -55,24 +56,30 @@ export async function GET(request: NextRequest) {
 
     console.log(`[News API] 获取新闻列表请求: 页码=${page}, 每页=${limit}, 关键词=${params.keyword}`);
 
-    // 构建查询条件对象（时区转换在tzNews中自动处理）
+    const timeRange = buildTimeRange(params.startTime, params.endTime);
+
+    // 构建查询条件对象（时间参数转换为UTC）
     const queryConditions = {
       page,
       limit,
-      startTime: params.startTime,  // 北京时间，tzNews会自动转换为UTC
-      endTime: params.endTime,      // 北京时间，tzNews会自动转换为UTC
+      startTime: timeRange.startTime,
+      endTime: timeRange.endTime,
       keyword: params.keyword,
       level: params.level,
       sortBy: params.sortBy,
       sortOrder: params.sortOrder
     };
 
-    // 使用时区感知的新闻服务获取新闻列表
-    const result = await tzNews.getNewsWithPagination(queryConditions);
+    const result = await neo4jNewsService.getNewsWithPagination(queryConditions);
+    const formattedNews = formatTimeFields(
+      result.news,
+      ['timestamp', 'processedAt'],
+      'YYYY-MM-DD HH:mm:ss'
+    );
 
     // 构建分页响应数据
     const responseData = {
-      news: result.news,  // 时间字段已经自动格式化为北京时间
+      news: formattedNews,
       pagination: {
         page,
         limit,
@@ -92,7 +99,7 @@ export async function GET(request: NextRequest) {
     };
 
     return buildSuccessResponse(responseData, {
-      timeFields: [], // 时间字段已经由tzNews处理，无需重复格式化
+      timeFields: [],
       message: `成功获取${result.news.length}条新闻`
     });
 

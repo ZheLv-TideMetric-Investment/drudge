@@ -1,0 +1,35 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`api/graph/stats returns graph stats payload 1`] = `
+{
+  "data": {
+    "graphStats": {
+      "generated_at": "2024-01-01 08:00:00",
+      "generated_at_utc": "2024-01-01T00:00:00.000Z",
+      "nodes": [],
+    },
+    "metadata": {
+      "generated_at": "2024-01-01 08:00:00",
+      "timezone": "Asia/Shanghai",
+    },
+    "overview": {
+      "period": {
+        "end": "2024-01-01 23:59:59",
+        "start": "2024-01-01 00:00:00",
+        "timezone": "Asia/Shanghai",
+      },
+      "total": 1,
+    },
+    "timeStats": {
+      "metadata": {
+        "beijing_now": "2024-01-01 08:00:00",
+        "timezone": "Asia/Shanghai",
+      },
+    },
+  },
+  "message": "成功获取图谱统计数据",
+  "success": true,
+  "timestamp": "2024-01-01 08:00:00",
+  "timezone": "Asia/Shanghai",
+}
+`;

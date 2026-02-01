@@ -56,7 +56,7 @@ export class FutuLiveService {
       author: '',
       category: '',
       summary: item.content ? item.content.substring(0, 200) : '',
-      raw: item // 保存原始数据
+      raw: item, // 保存原始数据
     };
   }
 
@@ -144,15 +144,12 @@ export class FutuLiveService {
     } catch (error: any) {
       const errorDetails = logErrorWithDetails('请求富途新闻API失败:', error, {
         params,
-        seqMark
+        seqMark,
       });
 
       // 发送API失败通知
       try {
-        await notificationService.sendNewsApiFailureNotification(
-          errorDetails.message,
-          undefined
-        );
+        await notificationService.sendNewsApiFailureNotification(errorDetails.message, undefined);
       } catch (notifyError) {
         logger.error('发送API失败通知失败:', notifyError);
       }
@@ -257,7 +254,7 @@ export class FutuLiveService {
     } catch (error: any) {
       const errorDetails = logErrorWithDetails('❌ 富途新闻获取失败:', error, {
         isFirstRun: this.isFirstRun,
-        lastRequestTime: this.lastRequestTime
+        lastRequestTime: this.lastRequestTime,
       });
 
       // 发送服务异常通知

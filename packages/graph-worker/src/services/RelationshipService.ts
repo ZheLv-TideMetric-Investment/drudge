@@ -2,14 +2,7 @@ import { logger } from '../utils/logger';
 import neo4jService from './Neo4jService';
 
 import { RELATIONSHIP_TYPES, SYSTEM_RELATIONSHIP_TYPES } from '../constants/enums';
-import { 
-  NewsExtractionResult, 
-  Relationship,
-  Company,
-  Person,
-  Organization,
-  Location
-} from '../types/index';
+import { NewsExtractionResult, Relationship } from '../types/index';
 
 /**
  * 关系服务
@@ -28,7 +21,7 @@ export class RelationshipService {
    */
   async initialize(): Promise<void> {
     if (this.initialized) return;
-    
+
     try {
       await this.neo4j.initialize();
       this.initialized = true;
@@ -49,7 +42,7 @@ export class RelationshipService {
 
     // 清理关系类型，确保是有效的Neo4j关系类型
     const cleanRelType = this.sanitizeRelationshipType(relationship.type);
-    
+
     const cypher = `
       MATCH (from) 
       WHERE from.name = $fromName 
@@ -84,7 +77,10 @@ export class RelationshipService {
       await this.neo4j.executeQuery(cypher, parameters);
       logger.debug(`关系创建成功: ${relationship.from} -[${cleanRelType}]-> ${relationship.to}`);
     } catch (error) {
-      logger.warn(`关系创建失败: ${relationship.from} -[${cleanRelType}]-> ${relationship.to}`, error);
+      logger.warn(
+        `关系创建失败: ${relationship.from} -[${cleanRelType}]-> ${relationship.to}`,
+        error
+      );
     }
   }
 
@@ -104,7 +100,7 @@ export class RelationshipService {
       for (const relationship of result.relationships) {
         const cleanRelType = this.sanitizeRelationshipType(relationship.type);
         const paramKey = `rel_${paramIndex}`;
-        
+
         queries.push(`
           MATCH (from) 
           WHERE from.name = $${paramKey}.fromName 
@@ -144,11 +140,12 @@ export class RelationshipService {
         let successCount = 0;
         for (let i = 0; i < queries.length; i++) {
           const query = queries[i];
+          /* istanbul ignore next */
           if (!query) continue; // 跳过空查询
-          
+
           const paramKey = `rel_${i}`;
           const queryParams = { [paramKey]: parameters[paramKey] };
-          
+
           try {
             await this.neo4j.executeQuery(query, queryParams);
             successCount++;
@@ -183,110 +180,162 @@ export class RelationshipService {
       await this.initialize();
     }
 
-    const queries: string[] = [];
     const processedPairs = new Set<string>();
+    const companyPersonPairs: Array<{ companyName: string; personName: string; newsId: string }> =
+      [];
+    const companyLocationPairs: Array<{
+      companyName: string;
+      locationName: string;
+      newsId: string;
+    }> = [];
+    const personLocationPairs: Array<{ personName: string; locationName: string; newsId: string }> =
+      [];
+    const organizationLocationPairs: Array<{
+      organizationName: string;
+      locationName: string;
+      newsId: string;
+    }> = [];
+
+    const addPair = <T extends { newsId: string }>(pairKey: string, bucket: T[], pair: T) => {
+      if (processedPairs.has(pairKey)) return;
+      processedPairs.add(pairKey);
+      bucket.push(pair);
+    };
 
     for (const result of extractionResults) {
       const { companies, persons, organizations, locations } = result;
+      const newsId = result.newsId || '';
 
       // 公司-人物关系推断 (人物在公司工作)
       for (const company of companies) {
         for (const person of persons || []) {
-          const pairKey = `${company.company_name}-${person.person_name}`;
-          if (!processedPairs.has(pairKey)) {
-            processedPairs.add(pairKey);
-            queries.push(`
-              MATCH (c:Company {company_name: "${this.escapeString(company.company_name)}"})
-              MATCH (p:Person {person_name: "${this.escapeString(person.person_name)}"})
-              MERGE (p)-[r:WORKS_FOR]->(c)
-              SET r.inferred = true, 
-                  r.confidence = 0.6,
-                  r.source_news = "${result.newsId || ''}",
-                  r.created_at = timestamp(),
-                  r.updated_at = timestamp()
-            `);
-          }
+          addPair(
+            `company-person-${company.company_name}-${person.person_name}`,
+            companyPersonPairs,
+            { companyName: company.company_name, personName: person.person_name, newsId }
+          );
         }
       }
 
       // 公司-位置关系推断
       for (const company of companies) {
         for (const location of locations) {
-          const pairKey = `${company.company_name}-${location.location_name}`;
-          if (!processedPairs.has(pairKey)) {
-            processedPairs.add(pairKey);
-            queries.push(`
-              MATCH (c:Company {company_name: "${this.escapeString(company.company_name)}"})
-              MATCH (l:Location {location_name: "${this.escapeString(location.location_name)}"})
-              MERGE (c)-[r:LOCATED_IN]->(l)
-              SET r.inferred = true, 
-                  r.confidence = 0.6,
-                  r.source_news = "${result.newsId || ''}",
-                  r.created_at = timestamp(),
-                  r.updated_at = timestamp()
-            `);
-          }
+          addPair(
+            `company-location-${company.company_name}-${location.location_name}`,
+            companyLocationPairs,
+            { companyName: company.company_name, locationName: location.location_name, newsId }
+          );
         }
       }
 
       // 人物-位置关系推断
       for (const person of persons || []) {
         for (const location of locations) {
-          const pairKey = `${person.person_name}-${location.location_name}`;
-          if (!processedPairs.has(pairKey)) {
-            processedPairs.add(pairKey);
-            queries.push(`
-              MATCH (p:Person {person_name: "${this.escapeString(person.person_name)}"})
-              MATCH (l:Location {location_name: "${this.escapeString(location.location_name)}"})
-              MERGE (p)-[r:LOCATED_IN]->(l)
-              SET r.inferred = true, 
-                  r.confidence = 0.6,
-                  r.source_news = "${result.newsId || ''}",
-                  r.created_at = timestamp(),
-                  r.updated_at = timestamp()
-            `);
-          }
+          addPair(
+            `person-location-${person.person_name}-${location.location_name}`,
+            personLocationPairs,
+            { personName: person.person_name, locationName: location.location_name, newsId }
+          );
         }
       }
 
       // 机构-位置关系推断
       for (const organization of organizations) {
         for (const location of locations) {
-          const pairKey = `${organization.organization_name}-${location.location_name}`;
-          if (!processedPairs.has(pairKey)) {
-            processedPairs.add(pairKey);
-            queries.push(`
-              MATCH (o:Organization {organization_name: "${this.escapeString(organization.organization_name)}"})
-              MATCH (l:Location {location_name: "${this.escapeString(location.location_name)}"})
-              MERGE (o)-[r:LOCATED_IN]->(l)
-              SET r.inferred = true, 
-                  r.confidence = 0.6,
-                  r.source_news = "${result.newsId || ''}",
-                  r.created_at = timestamp(),
-                  r.updated_at = timestamp()
-            `);
-          }
+          addPair(
+            `organization-location-${organization.organization_name}-${location.location_name}`,
+            organizationLocationPairs,
+            {
+              organizationName: organization.organization_name,
+              locationName: location.location_name,
+              newsId,
+            }
+          );
         }
       }
     }
 
-    // 执行推断关系创建
-    if (queries.length > 0) {
+    const runInferredQuery = async (
+      query: string,
+      pairs: Array<Record<string, string>>,
+      label: string
+    ) => {
+      if (pairs.length === 0) return 0;
       try {
-        // 单独执行每个查询以避免变量冲突
-        let successCount = 0;
-        for (const query of queries) {
-          try {
-            await this.neo4j.executeQuery(query);
-            successCount++;
-          } catch (queryError) {
-            logger.warn('单个推断关系创建失败:', queryError);
-          }
-        }
-        logger.info(`推断关系创建完成: ${successCount}/${queries.length} 个关系`);
+        await this.neo4j.executeQuery(query, { pairs });
+        return pairs.length;
       } catch (error) {
-        logger.error('推断关系创建失败:', error);
+        logger.error(`推断关系创建失败: ${label}`, error);
+        return 0;
       }
+    };
+
+    const createdCounts = await Promise.all([
+      runInferredQuery(
+        `
+          UNWIND $pairs as pair
+          MATCH (c:Company {company_name: pair.companyName})
+          MATCH (p:Person {person_name: pair.personName})
+          MERGE (p)-[r:WORKS_FOR]->(c)
+          SET r.inferred = true,
+              r.confidence = 0.6,
+              r.source_news = pair.newsId,
+              r.created_at = CASE WHEN r.created_at IS NULL THEN timestamp() ELSE r.created_at END,
+              r.updated_at = timestamp()
+        `,
+        companyPersonPairs,
+        'company-person'
+      ),
+      runInferredQuery(
+        `
+          UNWIND $pairs as pair
+          MATCH (c:Company {company_name: pair.companyName})
+          MATCH (l:Location {location_name: pair.locationName})
+          MERGE (c)-[r:LOCATED_IN]->(l)
+          SET r.inferred = true,
+              r.confidence = 0.6,
+              r.source_news = pair.newsId,
+              r.created_at = CASE WHEN r.created_at IS NULL THEN timestamp() ELSE r.created_at END,
+              r.updated_at = timestamp()
+        `,
+        companyLocationPairs,
+        'company-location'
+      ),
+      runInferredQuery(
+        `
+          UNWIND $pairs as pair
+          MATCH (p:Person {person_name: pair.personName})
+          MATCH (l:Location {location_name: pair.locationName})
+          MERGE (p)-[r:LOCATED_IN]->(l)
+          SET r.inferred = true,
+              r.confidence = 0.6,
+              r.source_news = pair.newsId,
+              r.created_at = CASE WHEN r.created_at IS NULL THEN timestamp() ELSE r.created_at END,
+              r.updated_at = timestamp()
+        `,
+        personLocationPairs,
+        'person-location'
+      ),
+      runInferredQuery(
+        `
+          UNWIND $pairs as pair
+          MATCH (o:Organization {organization_name: pair.organizationName})
+          MATCH (l:Location {location_name: pair.locationName})
+          MERGE (o)-[r:LOCATED_IN]->(l)
+          SET r.inferred = true,
+              r.confidence = 0.6,
+              r.source_news = pair.newsId,
+              r.created_at = CASE WHEN r.created_at IS NULL THEN timestamp() ELSE r.created_at END,
+              r.updated_at = timestamp()
+        `,
+        organizationLocationPairs,
+        'organization-location'
+      ),
+    ]);
+
+    const totalCreated = createdCounts.reduce((sum, count) => sum + count, 0);
+    if (totalCreated > 0) {
+      logger.info(`推断关系创建完成: ${totalCreated} 个关系`);
     }
   }
 
@@ -319,7 +368,7 @@ export class RelationshipService {
 
     try {
       const result = await this.neo4j.executeQuery(cypher, { entityName, limit });
-      
+
       return result.records.map((record: any) => ({
         relationType: record.get('relationType'),
         description: record.get('description'),
@@ -327,12 +376,12 @@ export class RelationshipService {
         inferred: record.get('inferred') || false,
         entity: {
           labels: record.get('entityLabels'),
-          properties: record.get('entity').properties
+          properties: record.get('entity').properties,
         },
         connected: {
           labels: record.get('connectedLabels'),
-          properties: record.get('connected').properties
-        }
+          properties: record.get('connected').properties,
+        },
       }));
     } catch (error) {
       logger.error('获取实体关系失败:', error);
@@ -346,43 +395,36 @@ export class RelationshipService {
   private sanitizeRelationshipType(relType: string): string {
     // 标准关系类型
     const validRelationships = Object.values(RELATIONSHIP_TYPES);
-    
+
     // 检查是否是标准关系类型
     const upperRelType = relType.toUpperCase();
     if (validRelationships.includes(upperRelType as any)) {
       return upperRelType;
     }
-    
+
     // 尝试映射常见的关系类型
     const typeMapping: { [key: string]: string } = {
       [SYSTEM_RELATIONSHIP_TYPES.DESCRIBES]: RELATIONSHIP_TYPES.OTHER,
       [SYSTEM_RELATIONSHIP_TYPES.INVOLVES]: RELATIONSHIP_TYPES.PARTICIPATES_IN,
       [SYSTEM_RELATIONSHIP_TYPES.MENTIONS]: RELATIONSHIP_TYPES.OTHER,
       [SYSTEM_RELATIONSHIP_TYPES.LOCATED_AT]: RELATIONSHIP_TYPES.LOCATED_IN,
-      'OCCURRED_AT': RELATIONSHIP_TYPES.OTHER,
-      'RELATED': RELATIONSHIP_TYPES.OTHER,
-      'ASSOCIATED_WITH': RELATIONSHIP_TYPES.OTHER,
-      'MEMBER_OF': RELATIONSHIP_TYPES.PARTICIPATES_IN,
-      'SUBSIDIARY_OF': RELATIONSHIP_TYPES.OWNS,
-      'PARENT_OF': RELATIONSHIP_TYPES.OWNS,
-      'COMPETITOR_OF': RELATIONSHIP_TYPES.OTHER
+      OCCURRED_AT: RELATIONSHIP_TYPES.OTHER,
+      RELATED: RELATIONSHIP_TYPES.OTHER,
+      ASSOCIATED_WITH: RELATIONSHIP_TYPES.OTHER,
+      MEMBER_OF: RELATIONSHIP_TYPES.PARTICIPATES_IN,
+      SUBSIDIARY_OF: RELATIONSHIP_TYPES.OWNS,
+      PARENT_OF: RELATIONSHIP_TYPES.OWNS,
+      COMPETITOR_OF: RELATIONSHIP_TYPES.OTHER,
     };
-    
+
     const mapped = typeMapping[upperRelType];
     if (mapped) {
       return mapped;
     }
-    
+
     // 默认返回 OTHER
     logger.warn(`未知关系类型: ${relType}，使用默认值 OTHER`);
     return RELATIONSHIP_TYPES.OTHER;
-  }
-
-  /**
-   * 转义字符串中的特殊字符
-   */
-  private escapeString(str: string): string {
-    return str.replace(/"/g, '\\"').replace(/'/g, "\\'");
   }
 
   /**
@@ -397,4 +439,4 @@ export class RelationshipService {
 }
 
 // 导出单例
-export default new RelationshipService(); 
+export default new RelationshipService();

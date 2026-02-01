@@ -1,7 +1,20 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Network, Data, Options, Node, Edge } from 'vis-network';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import type { Network, Data, Options, Node, Edge } from 'vis-network';
+
+const VIS_DEV_BUILD_WARNING = "You're running a development build.";
+
+const suppressVisWarning = () => {
+  const originalWarn = console.warn;
+  console.warn = (...args: unknown[]) => {
+    if (args[0] === VIS_DEV_BUILD_WARNING) return;
+    originalWarn(...args);
+  };
+  return () => {
+    console.warn = originalWarn;
+  };
+};
 
 // 接口定义
 interface GraphNode {
@@ -17,6 +30,72 @@ interface GraphEdge {
   type: string;
   properties?: Record<string, any>;
 }
+
+const getNodeColor = (type: string, isHighlighted: boolean, isSelected: boolean) => {
+  const colorMap: Record<string, any> = {
+    PERSON: {
+      background: '#e3f2fd',
+      border: '#2196f3',
+      highlight: { background: '#bbdefb', border: '#1976d2' },
+    },
+    ORGANIZATION: {
+      background: '#ffebee',
+      border: '#f44336',
+      highlight: { background: '#ffcdd2', border: '#d32f2f' },
+    },
+    LOCATION: {
+      background: '#e8f5e8',
+      border: '#4caf50',
+      highlight: { background: '#c8e6c9', border: '#388e3c' },
+    },
+    EVENT: {
+      background: '#f3e5f5',
+      border: '#9c27b0',
+      highlight: { background: '#e1bee7', border: '#7b1fa2' },
+    },
+    PRODUCT: {
+      background: '#fff3e0',
+      border: '#ff9800',
+      highlight: { background: '#ffe0b2', border: '#f57c00' },
+    },
+    default: {
+      background: '#f5f5f5',
+      border: '#9e9e9e',
+      highlight: { background: '#eeeeee', border: '#757575' },
+    },
+  };
+
+  const colors = colorMap[type] || colorMap.default;
+
+  if (isSelected) {
+    return {
+      background: '#fff9c4',
+      border: '#fbc02d',
+      highlight: { background: '#fff59d', border: '#f57f17' },
+    };
+  }
+
+  if (isHighlighted) {
+    return {
+      background: '#ffcdd2',
+      border: '#f44336',
+      highlight: { background: '#ef9a9a', border: '#d32f2f' },
+    };
+  }
+
+  return colors;
+};
+
+const getTypeLabel = (type: string) => {
+  const labelMap: Record<string, string> = {
+    PERSON: '人',
+    ORGANIZATION: '组织',
+    LOCATION: '地点',
+    EVENT: '事件',
+    PRODUCT: '产品',
+  };
+  return labelMap[type] || type;
+};
 
 interface GraphData {
   nodes: GraphNode[];
@@ -45,76 +124,8 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [nodeInfo, setNodeInfo] = useState<{ node: GraphNode; position: { x: number; y: number } } | null>(null);
 
-  // 节点类型到颜色的映射
-  const getNodeColor = (type: string, isHighlighted: boolean, isSelected: boolean) => {
-    const colorMap: Record<string, any> = {
-      'PERSON': {
-        background: '#e3f2fd', // 浅蓝色背景
-        border: '#2196f3',
-        highlight: { background: '#bbdefb', border: '#1976d2' }
-      },
-      'ORGANIZATION': {
-        background: '#ffebee', // 浅红色背景
-        border: '#f44336',
-        highlight: { background: '#ffcdd2', border: '#d32f2f' }
-      },
-      'LOCATION': {
-        background: '#e8f5e8', // 浅绿色背景
-        border: '#4caf50',
-        highlight: { background: '#c8e6c9', border: '#388e3c' }
-      },
-      'EVENT': {
-        background: '#f3e5f5', // 浅紫色背景
-        border: '#9c27b0',
-        highlight: { background: '#e1bee7', border: '#7b1fa2' }
-      },
-      'PRODUCT': {
-        background: '#fff3e0', // 浅橙色背景
-        border: '#ff9800',
-        highlight: { background: '#ffe0b2', border: '#f57c00' }
-      },
-      'default': {
-        background: '#f5f5f5', // 浅灰色背景
-        border: '#9e9e9e',
-        highlight: { background: '#eeeeee', border: '#757575' }
-      }
-    };
-
-    const colors = colorMap[type] || colorMap.default;
-    
-    if (isSelected) {
-      return {
-        background: '#fff9c4', // 选中时浅黄色背景
-        border: '#fbc02d',
-        highlight: { background: '#fff59d', border: '#f57f17' }
-      };
-    }
-    
-    if (isHighlighted) {
-      return {
-        background: '#ffcdd2', // 高亮时浅红色背景
-        border: '#f44336',
-        highlight: { background: '#ef9a9a', border: '#d32f2f' }
-      };
-    }
-    
-    return colors;
-  };
-
-  // 获取节点类型标签
-  const getTypeLabel = (type: string) => {
-    const labelMap: Record<string, string> = {
-      'PERSON': '人',
-      'ORGANIZATION': '组织',
-      'LOCATION': '地点',
-      'EVENT': '事件',
-      'PRODUCT': '产品'
-    };
-    return labelMap[type] || type;
-  };
-
   // 转换数据格式
-  const convertData = (): Data => {
+  const convertData = useCallback((): Data => {
     const nodes: Node[] = data.nodes.map(node => {
       const isHighlighted = highlightedNodeIds.includes(node.id);
       const isSelected = selectedNode === node.id;
@@ -183,7 +194,7 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
     }));
 
     return { nodes, edges };
-  };
+  }, [data.edges, data.nodes, highlightedNodeIds, selectedNode]);
 
   // 网络图配置选项
   const getOptions = (): Options => ({
@@ -274,69 +285,84 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
   useEffect(() => {
     if (!networkContainer.current || !data.nodes.length) return;
 
-    const networkData = convertData();
-    const options = getOptions();
+    let cancelled = false;
 
-    // 创建网络实例
-    const network = new Network(networkContainer.current, networkData, options);
-    networkInstance.current = network;
+    const initNetwork = async () => {
+      const restoreWarn = suppressVisWarning();
+      try {
+        const vis = await import('vis-network/peer/esm/vis-network.mjs');
+        if (cancelled || !networkContainer.current) return;
 
-    // 绑定事件
-    network.on('click', (params) => {
-      if (params.nodes.length > 0) {
-        const nodeId = params.nodes[0] as string;
-        const node = data.nodes.find(n => n.id === nodeId);
-        if (node) {
-          setSelectedNode(nodeId);
-          
-          // 获取节点位置并显示信息弹窗
-          const position = network.getPositions([nodeId])[nodeId];
-          const canvasPosition = network.canvasToDOM(position);
-          setNodeInfo({ node, position: canvasPosition });
-          
-          onNodeClick?.(node);
-        }
-      } else {
-        setSelectedNode(null);
-        setNodeInfo(null);
+        const networkData = convertData();
+        const options = getOptions();
+
+        // 创建网络实例
+        const network = new vis.Network(networkContainer.current, networkData, options);
+        networkInstance.current = network;
+
+        // 绑定事件
+        network.on('click', (params) => {
+          if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0] as string;
+            const node = data.nodes.find(n => n.id === nodeId);
+            if (node) {
+              setSelectedNode(nodeId);
+              
+              // 获取节点位置并显示信息弹窗
+              const position = network.getPositions([nodeId])[nodeId];
+              const canvasPosition = network.canvasToDOM(position);
+              setNodeInfo({ node, position: canvasPosition });
+              
+              onNodeClick?.(node);
+            }
+          } else {
+            setSelectedNode(null);
+            setNodeInfo(null);
+          }
+        });
+
+        network.on('doubleClick', (params) => {
+          if (params.nodes.length > 0) {
+            const nodeId = params.nodes[0] as string;
+            const node = data.nodes.find(n => n.id === nodeId);
+            if (node) {
+              onNodeDoubleClick?.(node);
+            }
+          }
+        });
+
+        // 点击空白区域隐藏信息弹窗
+        network.on('click', (params) => {
+          if (params.nodes.length === 0) {
+            setNodeInfo(null);
+          }
+        });
+
+        // 稳定化完成后适应画布
+        network.on('stabilizationIterationsDone', () => {
+          network.fit({
+            animation: {
+              duration: 1000,
+              easingFunction: 'easeInOutQuad'
+            }
+          });
+        });
+      } finally {
+        restoreWarn();
       }
-    });
+    };
 
-    network.on('doubleClick', (params) => {
-      if (params.nodes.length > 0) {
-        const nodeId = params.nodes[0] as string;
-        const node = data.nodes.find(n => n.id === nodeId);
-        if (node) {
-          onNodeDoubleClick?.(node);
-        }
-      }
-    });
-
-    // 点击空白区域隐藏信息弹窗
-    network.on('click', (params) => {
-      if (params.nodes.length === 0) {
-        setNodeInfo(null);
-      }
-    });
-
-    // 稳定化完成后适应画布
-    network.on('stabilizationIterationsDone', () => {
-      network.fit({
-        animation: {
-          duration: 1000,
-          easingFunction: 'easeInOutQuad'
-        }
-      });
-    });
+    void initNetwork();
 
     // 清理函数
     return () => {
+      cancelled = true;
       if (networkInstance.current) {
         networkInstance.current.destroy();
         networkInstance.current = null;
       }
     };
-  }, [data, onNodeClick, onNodeDoubleClick]);
+  }, [convertData, data, onNodeClick, onNodeDoubleClick]);
 
   // 更新节点颜色（当高亮状态改变时）
   useEffect(() => {
@@ -370,7 +396,7 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
         label: edge.type
       }))
     });
-  }, [highlightedNodeIds, selectedNode, data.nodes]);
+  }, [highlightedNodeIds, selectedNode, data.nodes, data.edges]);
 
   // 控制方法
   const handleFit = () => {

@@ -1,0 +1,29 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`api/scheduler handles simple trigger 1`] = `
+{
+  "data": {
+    "executedAt": "2024-01-01T00:00:00.000Z",
+    "type": "minute_check",
+  },
+  "message": "每分钟触发器执行成功",
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "trigger": "every_minute",
+}
+`;
+
+exports[`api/scheduler handles summary trigger 1`] = `
+{
+  "data": {
+    "executedAt": "2024-01-01T00:00:00.000Z",
+    "message": "ok",
+    "period": "period",
+    "success": true,
+  },
+  "message": "小时总结生成完成: period",
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "trigger": "daytime_05",
+}
+`;

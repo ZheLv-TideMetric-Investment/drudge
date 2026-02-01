@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import moment from 'moment-timezone';
-import { graphService } from '../../../../../../lib/services/graph';
+import { neo4jGraphService } from '../../../../../../lib/neo4j';
+import { TimeZoneUtils } from '../../../../../../lib/utils/timezone';
 
 export async function GET(
   request: Request,
@@ -16,16 +16,16 @@ export async function GET(
       return NextResponse.json({
         success: false,
         error: '缺少实体ID',
-        timestamp: moment.tz('Asia/Shanghai').toISOString()
+        timestamp: TimeZoneUtils.nowUTC()
       }, { status: 400 });
     }
 
-    const neighborhoodData = await graphService.getEntityNeighborhood(entityId, depth, limit);
+    const neighborhoodData = await neo4jGraphService.getEntityNeighborhood(entityId, depth, limit);
 
     return NextResponse.json({
       success: true,
       data: neighborhoodData,
-      timestamp: moment.tz('Asia/Shanghai').toISOString()
+      timestamp: TimeZoneUtils.nowUTC()
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -34,7 +34,7 @@ export async function GET(
     return NextResponse.json({
       success: false,
       error: errorMessage,
-      timestamp: moment.tz('Asia/Shanghai').toISOString()
+      timestamp: TimeZoneUtils.nowUTC()
     }, { status: 500 });
   }
-} 
+}

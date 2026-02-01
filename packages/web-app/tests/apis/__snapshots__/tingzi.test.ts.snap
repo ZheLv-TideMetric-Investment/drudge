@@ -1,0 +1,13 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`api/tingzi handles tingzi message 1`] = `
+{
+  "success": true,
+}
+`;
+
+exports[`api/tingzi rejects invalid token 1`] = `
+{
+  "error": "Invalid token",
+}
+`;

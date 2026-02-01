@@ -1,6 +1,5 @@
 import express, { Request, Response, Express } from 'express';
 import { logger } from '../utils/logger';
-import config from '../config/config';
 import { logErrorWithDetails } from '../utils/error';
 
 // APIs
@@ -37,10 +36,10 @@ app.post('/trigger/fetch-news', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('新闻获取触发失败:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: errorDetails.message,
-      details: errorDetails
+      details: errorDetails,
     });
   }
 });
@@ -49,18 +48,18 @@ app.post('/trigger/fetch-batch', async (req: Request, res: Response) => {
   try {
     const { days = 1 } = req.body;
     logger.info(`收到批量新闻获取触发请求: ${days}天`);
-    
+
     const startTime = daysAgo(days);
     const endTime = parseTime(Date.now());
     const result = await getNewsByTimeRange(startTime, endTime);
-    
+
     res.json(result);
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('批量新闻获取触发失败:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: errorDetails.message,
-      details: errorDetails
+      details: errorDetails,
     });
   }
 });
@@ -73,10 +72,10 @@ app.get('/api/news/list', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('获取新闻列表失败:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: errorDetails.message,
-      details: errorDetails
+      details: errorDetails,
     });
   }
 });
@@ -87,10 +86,10 @@ app.get('/api/news/count', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('获取新闻统计失败:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: errorDetails.message,
-      details: errorDetails
+      details: errorDetails,
     });
   }
 });
@@ -101,10 +100,10 @@ app.get('/api/news/status', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('获取服务状态失败:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: errorDetails.message,
-      details: errorDetails
+      details: errorDetails,
     });
   }
 });
@@ -116,10 +115,10 @@ app.post('/api/news/clean', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('清理旧新闻失败:', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: errorDetails.message,
-      details: errorDetails
+      details: errorDetails,
     });
   }
 });
@@ -131,10 +130,10 @@ app.get('/api/scheduler/status', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('获取调度器状态失败', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: errorDetails.message,
-      details: errorDetails 
+      details: errorDetails,
     });
   }
 });
@@ -145,10 +144,10 @@ app.post('/api/scheduler/trigger', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('手动触发新闻获取任务失败', error);
-    res.status(500).json({ 
-      success: false, 
+    res.status(500).json({
+      success: false,
       error: errorDetails.message,
-      details: errorDetails 
+      details: errorDetails,
     });
   }
 });
@@ -158,7 +157,7 @@ app.post('/api/scheduler/trigger', async (req: Request, res: Response) => {
  */
 export function startHttpServer(): Promise<any> {
   const port = process.env.PORT || 39110;
-  
+
   return new Promise((resolve, reject) => {
     const server = app.listen(port, () => {
       logger.info(`🌐 HTTP服务已启动，端口: ${port}`);
@@ -186,4 +185,4 @@ export function startHttpServer(): Promise<any> {
   });
 }
 
-export { app }; 
+export { app };

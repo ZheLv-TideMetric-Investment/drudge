@@ -10,7 +10,6 @@ import {
   Select,
   Row,
   Col,
-  Typography,
   message,
   Spin,
   Alert,
@@ -22,13 +21,12 @@ import {
   ClearOutlined
 } from '@ant-design/icons';
 import { Layout } from '../../components/Layout';
-import moment, { Moment } from 'moment-timezone';
-import { toAntdValue, fromAntdValue, formatNewsTime, formatTime } from '../../lib/utils/frontend-time';
+import { toAntdValue, fromAntdValue, formatNewsTime, formatTime } from '../../lib/utils/timezone';
+import { BEIJING_TIMEZONE } from '@drudge/common';
 
 const { Search } = Input;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
-const { Title, Text } = Typography;
 
 // 新闻数据接口 - 更新时间字段
 interface NewsItem {
@@ -37,15 +35,16 @@ interface NewsItem {
   content: string;
   level: string;
   timestamp: string;
-  processedAt: string;
+  processedAt?: string | number;
   source: string;
   url: string;
   // 使用新的时间工具，这些字段由API自动提供
   timestamp_display?: string;
   processedAt_display?: string;
+  processed_at_display?: string;
   // 兼容旧字段
   displayTime: string;
-  processedDisplayTime: string;
+  processedDisplayTime?: string | number;
   highlightedTitle?: string;
   highlightedContent?: string;
   relevanceScore?: number;
@@ -72,6 +71,19 @@ interface NewsResponse {
   };
   error?: string;
 }
+
+const parseLevelNumber = (level?: string) => {
+  if (!level) return null;
+  const match = level.match(/\d+/);
+  return match ? Number(match[0]) : null;
+};
+
+const getProcessedDisplayTime = (news: NewsItem) => {
+  if (news.processedAt_display) return news.processedAt_display;
+  if (news.processed_at_display) return news.processed_at_display;
+  if (news.processedDisplayTime) return formatTime(news.processedDisplayTime as any);
+  return news.processedAt ? formatTime(news.processedAt as any) : '';
+};
 
 // 新闻卡片组件
 interface NewsCardProps {
@@ -111,7 +123,8 @@ function NewsCard({
     }
   };
 
-  const isLevel1 = news.level === '1';
+  const levelNumber = parseLevelNumber(news.level);
+  const isLevel1 = levelNumber === 1;
 
     return (
     <Card
@@ -222,9 +235,9 @@ function NewsCard({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div className="newspaper-body" style={{ fontSize: 'var(--font-size-xs)', color: 'var(--newspaper-gray)' }}>
             📅 {news.timestamp_display || news.displayTime || formatNewsTime(news.timestamp)}
-            {(news.processedAt_display || news.processedDisplayTime) && (
+            {getProcessedDisplayTime(news) && (
               <span style={{ marginLeft: 'var(--space-sm)' }}>
-                ⚙️ 处理: {news.processedAt_display || news.processedDisplayTime || formatTime(news.processedAt)}
+                ⚙️ 处理: {getProcessedDisplayTime(news)}
               </span>
             )}
           </div>
@@ -246,6 +259,7 @@ export default function NewsPage() {
     hasNext: false,
     hasPrev: false
   });
+  const [beijingNow, setBeijingNow] = useState<Date | null>(null);
 
   // 新闻详情模态框状态
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
@@ -259,7 +273,7 @@ export default function NewsPage() {
   const [isSearchMode, setIsSearchMode] = useState(false);
   const [filters, setFilters] = useState({
     level: undefined as string | undefined,
-    dateRange: undefined as [Moment, Moment] | undefined,
+    dateRange: undefined as [string, string] | undefined,
     sortBy: 'timestamp' as string,
     sortOrder: 'desc' as string
   });
@@ -267,9 +281,30 @@ export default function NewsPage() {
   // 滚动监听相关
   const observerRef = useRef<IntersectionObserver | null>(null);
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const searchKeywordRef = useRef(searchKeyword);
+  const searchModeRef = useRef(isSearchMode);
+
+  useEffect(() => {
+    searchKeywordRef.current = searchKeyword;
+  }, [searchKeyword]);
+
+  useEffect(() => {
+    searchModeRef.current = isSearchMode;
+  }, [isSearchMode]);
+
+  useEffect(() => {
+    const updateTime = () => setBeijingNow(new Date());
+    updateTime();
+    const interval = setInterval(updateTime, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   // 获取新闻列表
-  const fetchNews = async (page: number = 1, searchParams?: any, isLoadMore: boolean = false) => {
+  const fetchNews = useCallback(async (
+    page: number = 1,
+    searchParams?: Record<string, string>,
+    isLoadMore: boolean = false
+  ) => {
     if (isLoadMore) {
       setLoadingMore(true);
     } else {
@@ -291,12 +326,14 @@ export default function NewsPage() {
       }
 
       if (filters.dateRange) {
-        params.append('startTime', filters.dateRange[0].toISOString());
-        params.append('endTime', filters.dateRange[1].toISOString());
+        params.append('startTime', filters.dateRange[0]);
+        params.append('endTime', filters.dateRange[1]);
       }
 
-      const url = isSearchMode && searchKeyword 
-        ? `/api/news/search?q=${encodeURIComponent(searchKeyword)}&${params.toString()}`
+      const keyword = searchKeywordRef.current;
+      const searchMode = searchModeRef.current;
+      const url = searchMode && keyword 
+        ? `/api/news/search?q=${encodeURIComponent(keyword)}&${params.toString()}`
         : `/api/news?${params.toString()}`;
 
       const response = await fetch(url);
@@ -321,7 +358,13 @@ export default function NewsPage() {
       setLoading(false);
       setLoadingMore(false);
     }
-  };
+  }, [
+    filters.dateRange,
+    filters.level,
+    filters.sortBy,
+    filters.sortOrder,
+    pagination.limit
+  ]);
 
   // 加载更多数据
   const loadMoreNews = useCallback(() => {
@@ -385,7 +428,7 @@ export default function NewsPage() {
   // 页面加载时获取数据
   useEffect(() => {
     fetchNews(1);
-  }, [filters]);
+  }, [fetchNews]);
 
   // 切换内容展开状态
   const toggleExpanded = (newsId: string) => {
@@ -412,21 +455,25 @@ export default function NewsPage() {
 
   // 级别标签颜色
   const getLevelColor = (level: string) => {
-    switch (level) {
-      case '1': return 'red';
-      case '2': return 'orange';
-      case '3': return 'blue';
+    const levelNumber = parseLevelNumber(level);
+    switch (levelNumber) {
+      case 1: return 'red';
+      case 2: return 'orange';
+      case 3: return 'blue';
       default: return 'default';
     }
   };
 
   // 级别标签文本
   const getLevelText = (level: string) => {
-    switch (level) {
-      case '1': return '头条新闻';
-      case '2': return '重要新闻';
-      case '3': return '一般新闻';
-      default: return `${level}级新闻`;
+    const levelNumber = parseLevelNumber(level);
+    switch (levelNumber) {
+      case 1: return '头条新闻';
+      case 2: return '重要新闻';
+      case 3: return '一般新闻';
+      case 4: return '普通新闻';
+      case 5: return '信息快讯';
+      default: return level ? `${level}级新闻` : '未知级别';
     }
   };
 
@@ -443,7 +490,10 @@ export default function NewsPage() {
               传统报纸式新闻阅读体验 • 智能检索与筛选
             </div>
             <div className="newspaper-time">
-              {new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })} • 实时更新
+              {beijingNow
+                ? beijingNow.toLocaleString('zh-CN', { timeZone: BEIJING_TIMEZONE })
+                : '加载中'}{' '}
+              • 实时更新
             </div>
           </div>
         </div>
@@ -466,6 +516,8 @@ export default function NewsPage() {
                   value={searchKeyword}
                   onChange={(e) => setSearchKeyword(e.target.value)}
                   onSearch={handleSearch}
+                  id="news-search"
+                  aria-label="新闻关键词搜索"
                   enterButton={
                     <Button className="newspaper-button" icon={<SearchOutlined className="newspaper-icon" />}>
                       搜索
@@ -481,15 +533,19 @@ export default function NewsPage() {
                 </div>
                 <Select
                   className="newspaper-search"
+                  id="news-level"
+                  aria-label="新闻级别筛选"
                   placeholder="选择级别"
                   value={filters.level}
                   onChange={(value) => setFilters(prev => ({ ...prev, level: value }))}
                   allowClear
                   style={{ width: '100%' }}
                 >
-                  <Option value="1">头条新闻</Option>
-                  <Option value="2">重要新闻</Option>
-                  <Option value="3">一般新闻</Option>
+                  <Option value="Level 1">头条新闻</Option>
+                  <Option value="Level 2">重要新闻</Option>
+                  <Option value="Level 3">一般新闻</Option>
+                  <Option value="Level 4">普通新闻</Option>
+                  <Option value="Level 5">信息快讯</Option>
                 </Select>
               </Col>
             
@@ -499,18 +555,32 @@ export default function NewsPage() {
                 </div>
                 <RangePicker
                   className="newspaper-search"
-                  value={filters.dateRange ? [
-                    moment(filters.dateRange[0].toISOString()) as any, 
-                    moment(filters.dateRange[1].toISOString()) as any
-                  ] : null}
+                  id="news-date-range"
+                  aria-label="新闻时间范围筛选"
+                  value={
+                    filters.dateRange
+                      ? ([
+                          toAntdValue(filters.dateRange[0]),
+                          toAntdValue(filters.dateRange[1])
+                        ] as any)
+                      : null
+                  }
                   onChange={(dates) => {
                     if (dates && dates[0] && dates[1]) {
+                      const startTime = fromAntdValue(dates[0] as any);
+                      const endTime = fromAntdValue(dates[1] as any);
+
+                      if (!startTime || !endTime) {
+                        setFilters(prev => ({ ...prev, dateRange: undefined }));
+                        return;
+                      }
+
                       setFilters(prev => ({ 
                         ...prev, 
                         dateRange: [
-                          moment(dates[0]!.toISOString()), 
-                          moment(dates[1]!.toISOString())
-                        ] as [Moment, Moment] 
+                          startTime,
+                          endTime
+                        ] as [string, string]
                       }));
                     } else {
                       setFilters(prev => ({ ...prev, dateRange: undefined }));
@@ -575,7 +645,7 @@ export default function NewsPage() {
             <div className="newspaper-subtitle" style={{ fontSize: '15px' }}>
               📊 新闻统计：共检索到 <span style={{ color: 'var(--newspaper-red)', fontWeight: 'bold' }}>{pagination.total}</span> 条新闻
               {(() => {
-                const level1Count = news.filter(item => item.level === '1').length;
+                const level1Count = news.filter(item => parseLevelNumber(item.level) === 1).length;
                 return level1Count > 0 && (
                   <span>，其中头条新闻 <span style={{ color: 'var(--newspaper-red)', fontWeight: 'bold' }}>{level1Count}</span> 条</span>
                 );
@@ -586,7 +656,11 @@ export default function NewsPage() {
                 {isSearchMode && <span>🔍 搜索关键词："{searchKeyword}" </span>}
                 {filters.level && <span>📑 级别筛选：{getLevelText(filters.level)} </span>}
                 {filters.dateRange && (
-                  <span>📅 时间范围：{filters.dateRange[0].format('MM-DD HH:mm')} ~ {filters.dateRange[1].format('MM-DD HH:mm')}</span>
+                  <span>
+                    📅 时间范围：
+                    {formatTime(filters.dateRange[0], 'MM-DD HH:mm')} ~{' '}
+                    {formatTime(filters.dateRange[1], 'MM-DD HH:mm')}
+                  </span>
                 )}
               </div>
             )}
@@ -745,7 +819,7 @@ export default function NewsPage() {
                   </div>
                   <div><strong>新闻来源：</strong>📰 {selectedNews.source}</div>
                   <div><strong>发布时间：</strong>📅 {selectedNews.timestamp_display || selectedNews.displayTime || formatTime(selectedNews.timestamp)}</div>
-                  <div><strong>处理时间：</strong>⚙️ {selectedNews.processedAt_display || selectedNews.processedDisplayTime || (selectedNews.processedAt ? formatTime(selectedNews.processedAt) : '未知')}</div>
+                  <div><strong>处理时间：</strong>⚙️ {getProcessedDisplayTime(selectedNews) || '未知'}</div>
                 </div>
               </div>
 

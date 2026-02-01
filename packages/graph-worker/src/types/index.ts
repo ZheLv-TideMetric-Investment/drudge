@@ -1,10 +1,10 @@
-import { 
-  EventType, 
-  Sentiment, 
-  EventLevel, 
-  OrganizationType, 
-  LocationType, 
-  RelationshipType 
+import {
+  EventType,
+  Sentiment,
+  EventLevel,
+  OrganizationType,
+  LocationType,
+  RelationshipType,
 } from '../constants/enums';
 
 // 基础新闻接口
@@ -17,6 +17,7 @@ export interface NewsItem {
   url?: string;
   timestamp: string; // UTC ISO 8601 格式时间字符串
   raw_time?: any; // 保存原始时间数据（任意格式）
+  news_level?: string;
   level?: number;
   processed?: boolean;
 }
@@ -103,8 +104,6 @@ export interface Location {
   updated_at?: string;
 }
 
-
-
 // 关系实体 - 使用标准关系类型
 export interface Relationship {
   type: RelationshipType;
@@ -114,28 +113,8 @@ export interface Relationship {
   confidence?: number;
 }
 
-// LLM 相关接口
-export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
-
-export interface LLMCallOptions {
-  temperature?: number;
-  timeout?: number;
-  schema?: any;
-}
-
-export interface LLMResponse<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-}
+// LLM 相关接口（共享）
+export type { LLMMessage, LLMCallOptions, LLMResponse } from '@drudge/common';
 
 // 处理结果接口
 export interface ProcessResult {
@@ -162,4 +141,4 @@ export interface BatchSummary {
   failed: number;
   processingTime: number;
   timestamp: string;
-} 
+}

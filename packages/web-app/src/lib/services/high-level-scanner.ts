@@ -1,5 +1,5 @@
-import moment from 'moment-timezone';
-import { queryService } from './query';
+import { TimeZoneUtils, TIME_FORMATS } from '../utils/timezone';
+import { neo4jNewsService } from '../neo4j';
 import { notificationService } from './notification';
 import { HighLevelScanResult } from '../../types/scheduler';
 
@@ -17,6 +17,20 @@ export interface ScanOptions {
  * Level 1 新闻扫描服务
  * 基于Neo4j数据，扫描 Level 1 新闻并批量发送聚合通知
  */
+type TimeInput = string | Date;
+
+const parseDate = (input: TimeInput): Date => {
+  const date = input instanceof Date ? new Date(input.getTime()) : new Date(input);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error('无效的时间格式');
+  }
+  return date;
+};
+
+const formatBeijing = (input: Date, format: string): string => {
+  return TimeZoneUtils.format(input, format);
+};
+
 class HighLevelNewsScanner {
   private lastScanTime: string | null = null;
   private processedNewsIds: Set<string> = new Set();
@@ -27,13 +41,13 @@ class HighLevelNewsScanner {
 
   /**
    * 扫描 Level 1 新闻
-   * @param startTime 开始时间（ISO字符串或moment对象），如果不提供则使用上次扫描时间或5分钟前
-   * @param endTime 结束时间（ISO字符串或moment对象），如果不提供则使用当前时间
+   * @param startTime 开始时间（ISO字符串或Date对象），如果不提供则使用上次扫描时间或5分钟前
+   * @param endTime 结束时间（ISO字符串或Date对象），如果不提供则使用当前时间
    * @param options 扫描选项
    */
   async scanHighLevelNews(
-    startTime?: string | moment.Moment,
-    endTime?: string | moment.Moment,
+    startTime?: TimeInput,
+    endTime?: TimeInput,
     options: ScanOptions = {}
   ): Promise<HighLevelScanResult> {
     try {
@@ -43,27 +57,23 @@ class HighLevelNewsScanner {
       console.log('开始扫描 Level 1 新闻...');
 
       // 计算扫描时间范围
-      const end = endTime ? moment(endTime).tz('Asia/Shanghai') : moment().tz('Asia/Shanghai');
+      const end = endTime ? parseDate(endTime) : new Date();
       const start = startTime
-        ? moment(startTime).tz('Asia/Shanghai')
+        ? parseDate(startTime)
         : this.lastScanTime
-          ? moment(this.lastScanTime).tz('Asia/Shanghai')
-          : moment().tz('Asia/Shanghai').subtract(5, 'minutes');
+          ? parseDate(this.lastScanTime)
+          : new Date(end.getTime() - 5 * 60 * 1000);
 
-      if (!start.isValid() || !end.isValid()) {
-        throw new Error('无效的时间格式');
-      }
-
-      if (start.isAfter(end)) {
+      if (start.getTime() > end.getTime()) {
         throw new Error('开始时间不能晚于结束时间');
       }
 
       console.log(
-        `扫描时间范围: ${start.format('YYYY-MM-DD HH:mm')} - ${end.format('YYYY-MM-DD HH:mm')}`
+        `扫描时间范围: ${formatBeijing(start, TIME_FORMATS.FULL)} - ${formatBeijing(end, TIME_FORMATS.FULL)}`
       );
 
       // 从Neo4j获取 Level 1 新闻
-      const highLevelNews = await queryService.getHighLevelNews(
+      const highLevelNews = await neo4jNewsService.getHighLevelNews(
         start.toISOString(),
         end.toISOString()
       );
@@ -74,9 +84,12 @@ class HighLevelNewsScanner {
           success: true,
           found: 0,
           sent: 0,
-          message: `${start.format('HH:mm')}-${end.format('HH:mm')} 时段没有发现 Level 1 新闻`,
+          message: `${formatBeijing(start, TIME_FORMATS.TIME_SHORT)}-${formatBeijing(
+            end,
+            TIME_FORMATS.TIME_SHORT
+          )} 时段没有发现 Level 1 新闻`,
           period: this.formatPeriod(start, end),
-          timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
+          timestamp: TimeZoneUtils.now(TIME_FORMATS.FULL),
         };
       }
 
@@ -93,7 +106,7 @@ class HighLevelNewsScanner {
           sent: 0,
           message: `发现 ${highLevelNews.length} 条 Level 1 新闻，但都已处理过`,
           period: this.formatPeriod(start, end),
-          timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
+          timestamp: TimeZoneUtils.now(TIME_FORMATS.FULL),
         };
       }
 
@@ -132,7 +145,7 @@ class HighLevelNewsScanner {
         message: `${scanType}扫描完成：发现 ${newsToProcess.length} 条${processType} Level 1 新闻${notificationText}`,
         period: this.formatPeriod(start, end),
         high_level_news: newsToProcess.map(news => this.formatNewsItem(news)),
-        timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
+        timestamp: TimeZoneUtils.now(TIME_FORMATS.FULL),
       };
     } catch (error: any) {
       console.error('扫描 Level 1 新闻失败:', error);
@@ -143,7 +156,7 @@ class HighLevelNewsScanner {
         message: '扫描 Level 1 新闻失败',
         error: error.message,
         period: '',
-        timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
+        timestamp: TimeZoneUtils.now(TIME_FORMATS.FULL),
       };
     }
   }
@@ -194,23 +207,24 @@ class HighLevelNewsScanner {
   /**
    * 更新最后扫描时间
    */
-  private updateLastScanTime(time: moment.Moment): void {
+  private updateLastScanTime(time: Date): void {
     this.lastScanTime = time.toISOString();
   }
 
   /**
    * 格式化时间段 - 显示北京时间
    */
-  private formatPeriod(start: moment.Moment, end: moment.Moment): string {
-    // 转换为北京时间显示
-    const beijingStart = start.clone().tz('Asia/Shanghai');
-    const beijingEnd = end.clone().tz('Asia/Shanghai');
+  private formatPeriod(start: Date, end: Date): string {
+    const startDay = formatBeijing(start, TIME_FORMATS.DATE);
+    const endDay = formatBeijing(end, TIME_FORMATS.DATE);
+    const startText = formatBeijing(start, TIME_FORMATS.NEWS_TIME);
+    const endText = formatBeijing(end, TIME_FORMATS.NEWS_TIME);
 
-    if (beijingStart.isSame(beijingEnd, 'day')) {
-      return `${beijingStart.format('MM-DD HH:mm')}-${beijingEnd.format('HH:mm')}`;
-    } else {
-      return `${beijingStart.format('MM-DD HH:mm')}-${beijingEnd.format('MM-DD HH:mm')}`;
+    if (startDay === endDay) {
+      return `${startText}-${formatBeijing(end, TIME_FORMATS.TIME_SHORT)}`;
     }
+
+    return `${startText}-${endText}`;
   }
 
   /**
@@ -221,7 +235,7 @@ class HighLevelNewsScanner {
       lastScanTime: this.lastScanTime,
       processedNewsCount: this.processedNewsIds.size,
       isRunning: false,
-      timestamp: moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss'),
+      timestamp: TimeZoneUtils.now(TIME_FORMATS.FULL),
     };
   }
 

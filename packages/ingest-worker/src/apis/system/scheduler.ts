@@ -17,11 +17,11 @@ export async function getSchedulerStatus(): Promise<any> {
           running: true,
           name: 'news-fetch',
           schedule: '* * * * *', // 每1分钟
-          description: '获取富途新闻数据'
-        }
+          description: '获取富途新闻数据',
+        },
       },
       totalTasks: 1,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('获取调度器状态失败:', error);
@@ -29,7 +29,7 @@ export async function getSchedulerStatus(): Promise<any> {
       success: false,
       error: errorDetails.message,
       details: errorDetails,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }
@@ -41,12 +41,12 @@ export async function triggerNewsTask(): Promise<any> {
   try {
     logger.info('🔧 手动触发新闻获取任务');
     const result = await fetchLatestNews();
-    
+
     return {
       success: true,
       message: '手动触发新闻获取任务完成',
       result: result,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('手动触发新闻获取任务失败:', error);
@@ -54,7 +54,7 @@ export async function triggerNewsTask(): Promise<any> {
       success: false,
       error: errorDetails.message,
       details: errorDetails,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }

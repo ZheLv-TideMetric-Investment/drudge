@@ -268,7 +268,8 @@ export async function processTingziMessage(body: TingziRequestBody): Promise<Tin
   }
 
   // 发送webhook响应
-  await sendWebhookResponse([sessionWebhook], senderNick, responseText);
+  const webhookUrls = [sessionWebhook].filter(Boolean) as string[];
+  await sendWebhookResponse(webhookUrls, senderNick, responseText);
 
   return {
     received: body,

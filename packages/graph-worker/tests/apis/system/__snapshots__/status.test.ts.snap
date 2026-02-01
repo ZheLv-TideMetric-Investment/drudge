@@ -1,0 +1,37 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`api/system/status returns error on failure 1`] = `
+{
+  "error": "boom",
+  "success": false,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`api/system/status returns system status payload 1`] = `
+{
+  "data": {
+    "memory": {
+      "external": 0,
+      "total": 0,
+      "used": 0,
+    },
+    "pid": 0,
+    "service": "graph-worker",
+    "services": {
+      "knowledgeGraph": {
+        "status": "ok",
+      },
+      "scheduler": {
+        "status": "ok",
+      },
+    },
+    "status": "healthy",
+    "timestamp": "2024-01-01T00:00:00.000Z",
+    "uptime": 0,
+    "version": "2.0",
+  },
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;

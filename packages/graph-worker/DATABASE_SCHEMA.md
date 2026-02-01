@@ -40,6 +40,7 @@
 | `news_level` | String | ✓ | 新闻级别 (Level 1-5) |
 | `level` | Integer | ✓ | 数值级别 (0-4) |
 | `processed` | Boolean | ✓ | 是否已处理 |
+| `processedAt` | DateTime | ✓ | 处理时间 (UTC) |
 | `created_at` | DateTime | ✓ | 创建时间 (UTC) |
 | `updated_at` | DateTime | ✓ | 更新时间 (UTC) |
 
@@ -53,6 +54,7 @@
   "news_level": "Level 3",
   "level": 0,
   "processed": true,
+  "processedAt": 1735689600000,
   "timestamp": "2025-01-01T00:00:00.000Z",
   "raw_time": 1735689600
 }

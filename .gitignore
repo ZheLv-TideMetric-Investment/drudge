@@ -25,6 +25,9 @@ data/
 *.seed
 *.pid.lock
 
+# 构建/测试产物
+artifacts/
+
 # 测试覆盖率
 coverage/
 
@@ -45,3 +48,5 @@ out/
 # 编译输出
 packages/*/dist/
 packages/*/.next/ 
+
+.pnpm-store

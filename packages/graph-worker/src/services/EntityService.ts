@@ -17,7 +17,6 @@ import {
   Person,
   Organization,
   Location,
-  Relationship,
   NewsItem,
 } from '../types/index';
 
@@ -47,10 +46,23 @@ export class EntityService {
     }
   }
 
+  private resolveLevelNumber(newsLevel?: string, fallbackLevel?: number): number {
+    if (newsLevel) {
+      const match = newsLevel.match(/\d+/);
+      if (match) {
+        return Number(match[0]);
+      }
+    }
+
+    return typeof fallbackLevel === 'number' ? fallbackLevel : 0;
+  }
+
   /**
    * 创建新闻节点
    */
   async createNews(newsItem: NewsItem, newsLevel: string = EVENT_LEVELS.LEVEL_5): Promise<void> {
+    const levelNumber = this.resolveLevelNumber(newsLevel, newsItem.level);
+
     const cypher = `
       MERGE (n:News {id: $id})
       SET n.title = $title,
@@ -62,6 +74,7 @@ export class EntityService {
           n.level = $level,
           n.news_level = $newsLevel,
           n.processed = true,
+          n.processedAt = timestamp(),
           n.created_at = CASE WHEN n.created_at IS NULL THEN timestamp() ELSE n.created_at END,
           n.updated_at = timestamp()
       RETURN n
@@ -75,7 +88,7 @@ export class EntityService {
       rawTime: newsItem.raw_time || null,
       source: newsItem.source || '',
       url: newsItem.url || '',
-      level: newsItem.level || 0,
+      level: levelNumber,
       newsLevel,
     };
 
@@ -262,7 +275,7 @@ export class EntityService {
         content: extractionResult.content || '',
         source: extractionResult.source || '',
         url: extractionResult.url || '',
-        level: 0, // 兼容旧字段
+        level: this.resolveLevelNumber(extractionResult.news_level),
         timestamp:
           typeof extractionResult.timestamp === 'string'
             ? extractionResult.timestamp

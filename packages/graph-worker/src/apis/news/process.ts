@@ -12,7 +12,7 @@ export async function processNews(newsItem: NewsItem): Promise<any> {
       return {
         success: false,
         error: '缺少必要的新闻数据字段 (id, title, content)',
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       };
     }
 
@@ -23,15 +23,14 @@ export async function processNews(newsItem: NewsItem): Promise<any> {
     return {
       success: true,
       data: result,
-      timestamp: getCurrentTime()
+      timestamp: getCurrentTime(),
     };
-
   } catch (error: any) {
     logger.error('处理新闻失败:', error);
     return {
       success: false,
       error: error.message,
-      timestamp: getCurrentTime()
+      timestamp: getCurrentTime(),
     };
   }
 }
@@ -45,7 +44,7 @@ export async function batchProcessNews(newsItems: NewsItem[]): Promise<any> {
       return {
         success: false,
         error: 'newsItems 必须是非空数组',
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       };
     }
 
@@ -56,22 +55,21 @@ export async function batchProcessNews(newsItems: NewsItem[]): Promise<any> {
     const summary = {
       total: results.length,
       success: results.filter(r => r.success).length,
-      failed: results.filter(r => !r.success).length
+      failed: results.filter(r => !r.success).length,
     };
 
     return {
       success: true,
       data: results,
       summary,
-      timestamp: getCurrentTime()
+      timestamp: getCurrentTime(),
     };
-
   } catch (error: any) {
     logger.error('批量处理新闻失败:', error);
     return {
       success: false,
       error: error.message,
-      timestamp: getCurrentTime()
+      timestamp: getCurrentTime(),
     };
   }
 }
@@ -85,11 +83,12 @@ export async function checkNewsStatus(newsIds: string[]): Promise<any> {
       return {
         success: false,
         error: 'newsIds 必须是数组',
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       };
     }
 
-    const unprocessedIds = await knowledgeGraphService['entityService'].getUnprocessedNewsIds(newsIds);
+    const unprocessedIds =
+      await knowledgeGraphService['entityService'].getUnprocessedNewsIds(newsIds);
     const processedIds = newsIds.filter(id => !unprocessedIds.includes(id));
 
     return {
@@ -99,17 +98,16 @@ export async function checkNewsStatus(newsIds: string[]): Promise<any> {
         processed: processedIds.length,
         unprocessed: unprocessedIds.length,
         processedIds,
-        unprocessedIds
+        unprocessedIds,
       },
-      timestamp: getCurrentTime()
+      timestamp: getCurrentTime(),
     };
-
   } catch (error: any) {
     logger.error('检查新闻状态失败:', error);
     return {
       success: false,
       error: error.message,
-      timestamp: getCurrentTime()
+      timestamp: getCurrentTime(),
     };
   }
-} 
+}

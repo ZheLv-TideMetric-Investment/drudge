@@ -16,7 +16,6 @@ import {
   OrganizationType,
   LocationType,
   RelationshipType,
-  EVENT_TYPE_DESCRIPTIONS,
   ORGANIZATION_TYPE_DESCRIPTIONS,
   DEFAULT_EVENT_TYPE,
   DEFAULT_SENTIMENT,
@@ -27,18 +26,9 @@ import {
 } from '../constants/enums';
 import * as fs from 'fs';
 import * as path from 'path';
-import {
-  NewsItem,
-  NewsExtractionResult,
-  Event,
-  Company,
-  Person,
-  Organization,
-  Location,
-  Relationship,
-  LLMMessage,
-} from '../types/index';
+import { NewsItem, NewsExtractionResult, LLMMessage } from '../types/index';
 import config from '../config/config';
+import { createMessages, formatPromptFields } from '@drudge/common';
 
 // ISO-8601 正则表达式
 const iso8601 = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?)?$/;
@@ -119,7 +109,7 @@ const newsExtractionSchema = z.object({
 export class EntityExtractionService {
   private maxRetries = 5;
   private retryDelay = 2000;
-  private failedNewsDir = path.join(process.cwd(), '../..', 'data', 'news', 'failed');
+  private failedNewsDir = config.dataSource.failedNewsDirectory;
 
   constructor() {}
 
@@ -166,7 +156,7 @@ export class EntityExtractionService {
       try {
         const providerInfo = aiService.getProviderInfo();
         const detailedError = `${error.message || '实体提取失败'} | 主Provider: ${providerInfo.current}${providerInfo.hasFallback ? `, 备用: ${providerInfo.fallback}` : ' (无备用)'}`;
-        
+
         await notificationService.sendEntityExtractionFailureNotification(
           newsItem.id,
           detailedError,
@@ -318,25 +308,21 @@ export class EntityExtractionService {
   private async callAIExtraction(newsItem: NewsItem): Promise<any> {
     // 获取AI服务的provider信息
     const providerInfo = aiService.getProviderInfo();
-    logger.info(`🤖 使用AI提取六要素 - 主Provider: ${providerInfo.current}${providerInfo.hasFallback ? `, 备用: ${providerInfo.fallback}` : ''}`);
+    logger.info(
+      `🤖 使用AI提取六要素 - 主Provider: ${providerInfo.current}${providerInfo.hasFallback ? `, 备用: ${providerInfo.fallback}` : ''}`
+    );
 
-    const messages: LLMMessage[] = [
-      {
-        role: 'system',
-        content: this.getSystemPrompt(),
-      },
-      {
-        role: 'user',
-        content: `
-请提取以下新闻的六要素信息：
+    const promptFields = formatPromptFields([
+      ['标题', newsItem.title],
+      ['内容', newsItem.content],
+      ['发布时间', newsItem.timestamp],
+      ['来源', newsItem.source],
+    ]);
 
-标题：${newsItem.title}
-内容：${newsItem.content}
-        发布时间：${newsItem.timestamp}
-来源：${newsItem.source}
-        `,
-      },
-    ];
+    const messages: LLMMessage[] = createMessages(
+      this.getSystemPrompt(),
+      `请提取以下新闻的六要素信息：\n\n${promptFields}`
+    );
 
     let lastError: any;
 
@@ -500,9 +486,13 @@ export class EntityExtractionService {
         .map((event: any) => {
           // 确保 event_id 存在
           if (!event.event_id) {
-            event.event_id = event.event_name
-              ? event.event_name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() + '_' + Date.now()
-              : 'event_' + Date.now();
+            /* istanbul ignore else */
+            if (event.event_name) {
+              event.event_id =
+                event.event_name.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase() + '_' + Date.now();
+            } else {
+              event.event_id = 'event_' + Date.now();
+            }
           }
 
           // 修复 event_type 枚举
@@ -692,7 +682,7 @@ export class EntityExtractionService {
     jsonContent = jsonContent.replace(/,\s*""\s*}/g, '}');
 
     // 4. 修复单独的空key："key":"value","" -> "key":"value"
-    jsonContent = jsonContent.replace(/,\s*""\s*(?=[,\]\}])/g, '');
+    jsonContent = jsonContent.replace(/,\s*""\s*(?=[,\]}])/g, '');
 
     // 5. 修复空key后跟冒号的情况：""," -> 删除整个部分
     jsonContent = jsonContent.replace(/,\s*""\s*:\s*"[^"]*"/g, '');
@@ -741,7 +731,7 @@ export class EntityExtractionService {
           .filter((event: any) => event && typeof event === 'object' && event.event_name)
           .map((event: any, index: number) => ({
             event_id: `${newsItem.id}_event_${index}`,
-            event_name: event.event_name || '',
+            event_name: event.event_name,
             event_description: event.event_description || '',
             event_type: event.event_type || DEFAULT_EVENT_TYPE,
             significance: event.significance || 1,
@@ -758,7 +748,7 @@ export class EntityExtractionService {
         result.companies = extractionData.companies
           .filter((company: any) => company && typeof company === 'object' && company.company_name)
           .map((company: any) => ({
-            company_name: company.company_name || '',
+            company_name: company.company_name,
             ticker: company.ticker || '',
             industry: company.industry || '',
             market: company.market || '',
@@ -772,7 +762,7 @@ export class EntityExtractionService {
         result.persons = extractionData.persons
           .filter((person: any) => person && typeof person === 'object' && person.person_name)
           .map((person: any) => ({
-            person_name: person.person_name || '',
+            person_name: person.person_name,
             title: person.title || '',
             company: person.company || '',
             nationality: person.nationality || '',
@@ -784,7 +774,7 @@ export class EntityExtractionService {
         result.organizations = extractionData.organizations
           .filter((org: any) => org && typeof org === 'object' && org.organization_name)
           .map((org: any) => ({
-            organization_name: org.organization_name || '',
+            organization_name: org.organization_name,
             type: org.type || DEFAULT_ORGANIZATION_TYPE,
             country: org.country || '',
           }));
@@ -797,7 +787,7 @@ export class EntityExtractionService {
             (location: any) => location && typeof location === 'object' && location.location_name
           )
           .map((location: any) => ({
-            location_name: location.location_name || '',
+            location_name: location.location_name,
             type: location.type || DEFAULT_LOCATION_TYPE,
             country: location.country || '',
             region: location.region || '',
@@ -811,8 +801,8 @@ export class EntityExtractionService {
           .filter((rel: any) => rel && typeof rel === 'object' && rel.from && rel.to)
           .map((rel: any) => ({
             type: rel.type || DEFAULT_RELATIONSHIP_TYPE,
-            from: rel.from || '',
-            to: rel.to || '',
+            from: rel.from,
+            to: rel.to,
             description: rel.description || '',
             confidence: rel.confidence || 0.8,
           }));

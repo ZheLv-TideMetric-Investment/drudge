@@ -3,7 +3,7 @@ import path from 'path';
 import { logger } from '../utils/logger';
 import { NewsItem } from '../types/index';
 import knowledgeGraphService from './KnowledgeGraphService';
-import { getCurrentTime } from '../utils/timeUtils';
+import config from '../config/config';
 
 export interface FailedNewsFile {
   newsItem: NewsItem;
@@ -40,7 +40,7 @@ export interface RetryStats {
  * 负责扫描失败目录、解析失败文件并重新处理新闻
  */
 class FailedNewsProcessor {
-  private failedNewsDir = path.join(process.cwd(), '../../data/news/failed');
+  private failedNewsDir = config.dataSource.failedNewsDirectory;
 
   /**
    * 扫描失败目录，获取所有失败的新闻文件
@@ -53,8 +53,8 @@ class FailedNewsProcessor {
       }
 
       const files = fs.readdirSync(this.failedNewsDir);
-      const failedFiles = files.filter(file => 
-        file.startsWith('failed_') && file.endsWith('.json')
+      const failedFiles = files.filter(
+        file => file.startsWith('failed_') && file.endsWith('.json')
       );
 
       logger.info(`🔍 发现 ${failedFiles.length} 个失败新闻文件`);
@@ -72,13 +72,13 @@ class FailedNewsProcessor {
     try {
       const fileContent = fs.readFileSync(filePath, 'utf8');
       const failedData = JSON.parse(fileContent) as FailedNewsFile;
-      
+
       // 验证文件格式
       if (!failedData.newsItem || !failedData.error || !failedData.metadata) {
         logger.warn(`❌ 失败文件格式无效: ${path.basename(filePath)}`);
         return null;
       }
-      
+
       return failedData;
     } catch (error) {
       logger.error(`解析失败文件时出错 ${path.basename(filePath)}:`, error);
@@ -103,16 +103,16 @@ class FailedNewsProcessor {
 
       // 重新处理新闻
       const processResult = await knowledgeGraphService.processNews(failedData.newsItem);
-      
+
       if (processResult.success) {
         // 处理成功，删除失败文件
         await this.deleteFailedFile(filePath);
         logger.info(`✅ 新闻 ${newsId} 重新处理成功，已删除失败文件`);
-        
+
         return {
           success: true,
           newsId,
-          fileName
+          fileName,
         };
       } else {
         logger.warn(`⚠️ 新闻 ${newsId} 重新处理仍然失败: ${processResult.error}`);
@@ -120,7 +120,7 @@ class FailedNewsProcessor {
           success: false,
           newsId,
           fileName,
-          error: processResult.error || '重新处理失败'
+          error: processResult.error || '重新处理失败',
         };
       }
     } catch (error: any) {
@@ -129,7 +129,7 @@ class FailedNewsProcessor {
         success: false,
         newsId,
         fileName,
-        error: error.message || '重新处理异常'
+        error: error.message || '重新处理异常',
       };
     }
   }
@@ -140,22 +140,22 @@ class FailedNewsProcessor {
   async retryFailedNews(limit?: number): Promise<RetryStats> {
     try {
       logger.info('🔄 开始批量重新处理失败的新闻...');
-      
+
       const failedFiles = await this.scanFailedFiles();
-      
+
       if (failedFiles.length === 0) {
         logger.info('✅ 没有找到失败的新闻文件');
         return {
           total: 0,
           successful: 0,
           failed: 0,
-          results: []
+          results: [],
         };
       }
 
       // 如果设置了限制，只处理前N个文件
       const filesToProcess = limit ? failedFiles.slice(0, limit) : failedFiles;
-      
+
       logger.info(`📊 准备重新处理 ${filesToProcess.length} 个失败新闻文件`);
 
       const results: RetryResult[] = [];
@@ -165,14 +165,14 @@ class FailedNewsProcessor {
       // 逐个处理失败文件（避免并发过高）
       for (const filePath of filesToProcess) {
         const failedData = await this.parseFailedFile(filePath);
-        
+
         if (!failedData) {
           const fileName = path.basename(filePath);
           results.push({
             success: false,
             newsId: 'unknown',
             fileName,
-            error: '文件解析失败'
+            error: '文件解析失败',
           });
           failed++;
           continue;
@@ -180,7 +180,7 @@ class FailedNewsProcessor {
 
         const retryResult = await this.reprocessSingleNews(failedData, filePath);
         results.push(retryResult);
-        
+
         if (retryResult.success) {
           successful++;
         } else {
@@ -192,12 +192,12 @@ class FailedNewsProcessor {
       }
 
       logger.info(`✅ 批量重新处理完成: 成功 ${successful} 个，失败 ${failed} 个`);
-      
+
       return {
         total: filesToProcess.length,
         successful,
         failed,
-        results
+        results,
       };
     } catch (error) {
       logger.error('批量重新处理失败新闻时出错:', error);
@@ -211,7 +211,7 @@ class FailedNewsProcessor {
   async retryFailedNewsByIds(newsIds: string[]): Promise<RetryStats> {
     try {
       logger.info(`🔄 根据ID重新处理失败的新闻: ${newsIds.join(', ')}`);
-      
+
       const failedFiles = await this.scanFailedFiles();
       const results: RetryResult[] = [];
       let successful = 0;
@@ -230,20 +230,20 @@ class FailedNewsProcessor {
             success: false,
             newsId,
             fileName: 'not_found',
-            error: '未找到对应的失败文件'
+            error: '未找到对应的失败文件',
           });
           failed++;
           continue;
         }
 
         const failedData = await this.parseFailedFile(matchingFile);
-        
+
         if (!failedData) {
           results.push({
             success: false,
             newsId,
             fileName: path.basename(matchingFile),
-            error: '文件解析失败'
+            error: '文件解析失败',
           });
           failed++;
           continue;
@@ -251,7 +251,7 @@ class FailedNewsProcessor {
 
         const retryResult = await this.reprocessSingleNews(failedData, matchingFile);
         results.push(retryResult);
-        
+
         if (retryResult.success) {
           successful++;
         } else {
@@ -260,12 +260,12 @@ class FailedNewsProcessor {
       }
 
       logger.info(`✅ 按ID重新处理完成: 成功 ${successful} 个，失败 ${failed} 个`);
-      
+
       return {
         total: newsIds.length,
         successful,
         failed,
-        results
+        results,
       };
     } catch (error) {
       logger.error('按ID重新处理失败新闻时出错:', error);
@@ -279,7 +279,7 @@ class FailedNewsProcessor {
   async listFailedNews(limit: number = 50): Promise<FailedNewsFile[]> {
     try {
       const failedFiles = await this.scanFailedFiles();
-      
+
       if (failedFiles.length === 0) {
         return [];
       }
@@ -288,7 +288,7 @@ class FailedNewsProcessor {
       const sortedFiles = failedFiles
         .map(filePath => ({
           filePath,
-          mtime: fs.statSync(filePath).mtime
+          mtime: fs.statSync(filePath).mtime,
         }))
         .sort((a, b) => b.mtime.getTime() - a.mtime.getTime())
         .slice(0, limit)
@@ -328,7 +328,7 @@ class FailedNewsProcessor {
   async cleanOldFailedFiles(daysOld: number = 30): Promise<number> {
     try {
       const failedFiles = await this.scanFailedFiles();
-      const cutoffTime = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
+      const cutoffTime = Date.now() - daysOld * 24 * 60 * 60 * 1000;
       let deletedCount = 0;
 
       for (const filePath of failedFiles) {
@@ -348,4 +348,4 @@ class FailedNewsProcessor {
   }
 }
 
-export default new FailedNewsProcessor(); 
+export default new FailedNewsProcessor();

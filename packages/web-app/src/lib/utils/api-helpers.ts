@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { TimeZoneUtils, buildTimeRange, formatTimeFields, nowBeijing } from './timezone';
+import { BEIJING_TIMEZONE } from '@drudge/common';
+import { TimeZoneUtils, buildTimeRange, formatTimeFields, TIME_FORMATS } from './timezone';
 
 /**
  * API时间处理辅助函数
@@ -85,8 +86,8 @@ export class ApiTimeHelpers {
       success: true,
       data: formattedData,
       ...(message && { message }),
-      timestamp: nowBeijing().format('YYYY-MM-DD HH:mm:ss'),
-      timezone: 'Asia/Shanghai'
+      timestamp: TimeZoneUtils.now(TIME_FORMATS.FULL),
+      timezone: BEIJING_TIMEZONE
     };
 
     return NextResponse.json(response, { status });
@@ -106,8 +107,8 @@ export class ApiTimeHelpers {
     const response = {
       success: false,
       error: errorMessage,
-      timestamp: nowBeijing().format('YYYY-MM-DD HH:mm:ss'),
-      timezone: 'Asia/Shanghai'
+      timestamp: TimeZoneUtils.now(TIME_FORMATS.FULL),
+      timezone: BEIJING_TIMEZONE
     };
 
     return NextResponse.json(response, { status });
@@ -255,19 +256,20 @@ export class ApiTimeHelpers {
     customStart?: string,
     customEnd?: string
   ): { startTime: string; endTime: string } {
-    const now = nowBeijing();
-
     switch (preset) {
       case 'today':
         return TimeZoneUtils.getTodayRange();
       
       case 'yesterday': {
-        const yesterday = now.clone().subtract(1, 'day');
-        const start = yesterday.startOf('day');
-        const end = yesterday.endOf('day');
+        const todayRange = TimeZoneUtils.getTodayRange();
+        const start = new Date(todayRange.startTime);
+        const end = new Date(todayRange.endTime);
+        const offset = 24 * 60 * 60 * 1000;
+        const startTime = new Date(start.getTime() - offset);
+        const endTime = new Date(end.getTime() - offset);
         return {
-          startTime: TimeZoneUtils.toUTC(start),
-          endTime: TimeZoneUtils.toUTC(end)
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString()
         };
       }
       

@@ -1,0 +1,197 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`graph query api getEntityNews handles errors 1`] = `
+{
+  "entityName": "Acme",
+  "error": "boom",
+  "success": false,
+}
+`;
+
+exports[`graph query api getEntityNews maps relation types 1`] = `
+{
+  "count": 1,
+  "entityName": "Acme",
+  "news": [
+    {
+      "id": "news_1",
+      "level": "Level 2",
+      "relationType": "INVOLVES",
+      "timestamp": "2024-01-01T00:00:00.000Z",
+      "title": "Title",
+    },
+  ],
+  "success": true,
+}
+`;
+
+exports[`graph query api getEntityRelations returns relation graph and handles errors 1`] = `
+{
+  "depth": 2,
+  "entityName": "Acme",
+  "relations": {
+    "nodes": [],
+  },
+  "success": true,
+}
+`;
+
+exports[`graph query api getEntityRelations returns relation graph and handles errors 2`] = `
+{
+  "entityName": "Acme",
+  "error": "boom",
+  "success": false,
+}
+`;
+
+exports[`graph query api getGraphStats handles failures 1`] = `
+{
+  "error": "boom",
+  "success": false,
+}
+`;
+
+exports[`graph query api getGraphStats returns stats 1`] = `
+{
+  "stats": {
+    "nodes": 1,
+  },
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`graph query api getNewsDetail handles query errors 1`] = `
+{
+  "error": "boom",
+  "newsId": "news_1",
+  "success": false,
+}
+`;
+
+exports[`graph query api getNewsDetail returns entities when found 1`] = `
+{
+  "entities": [
+    {
+      "entity": {
+        "company_name": "Acme",
+      },
+      "entityLabels": [
+        "Company",
+      ],
+      "relationType": "INVOLVES",
+    },
+  ],
+  "entityCount": 1,
+  "news": {
+    "id": "news_1",
+  },
+  "newsId": "news_1",
+  "success": true,
+}
+`;
+
+exports[`graph query api getNewsDetail returns not found when missing 1`] = `
+{
+  "error": "新闻不存在",
+  "newsId": "missing",
+  "success": false,
+}
+`;
+
+exports[`graph query api getNewsLevelDistribution handles errors 1`] = `
+{
+  "error": "boom",
+  "success": false,
+}
+`;
+
+exports[`graph query api getNewsLevelDistribution returns totals 1`] = `
+{
+  "distribution": [
+    {
+      "count": 2,
+      "level": "Level 1",
+    },
+    {
+      "count": 1,
+      "level": "Level 2",
+    },
+  ],
+  "success": true,
+  "total": 3,
+}
+`;
+
+exports[`graph query api getNewsList maps records with normalized levels 1`] = `
+{
+  "count": 1,
+  "filters": {
+    "level": "Level 1",
+    "limit": 1,
+  },
+  "news": [
+    {
+      "id": "news_1",
+      "level": "Level 1",
+      "processedAt": 1704067800000,
+      "timestamp": "2024-01-01T00:00:00.000Z",
+      "title": "Title",
+    },
+  ],
+  "success": true,
+}
+`;
+
+exports[`graph query api getNewsList returns error when query fails 1`] = `
+{
+  "error": "boom",
+  "success": false,
+}
+`;
+
+exports[`graph query api getPopularEntities maps counts 1`] = `
+{
+  "count": 1,
+  "entities": [
+    {
+      "labels": [
+        "Company",
+      ],
+      "name": "Company A",
+      "newsCount": 5,
+    },
+  ],
+  "success": true,
+}
+`;
+
+exports[`graph query api getPopularEntities returns errors 1`] = `
+{
+  "error": "boom",
+  "success": false,
+}
+`;
+
+exports[`graph query api searchEntities handles failures 1`] = `
+{
+  "error": "boom",
+  "query": "test",
+  "success": false,
+}
+`;
+
+exports[`graph query api searchEntities returns entities 1`] = `
+{
+  "count": 1,
+  "entities": [
+    {
+      "labels": [
+        "Company",
+      ],
+    },
+  ],
+  "query": "test",
+  "success": true,
+}
+`;

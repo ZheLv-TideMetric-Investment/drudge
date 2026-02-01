@@ -10,21 +10,21 @@ import { logErrorWithDetails } from '../../utils/error';
 export async function fetchLatestNews(): Promise<any> {
   try {
     logger.info('🔄 开始获取最新新闻...');
-    
+
     // 并行获取两个数据源的新闻
     const [futuNewsItems, awtmtNewsItems] = await Promise.all([
       futuLiveService.fetchNews(),
-      awtmtLiveService.fetchNews()
+      awtmtLiveService.fetchNews(),
     ]);
-    
+
     const totalCount = futuNewsItems.length + awtmtNewsItems.length;
-    
+
     if (totalCount === 0) {
       return {
         success: true,
         count: 0,
         message: '没有获取到新的新闻',
-        timestamp: formatReadable()
+        timestamp: formatReadable(),
       };
     }
 
@@ -36,11 +36,11 @@ export async function fetchLatestNews(): Promise<any> {
       count: totalCount,
       sources: {
         futu: futuNewsItems.length,
-        awtmt: awtmtNewsItems.length
+        awtmt: awtmtNewsItems.length,
       },
       message: `成功获取 ${totalCount} 条新闻 (富途: ${futuNewsItems.length}, AWTMT: ${awtmtNewsItems.length})`,
       timestamp: formatReadable(),
-      news: allNews.slice(0, 5) // 返回前5条作为预览
+      news: allNews.slice(0, 5), // 返回前5条作为预览
     };
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('获取新闻失败:', error);
@@ -49,7 +49,7 @@ export async function fetchLatestNews(): Promise<any> {
       count: 0,
       error: errorDetails.message,
       details: errorDetails,
-      timestamp: formatReadable()
+      timestamp: formatReadable(),
     };
   }
 }

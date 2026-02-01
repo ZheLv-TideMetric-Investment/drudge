@@ -31,17 +31,18 @@ export class FileStorage {
   private defaultSource: string = 'mixed';
 
   constructor() {
-    const storagePath = config.storage.path || '../../data';
+    const storagePath = config.storage.path;
     this.dataPath = path.join(storagePath, 'news');
     this.ensureDataPath();
+    logger.info(`📁 使用新闻存储目录: ${this.dataPath}`);
   }
 
   /**
    * 确保数据目录存在
    */
-  private async ensureDataPath(): Promise<void> {
+  private ensureDataPath(): void {
     try {
-      await fs.promises.mkdir(this.dataPath, { recursive: true });
+      fs.mkdirSync(this.dataPath, { recursive: true });
     } catch (error: any) {
       logErrorWithDetails('创建数据目录失败:', error, { dataPath: this.dataPath });
     }
@@ -53,7 +54,7 @@ export class FileStorage {
   async saveNews(news: NewsItem[]): Promise<string> {
     // 按源分组保存
     const groupedNews: { [source: string]: NewsItem[] } = {};
-    
+
     news.forEach(item => {
       const source = item.source || this.defaultSource;
       if (!groupedNews[source]) {
@@ -61,14 +62,14 @@ export class FileStorage {
       }
       groupedNews[source].push(item);
     });
-    
+
     const savedFiles: string[] = [];
-    
+
     for (const [source, sourceNews] of Object.entries(groupedNews)) {
       const timestamp = formatForFilename();
       const filename = `${source}_${timestamp}.json`;
       const filePath = path.join(this.dataPath, filename);
-      
+
       try {
         await fs.promises.writeFile(filePath, JSON.stringify(sourceNews, null, 2));
         logger.info(`✅ 保存新闻到文件: ${filename} (${sourceNews.length}条)`);
@@ -77,9 +78,9 @@ export class FileStorage {
         const errorDetails = logErrorWithDetails(`❌ 保存新闻文件失败: ${filename}`, error, {
           source,
           count: sourceNews.length,
-          filePath
+          filePath,
         });
-        
+
         // 发送文件保存失败通知
         try {
           await notificationService.sendFileSaveFailureNotification(
@@ -90,11 +91,11 @@ export class FileStorage {
         } catch (notifyError) {
           logger.error('发送文件保存失败通知失败:', notifyError);
         }
-        
+
         throw error; // 重新抛出错误，让调用方知道保存失败
       }
     }
-    
+
     return savedFiles.join(', ');
   }
 
@@ -110,7 +111,7 @@ export class FileStorage {
       const filePath = path.join(this.dataPath, latestFile);
       const content = await fs.promises.readFile(filePath, 'utf-8');
       const news: NewsItem[] = JSON.parse(content);
-      
+
       return news.length > 0 ? news[0].id : null;
     } catch (error: any) {
       const errorDetails = buildErrorDetails(error, { source });
@@ -143,7 +144,7 @@ export class FileStorage {
     try {
       const files = await this.getNewsFiles();
       const allNews: NewsItem[] = [];
-      
+
       for (const file of files) {
         try {
           const filePath = path.join(this.dataPath, file);
@@ -155,7 +156,7 @@ export class FileStorage {
           logger.warn(`读取文件失败: ${file}`, errorDetails);
         }
       }
-      
+
       return allNews.sort((a, b) => b.time - a.time);
     } catch (error: any) {
       logErrorWithDetails('获取所有新闻失败:', error);
@@ -178,25 +179,25 @@ export class FileStorage {
     try {
       const files = await this.getNewsFiles();
       const allNews: NewsItem[] = [];
-      
+
       for (const file of files) {
         try {
           const filePath = path.join(this.dataPath, file);
           const content = await fs.promises.readFile(filePath, 'utf-8');
           const news: NewsItem[] = JSON.parse(content);
-          
+
           const filteredNews = news.filter(item => {
-            const newsTime = parseTime(item.time * 1000);
+            const newsTime = parseTime(item.time);
             return newsTime.isAfter(startTime) && newsTime.isBefore(endTime);
           });
-          
+
           allNews.push(...filteredNews);
         } catch (error: any) {
           const errorDetails = buildErrorDetails(error, { file });
           logger.warn(`读取文件失败: ${file}`, errorDetails);
         }
       }
-      
+
       return allNews.sort((a, b) => b.time - a.time);
     } catch (error: any) {
       logger.error('按时间范围获取新闻失败:', error);
@@ -214,51 +215,50 @@ export class FileStorage {
       let todayCount = 0;
       let recentCount = 0;
       const sourceStats: { [source: string]: number } = {};
-      
+
       const today = startOfToday();
       const threeDaysAgo = daysAgo(3);
-      
+
       for (const file of files) {
         try {
           const filePath = path.join(this.dataPath, file);
           const content = await fs.promises.readFile(filePath, 'utf-8');
           const news: NewsItem[] = JSON.parse(content);
-          
+
           totalCount += news.length;
-          
+
           // 按源统计
           news.forEach(item => {
             const source = item.source || 'unknown';
             sourceStats[source] = (sourceStats[source] || 0) + 1;
           });
-          
+
           // 统计今天的新闻
           const todayNews = news.filter(item => {
-            const newsTime = parseTime(item.time * 1000);
+            const newsTime = parseTime(item.time);
             return newsTime.isAfter(today);
           });
           todayCount += todayNews.length;
-          
+
           // 统计最近3天的新闻
           const recentNews = news.filter(item => {
-            const newsTime = parseTime(item.time * 1000);
+            const newsTime = parseTime(item.time);
             return newsTime.isAfter(threeDaysAgo);
           });
           recentCount += recentNews.length;
-          
         } catch (error: any) {
           const errorDetails = buildErrorDetails(error, { file });
           logger.warn(`读取文件失败: ${file}`, errorDetails);
         }
       }
-      
+
       return {
         totalCount,
         todayCount,
         recentCount,
         fileCount: files.length,
         sourceStats,
-        sources: Object.keys(sourceStats)
+        sources: Object.keys(sourceStats),
       };
     } catch (error: any) {
       logger.error('获取新闻统计失败:', error);
@@ -268,7 +268,7 @@ export class FileStorage {
         recentCount: 0,
         fileCount: 0,
         sourceStats: {},
-        sources: []
+        sources: [],
       };
     }
   }
@@ -282,12 +282,12 @@ export class FileStorage {
       const cutoffTime = daysAgo(days);
       let deletedCount = 0;
       let remainingCount = 0;
-      
+
       for (const file of files) {
         try {
           const filePath = path.join(this.dataPath, file);
           const stats = await fs.promises.stat(filePath);
-          
+
           const fileTime = parseTime(stats.mtime);
           if (fileTime.isBefore(cutoffTime)) {
             await fs.promises.unlink(filePath);
@@ -301,11 +301,11 @@ export class FileStorage {
           logger.warn(`处理文件失败: ${file}`, errorDetails);
         }
       }
-      
+
       return {
         deletedCount,
         remainingCount,
-        message: `清理完成: 删除 ${deletedCount} 个文件，保留 ${remainingCount} 个文件`
+        message: `清理完成: 删除 ${deletedCount} 个文件，保留 ${remainingCount} 个文件`,
       };
     } catch (error: any) {
       logErrorWithDetails('清理旧文件失败:', error);
@@ -314,4 +314,4 @@ export class FileStorage {
   }
 }
 
-export default new FileStorage(); 
+export default new FileStorage();

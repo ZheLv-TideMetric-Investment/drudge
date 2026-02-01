@@ -81,7 +81,7 @@ export class AwtmtLiveService {
       author: '',
       category: item.global_channel_name || '',
       summary: item.content_text ? item.content_text.substring(0, 200) : '',
-      raw: item // 保存原始数据
+      raw: item, // 保存原始数据
     };
   }
 
@@ -93,7 +93,7 @@ export class AwtmtLiveService {
       channel: 'global-channel',
       client: 'pc',
       limit: 20,
-      accept: 'live,vip-live'
+      accept: 'live,vip-live',
     };
 
     try {
@@ -148,7 +148,7 @@ export class AwtmtLiveService {
     } catch (error: any) {
       const errorDetails = logErrorWithDetails('[AWTMT] 请求AWTMT新闻API失败:', error, {
         params,
-        cursor
+        cursor,
       });
 
       // 发送API失败通知
@@ -176,7 +176,13 @@ export class AwtmtLiveService {
         logger.info('🔄 [AWTMT] 新闻首次运行，获取最新一页新闻');
         const response = await this.makeRequest();
 
-        if (!response || !response.data || response.data.code !== 20000 || !response.data.data || !response.data.data.items) {
+        if (
+          !response ||
+          !response.data ||
+          response.data.code !== 20000 ||
+          !response.data.data ||
+          !response.data.data.items
+        ) {
           const errorMsg = '[AWTMT] 获取新闻失败: 响应格式错误';
           logger.error(`❌ ${errorMsg}`);
 
@@ -203,7 +209,7 @@ export class AwtmtLiveService {
           }
         }
         this.isFirstRun = false;
-        return items ? items.map((item: any) => this.transformNewsItem(item)) : [];
+        return items.map((item: any) => this.transformNewsItem(item));
       }
 
       // 非首次运行，执行完整的分页获取
@@ -217,7 +223,13 @@ export class AwtmtLiveService {
         logger.info(`🔄 [AWTMT] 新闻请求第 ${page} 页`);
         const response = await this.makeRequest(cursor);
 
-        if (!response || !response.data || response.data.code !== 20000 || !response.data.data || !response.data.data.items) {
+        if (
+          !response ||
+          !response.data ||
+          response.data.code !== 20000 ||
+          !response.data.data ||
+          !response.data.data.items
+        ) {
           logger.error('❌ [AWTMT] 获取新闻失败: 响应格式错误');
           break;
         }
@@ -258,7 +270,7 @@ export class AwtmtLiveService {
     } catch (error: any) {
       const errorDetails = logErrorWithDetails('❌ [AWTMT] 新闻获取失败:', error, {
         isFirstRun: this.isFirstRun,
-        lastRequestTime: this.lastRequestTime
+        lastRequestTime: this.lastRequestTime,
       });
 
       // 发送服务异常通知

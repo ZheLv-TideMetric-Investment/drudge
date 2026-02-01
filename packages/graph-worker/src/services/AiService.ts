@@ -7,6 +7,12 @@ import { logger } from '../utils/logger';
 import config from '../config/config';
 import notificationService from './NotificationService';
 import { LLMMessage, LLMCallOptions, LLMResponse } from '../types/index';
+import {
+  buildLLMLogMeta,
+  getLLMErrorMessage,
+  normalizeLLMUsage,
+  parseJsonContent,
+} from '@drudge/common';
 
 /**
  * AI 服务类
@@ -143,28 +149,33 @@ export class AiService {
       if (this.fallbackModel && this.fallbackProvider) {
         logger.info(`🔄 切换到备用Provider: ${this.fallbackProvider}`);
         try {
-          const result = await this.callWithProvider(this.fallbackModel, this.fallbackProvider, messages, options);
+          const result = await this.callWithProvider(
+            this.fallbackModel,
+            this.fallbackProvider,
+            messages,
+            options
+          );
           logger.info(`✅ 备用Provider(${this.fallbackProvider})调用成功`);
           return result;
-                 } catch (fallbackError: any) {
-           logger.error(`❌ 备用Provider(${this.fallbackProvider})也失败: ${fallbackError.message}`);
-           
-           // 不在这里发送通知，由上层EntityExtractionService在最终失败时统一发送
-           // 返回主provider的错误（通常更有意义）
-           return {
-             success: false,
-             error: `主Provider失败: ${primaryError.message}; 备用Provider失败: ${fallbackError.message}`,
-           };
-         }
-             } else {
-         logger.warn('⚠️ 没有可用的备用Provider');
-         
-         // 不在这里发送通知，由上层EntityExtractionService在最终失败时统一发送
-         return {
-           success: false,
-           error: primaryError.message || 'LLM JSON调用失败',
-         };
-       }
+        } catch (fallbackError: any) {
+          logger.error(`❌ 备用Provider(${this.fallbackProvider})也失败: ${fallbackError.message}`);
+
+          // 不在这里发送通知，由上层EntityExtractionService在最终失败时统一发送
+          // 返回主provider的错误（通常更有意义）
+          return {
+            success: false,
+            error: `主Provider失败: ${primaryError.message}; 备用Provider失败: ${fallbackError.message}`,
+          };
+        }
+      } else {
+        logger.warn('⚠️ 没有可用的备用Provider');
+
+        // 不在这里发送通知，由上层EntityExtractionService在最终失败时统一发送
+        return {
+          success: false,
+          error: primaryError.message || 'LLM JSON调用失败',
+        };
+      }
     }
   }
 
@@ -187,12 +198,17 @@ export class AiService {
       schema,
     } = options;
 
-    logger.debug(`调用LLM (${providerName}):`, {
-      messageCount: messages.length,
-      firstMessage: messages[0]?.content?.substring(0, 100) + '...',
-      options: { ...options, schema: schema ? 'provided' : 'default' },
-      provider: providerName,
-    });
+    const modelName = (config.ai as any)?.[providerName]?.model || providerName;
+    logger.debug(
+      `调用LLM (${providerName}):`,
+      buildLLMLogMeta({
+        provider: providerName,
+        model: modelName,
+        mode: 'json',
+        messages,
+        options,
+      })
+    );
 
     // 如果是xAI且使用代理，直接调用代理API
     if (providerName === 'xai' && config.ai.xai?.proxyUrl) {
@@ -238,37 +254,33 @@ export class AiService {
     };
 
     // 使用Promise.race来实现超时控制
-    const result = await Promise.race([llmPromise(), this.createTimeoutPromise(timeout)]);
-
-    // 解析结果
-    let parsedData: T;
+    const { promise: timeoutPromise, timeoutId } = this.createTimeoutPromise(timeout);
+    let result: { object: any; usage?: any };
     try {
-      // 如果result.object是字符串，尝试解析为JSON
-      if (typeof result.object === 'string') {
-        parsedData = JSON.parse(result.object) as T;
-      } else {
-        parsedData = result.object as T;
-      }
-    } catch (parseError) {
-      // 如果解析失败，返回原始对象
-      parsedData = result.object as T;
+      result = await Promise.race([llmPromise(), timeoutPromise]);
+    } finally {
+      clearTimeout(timeoutId);
     }
 
-    logger.debug(`LLM JSON响应成功 (${providerName}):`, {
-      hasObject: !!result.object,
-      usage: result.usage,
-    });
+    // 解析结果
+    const parsedResult = parseJsonContent(result.object);
+    const parsedData = parsedResult.value as T;
+    const usage = normalizeLLMUsage(result.usage);
+
+    logger.debug(
+      `LLM JSON响应成功 (${providerName}):`,
+      buildLLMLogMeta({
+        provider: providerName,
+        model: modelName,
+        mode: 'json',
+        usage,
+      })
+    );
 
     return {
       success: true,
       data: parsedData,
-      usage: result.usage
-        ? {
-            promptTokens: result.usage.promptTokens,
-            completionTokens: result.usage.completionTokens,
-            totalTokens: result.usage.totalTokens,
-          }
-        : undefined,
+      usage,
     };
   }
 
@@ -279,13 +291,10 @@ export class AiService {
     messages: LLMMessage[],
     options: LLMCallOptions = {}
   ): Promise<LLMResponse<T>> {
-    const {
-      temperature = 0.7,
-      timeout = 10 * 60 * 1000,
-    } = options;
+    const { temperature = 0.7, timeout = 10 * 60 * 1000 } = options;
 
     const proxyUrl = `${config.ai.xai!.proxyUrl}/v1/chat/completions`;
-    
+
     logger.debug('调用xAI代理:', {
       url: proxyUrl,
       messageCount: messages.length,
@@ -296,10 +305,10 @@ export class AiService {
       model: config.ai.xai!.model,
       messages: messages.map(msg => ({
         role: msg.role,
-        content: msg.content
+        content: msg.content,
       })),
       temperature,
-      response_format: { type: "json_object" }
+      response_format: { type: 'json_object' },
     };
 
     const abortController = new AbortController();
@@ -325,7 +334,7 @@ export class AiService {
         logger.error('xAI代理请求失败:', {
           status: response.status,
           statusText: response.statusText,
-          errorText
+          errorText,
         });
         return {
           success: false,
@@ -333,7 +342,7 @@ export class AiService {
         };
       }
 
-      const responseData = await response.json() as {
+      const responseData = (await response.json()) as {
         choices?: Array<{
           message?: {
             content?: string;
@@ -346,10 +355,10 @@ export class AiService {
           total_tokens?: number;
         };
       };
-      
+
       logger.debug('xAI代理响应成功:', {
         model: responseData.model,
-        usage: responseData.usage
+        usage: responseData.usage,
       });
 
       // 提取消息内容
@@ -362,47 +371,32 @@ export class AiService {
       }
 
       // 解析结果 - 与callWithProvider保持一致的逻辑
+      const parsedResult = parseJsonContent(content);
       let parsedData: T;
-      try {
-        // 如果content是字符串，尝试解析为JSON
-        if (typeof content === 'string') {
-          parsedData = JSON.parse(content) as T;
-        } else {
-          parsedData = content as T;
-        }
-      } catch (parseError) {
-        // 如果解析失败，返回原始对象或创建包含内容的对象
-        if (typeof content === 'string') {
-          // 尝试创建一个包含原始内容的对象
-          parsedData = { message: content } as T;
-        } else {
-          parsedData = content as T;
-        }
+      if (parsedResult.parsed) {
+        parsedData = parsedResult.value as T;
+      } else {
+        parsedData = { message: parsedResult.value as string } as T;
       }
 
       return {
         success: true,
         data: parsedData,
-        usage: responseData.usage ? {
-          promptTokens: responseData.usage.prompt_tokens || 0,
-          completionTokens: responseData.usage.completion_tokens || 0,
-          totalTokens: responseData.usage.total_tokens || 0,
-        } : undefined,
+        usage: normalizeLLMUsage(responseData.usage),
       };
-
     } catch (error: any) {
       clearTimeout(timeoutId);
-      
+
       if (error.name === 'AbortError') {
         return {
           success: false,
           error: `xAI代理请求超时 (${timeout}ms)`,
         };
       }
-      
+
       return {
         success: false,
-        error: error.message || 'xAI代理调用失败',
+        error: getLLMErrorMessage(error, 'xAI代理调用失败'),
       };
     }
   }
@@ -410,12 +404,17 @@ export class AiService {
   /**
    * 创建超时Promise
    */
-  private createTimeoutPromise(timeoutMs: number): Promise<never> {
-    return new Promise((_, reject) => {
-      setTimeout(() => {
+  private createTimeoutPromise(timeoutMs: number): {
+    promise: Promise<never>;
+    timeoutId: NodeJS.Timeout;
+  } {
+    let timeoutId: NodeJS.Timeout;
+    const promise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
         reject(new Error(`LLM调用超时 (${timeoutMs}ms)`));
       }, timeoutMs);
     });
+    return { promise, timeoutId: timeoutId! };
   }
 
   /**

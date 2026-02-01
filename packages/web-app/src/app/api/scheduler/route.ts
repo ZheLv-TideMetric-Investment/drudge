@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import moment from 'moment-timezone';
+import { TimeZoneUtils } from '../../../lib/utils/timezone';
 import {
   SchedulerTrigger,
   SchedulerApiRequest,
   SchedulerApiResponse,
 } from '../../../types/scheduler';
-// import { highLevelNewsScanner } from '../../../lib/services/high-level-scanner';
+import { highLevelNewsScanner } from '../../../lib/services/high-level-scanner';
 import { summaryService } from '../../../lib/services/summary';
 import { initializeServices } from '../../../lib/services/init';
 
@@ -16,6 +16,15 @@ const schedulerRequestSchema = z.object({
   timestamp: z.string(),
   metadata: z.record(z.unknown()).optional(),
 });
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const BEIJING_OFFSET_MS = 8 * 60 * 60 * 1000;
+
+const getBeijingWeekday = (date: Date): number => {
+  const beijingTime = new Date(date.getTime() + BEIJING_OFFSET_MS);
+  return beijingTime.getUTCDay();
+};
 
 /**
  * 统一调度API接口
@@ -43,7 +52,7 @@ export async function POST(request: NextRequest) {
       success: true,
       trigger: validatedBody.trigger,
       message: result.message,
-      timestamp: moment.tz('Asia/Shanghai').toISOString(),
+      timestamp: TimeZoneUtils.nowUTC(),
       data: result.data,
     };
 
@@ -59,7 +68,7 @@ export async function POST(request: NextRequest) {
       success: false,
       trigger: SchedulerTrigger.EVERY_MINUTE, // 默认值
       message: `调度器执行失败: ${errorMessage}`,
-      timestamp: moment.tz('Asia/Shanghai').toISOString(),
+      timestamp: TimeZoneUtils.nowUTC(),
       error: errorMessage,
     };
 
@@ -137,17 +146,30 @@ async function handleEvery5Minutes(timestamp: string, metadata?: Record<string, 
   console.log(`[每5分钟触发器] 执行高级别新闻扫描: ${timestamp}`);
 
   try {
+    const scanResult = await highLevelNewsScanner.scanHighLevelNews(undefined, undefined, {
+      sendNotifications: true,
+      skipProcessed: true,
+    });
+
+    if (!scanResult.success) {
+      throw new Error(scanResult.error || '高级别新闻扫描失败');
+    }
+
     return {
-      message: `每5分钟触发器执行成功`,
+      message: `高级别新闻扫描完成，发现 ${scanResult.found} 条新闻`,
       data: {
         executedAt: timestamp,
+        found: scanResult.found,
+        sent: scanResult.sent,
+        period: scanResult.period,
         metadata,
       },
     };
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : '扫描失败';
+    const errorMessage = error instanceof Error ? error.message : '高级别新闻扫描失败';
     throw new Error(`高级别新闻扫描失败: ${errorMessage}`);
   }
+
 }
 
 /**
@@ -235,16 +257,9 @@ async function handleDaytime05(timestamp: string, metadata?: Record<string, unkn
   console.log(`[白天05分触发器] 执行小时总结: ${timestamp}`);
 
   try {
-    const currentHour = moment().tz('Asia/Shanghai').hour();
-
-    // 计算小时时间范围（从上一个小时05分到当前小时05分）
-    const hourEnd = moment()
-      .tz('Asia/Shanghai')
-      .hour(currentHour)
-      .minute(0)
-      .second(0)
-      .millisecond(0);
-    const hourStart = moment(hourEnd).minute(0).subtract(1, 'hour');
+    const currentHourRange = TimeZoneUtils.getCurrentHourRange();
+    const hourEnd = new Date(currentHourRange.startTime);
+    const hourStart = new Date(hourEnd.getTime() - HOUR_MS);
 
     const summaryResult = await summaryService.generateSummary(
       hourStart.toISOString(),
@@ -292,8 +307,10 @@ async function handleOvernight05(timestamp: string, metadata?: Record<string, un
 
   try {
     // 计算总结时间范围：前一天22:05 - 今天10:05
-    const summaryEnd = moment().tz('Asia/Shanghai').hour(10).minute(0).second(0).millisecond(0);
-    const summaryStart = moment(summaryEnd).subtract(1, 'day').hour(22).minute(0);
+    const todayRange = TimeZoneUtils.getTodayRange();
+    const todayStart = new Date(todayRange.startTime);
+    const summaryEnd = new Date(todayStart.getTime() + 10 * HOUR_MS);
+    const summaryStart = new Date(summaryEnd.getTime() - 12 * HOUR_MS);
 
     const summaryResult = await summaryService.generateSummary(
       summaryStart.toISOString(),
@@ -324,8 +341,12 @@ async function handleWeeklyFriday1605(timestamp: string, metadata?: Record<strin
 
   try {
     // 计算周报时间范围：上周五16:05 - 本周五16:05
-    const weekEnd = moment().tz('Asia/Shanghai').day(5).hour(16).minute(0).second(0).millisecond(0);
-    const weekStart = moment(weekEnd).subtract(1, 'week');
+    const todayRange = TimeZoneUtils.getTodayRange();
+    const todayStart = new Date(todayRange.startTime);
+    const weekday = getBeijingWeekday(new Date());
+    const deltaDays = 5 - weekday;
+    const weekEnd = new Date(todayStart.getTime() + deltaDays * DAY_MS + 16 * HOUR_MS);
+    const weekStart = new Date(weekEnd.getTime() - 7 * DAY_MS);
 
     const summaryResult = await summaryService.generateSummary(
       weekStart.toISOString(),
@@ -357,7 +378,7 @@ export async function GET() {
 
     const status = {
       available_triggers: Object.values(SchedulerTrigger),
-      server_time: moment.tz('Asia/Shanghai').toISOString(),
+      server_time: TimeZoneUtils.nowUTC(),
       status: 'active',
     };
 

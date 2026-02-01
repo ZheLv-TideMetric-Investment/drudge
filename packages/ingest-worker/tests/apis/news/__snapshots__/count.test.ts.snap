@@ -1,0 +1,26 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`news count api returns error on failure 1`] = `
+{
+  "details": {
+    "cause": undefined,
+    "code": undefined,
+    "message": "boom",
+    "name": "Error",
+    "stack": "<stack>",
+  },
+  "error": "boom",
+  "success": false,
+  "timestamp": "2024-01-01 08:00:00",
+}
+`;
+
+exports[`news count api returns stats on success 1`] = `
+{
+  "stats": {
+    "totalCount": 5,
+  },
+  "success": true,
+  "timestamp": "2024-01-01 08:00:00",
+}
+`;

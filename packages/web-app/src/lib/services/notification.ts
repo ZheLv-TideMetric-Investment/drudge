@@ -1,6 +1,6 @@
 import { webhookService } from './webhook';
-import moment from 'moment-timezone';
 import { UrgencyLevel, EventLevel } from '../../../constants/enums';
+import { TimeZoneUtils, TIME_FORMATS } from '../utils/timezone';
 
 /**
  * 通知服务
@@ -38,7 +38,7 @@ class NotificationService {
     }
 
     try {
-      const currentTime = moment().tz('Asia/Shanghai').format('HH:mm:ss');
+      const currentTime = TimeZoneUtils.now(TIME_FORMATS.TIME);
 
       let message = `🚨 **${EventLevel.LEVEL_1} 新闻批量提醒** (${newsItems.length}条) - ${currentTime}
 
@@ -50,7 +50,7 @@ class NotificationService {
       const allEvents = new Set<string>();
 
       newsItems.forEach((news, index) => {
-        const timestamp = moment(news.timestamp).tz('Asia/Shanghai').format('HH:mm');
+        const timestamp = TimeZoneUtils.format(news.timestamp, TIME_FORMATS.TIME_SHORT);
         message += `📰 **${index + 1}. ${news.title}** *(${timestamp})*\n`;
 
         // 收集实体信息
@@ -76,12 +76,41 @@ class NotificationService {
       }
 
       // 添加时间范围信息
-      const timestamps = newsItems.map(news => moment(news.timestamp));
-      const earliestTime = moment.min(timestamps).tz('Asia/Shanghai').format('HH:mm');
-      const latestTime = moment.max(timestamps).tz('Asia/Shanghai').format('HH:mm');
+      const resolveTimestamp = (value: unknown): number | null => {
+        if (!value) return null;
+        if (typeof value === 'number') return value;
+        const date = new Date(value as any);
+        const timestamp = date.getTime();
+        return Number.isNaN(timestamp) ? null : timestamp;
+      };
 
-      if (earliestTime !== latestTime) {
-        message += `\n⏰ **时间范围**: ${earliestTime} - ${latestTime}`;
+      let earliestTimestamp: number | null = null;
+      let latestTimestamp: number | null = null;
+
+      newsItems.forEach(news => {
+        const timestamp = resolveTimestamp(news.timestamp);
+        if (timestamp === null) return;
+        if (earliestTimestamp === null || timestamp < earliestTimestamp) {
+          earliestTimestamp = timestamp;
+        }
+        if (latestTimestamp === null || timestamp > latestTimestamp) {
+          latestTimestamp = timestamp;
+        }
+      });
+
+      if (earliestTimestamp !== null && latestTimestamp !== null) {
+        const earliestTime = TimeZoneUtils.format(
+          new Date(earliestTimestamp),
+          TIME_FORMATS.TIME_SHORT
+        );
+        const latestTime = TimeZoneUtils.format(
+          new Date(latestTimestamp),
+          TIME_FORMATS.TIME_SHORT
+        );
+
+        if (earliestTime !== latestTime) {
+          message += `\n⏰ **时间范围**: ${earliestTime} - ${latestTime}`;
+        }
       }
 
       await this.webhook.sendMessage(message);
@@ -107,7 +136,7 @@ class NotificationService {
       };
 
       const emoji = urgencyEmoji[news.urgency] || '⚠️';
-      const timestamp = moment(news.timestamp).tz('Asia/Shanghai').format('HH:mm:ss');
+      const timestamp = TimeZoneUtils.format(news.timestamp, TIME_FORMATS.TIME);
 
       let message = `${emoji} **高级别新闻提醒** [${news.level}]
 
@@ -179,13 +208,19 @@ ${highLevelNews
 
       const message = `${level1Message}
 
-📊 **总结** (${moment(hourStart).tz('Asia/Shanghai').format('MM-DD HH:mm')}-${moment(hourEnd).tz('Asia/Shanghai').format('MM-DD HH:mm')})  
+📊 **总结** (${TimeZoneUtils.format(hourStart, TIME_FORMATS.NEWS_TIME)}-${TimeZoneUtils.format(
+        hourEnd,
+        TIME_FORMATS.NEWS_TIME
+      )})  
 ${summaryContent}
 `.trim();
 
       await this.webhook.sendMessage(message);
       console.log(
-        `小时总结通知已发送: ${moment(hourStart).tz('Asia/Shanghai').format('HH:00')}-${moment(hourEnd).tz('Asia/Shanghai').format('HH:00')}`
+        `小时总结通知已发送: ${TimeZoneUtils.format(hourStart, TIME_FORMATS.HOUR_FORMAT)}-${TimeZoneUtils.format(
+          hourEnd,
+          TIME_FORMATS.HOUR_FORMAT
+        )}`
       );
       return true;
     } catch (error: any) {
@@ -204,7 +239,7 @@ ${summaryContent}
     try {
       const alertMessage = `🚨 **系统警报** - ${title}
 
-📅 **时间**: ${moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')}
+📅 **时间**: ${TimeZoneUtils.now(TIME_FORMATS.FULL)}
 📋 **详情**: ${message}
   `;
 

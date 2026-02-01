@@ -1,0 +1,14 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`api/graph/entities/search returns search results 1`] = `
+{
+  "count": 1,
+  "data": [
+    {
+      "name": "Entity",
+    },
+  ],
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;

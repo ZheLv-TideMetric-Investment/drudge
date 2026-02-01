@@ -4,15 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Layout as AntLayout, Menu, Drawer, Button, Typography } from 'antd';
-import {
-  MenuOutlined,
-  HomeOutlined,
-  FileTextOutlined,
-  ShareAltOutlined,
-  SnippetsOutlined,
-  EyeOutlined,
-  BarChartOutlined,
-} from '@ant-design/icons';
+import { MenuOutlined } from '@ant-design/icons';
 
 const { Header, Sider, Content } = AntLayout;
 const { Title } = Typography;
@@ -211,8 +203,9 @@ export function Layout({ children }: LayoutProps) {
       </Header>
 
       {/* 主内容区域 */}
-      <AntLayout style={{ marginLeft: 'var(--sidebar-width)' }} className="hidden-mobile">
+      <AntLayout style={{ marginLeft: 'var(--sidebar-width)' }} className="content-layout">
         <Content
+          className="content-area"
           style={{
             margin: 0,
             overflow: 'initial',
@@ -221,25 +214,9 @@ export function Layout({ children }: LayoutProps) {
           }}
         >
           <div
-            className="newspaper-page"
+            className="newspaper-page content-inner"
             style={{ padding: 'var(--space-2xl)', minHeight: '100vh' }}
           >
-            {children}
-          </div>
-        </Content>
-      </AntLayout>
-
-      {/* 移动端主内容 */}
-      <AntLayout className="show-mobile">
-        <Content
-          style={{
-            marginTop: 'var(--mobile-header-height)',
-            overflow: 'initial',
-            backgroundColor: 'var(--newspaper-bg)',
-            minHeight: 'calc(100vh - var(--mobile-header-height))',
-          }}
-        >
-          <div className="newspaper-page" style={{ padding: 'var(--space-lg)' }}>
             {children}
           </div>
         </Content>
@@ -259,6 +236,17 @@ const style = `
     }
     .mobile-header {
       display: flex !important;
+    }
+    .content-layout {
+      margin-left: 0 !important;
+    }
+    .content-area {
+      margin-top: var(--mobile-header-height) !important;
+      min-height: calc(100vh - var(--mobile-header-height)) !important;
+    }
+    .content-inner {
+      padding: var(--space-lg) !important;
+      min-height: calc(100vh - var(--mobile-header-height)) !important;
     }
   }
   
