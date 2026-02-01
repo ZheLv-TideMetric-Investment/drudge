@@ -1,0 +1,59 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`scheduler api returns error on trigger failure 1`] = `
+{
+  "details": {
+    "cause": undefined,
+    "code": undefined,
+    "message": "boom",
+    "name": "Error",
+    "stack": "<stack>",
+  },
+  "error": "boom",
+  "success": false,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`scheduler api returns error when status build fails 1`] = `
+{
+  "details": {
+    "cause": undefined,
+    "code": undefined,
+    "message": "boom",
+    "name": "Error",
+    "stack": "<stack>",
+  },
+  "error": "boom",
+  "success": false,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`scheduler api returns scheduler status 1`] = `
+{
+  "status": "running",
+  "success": true,
+  "tasks": {
+    "news-fetch": {
+      "description": "获取富途新闻数据",
+      "name": "news-fetch",
+      "running": true,
+      "schedule": "* * * * *",
+    },
+  },
+  "timestamp": "2024-01-01T00:00:00.000Z",
+  "totalTasks": 1,
+}
+`;
+
+exports[`scheduler api returns trigger result 1`] = `
+{
+  "message": "手动触发新闻获取任务完成",
+  "result": {
+    "success": true,
+  },
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;

@@ -1,0 +1,14 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`api/graph/hot-rank parses days and limit 1`] = `
+{
+  "data": {
+    "hotNews": [],
+    "timeStats": [],
+  },
+  "message": "成功获取过去3天的热点排行数据",
+  "success": true,
+  "timestamp": "2024-01-01 08:00:00",
+  "timezone": "Asia/Shanghai",
+}
+`;

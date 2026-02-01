@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import moment from 'moment-timezone';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Button,
   Card,
@@ -10,13 +9,9 @@ import {
   message,
   Row,
   Col,
-  Divider,
   Space,
-  Typography,
   Alert,
-  Descriptions,
   Tag,
-  Progress,
   notification,
 } from 'antd';
 import {
@@ -25,7 +20,6 @@ import {
   FileTextOutlined,
   ClockCircleOutlined,
   CheckCircleOutlined,
-  ExclamationCircleOutlined,
   ReloadOutlined,
   RobotOutlined,
   DatabaseOutlined,
@@ -34,10 +28,8 @@ import {
   BarChartOutlined,
 } from '@ant-design/icons';
 import { Layout } from '../components/Layout';
-import { getCurrentTime, TIME_FORMATS } from '../lib/utils/frontend-time';
 import { buildTimeRangePreset as apiTimeRangePreset } from '../lib/utils/api-helpers';
-
-const { Title, Paragraph, Text } = Typography;
+import { TimeZoneUtils, TIME_FORMATS } from '../lib/utils/timezone';
 
 interface SystemStatus {
   scheduler: {
@@ -58,16 +50,11 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [triggerLoading, setTriggerLoading] = useState<Record<string, boolean>>({});
+  const [beijingNow, setBeijingNow] = useState<Date | null>(null);
   const [messageApi, contextHolder] = message.useMessage();
   const [notificationApi, notificationContextHolder] = notification.useNotification();
 
-  useEffect(() => {
-    fetchSystemStatus();
-    const interval = setInterval(fetchSystemStatus, 30000); // 每30秒更新一次
-    return () => clearInterval(interval);
-  }, []);
-
-  const fetchSystemStatus = async () => {
+  const fetchSystemStatus = useCallback(async () => {
     try {
       const [schedulerRes, scanRes] = await Promise.all([
         fetch('/api/scheduler'),
@@ -87,7 +74,20 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [messageApi]);
+
+  useEffect(() => {
+    fetchSystemStatus();
+    const interval = setInterval(fetchSystemStatus, 30000); // 每30秒更新一次
+    return () => clearInterval(interval);
+  }, [fetchSystemStatus]);
+
+  useEffect(() => {
+    const updateTime = () => setBeijingNow(new Date());
+    updateTime();
+    const interval = setInterval(updateTime, 60000);
+    return () => clearInterval(interval);
+  }, []);
 
   const triggerSummary = async (type: 'hourly' | 'daily' | 'custom') => {
     const key = `summary-${type}`;
@@ -99,10 +99,11 @@ export default function Home() {
       
       if (type === 'hourly') {
         // 当前小时的开始时间到现在
-        const now = moment.tz('Asia/Shanghai');
-        const hourStart = now.clone().startOf('hour');
+        const now = new Date();
+        const currentHourRange = TimeZoneUtils.getCurrentHourRange();
+        const hourStart = new Date(currentHourRange.startTime);
         timeRange = { 
-          startTime: hourStart.toISOString(), 
+          startTime: hourStart.toISOString(),
           endTime: now.toISOString() 
         };
       } else if (type === 'daily') {
@@ -110,8 +111,8 @@ export default function Home() {
         timeRange = apiTimeRangePreset('today');
       } else {
         // custom: 最近1小时的总结
-        const now = moment.tz('Asia/Shanghai');
-        const oneHourAgo = now.clone().subtract(1, 'hour');
+        const now = new Date();
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
         timeRange = { 
           startTime: oneHourAgo.toISOString(), 
           endTime: now.toISOString() 
@@ -165,8 +166,9 @@ export default function Home() {
         };
       } else {
         // 手动扫描最近30分钟，不跳过已处理的内容
-        const endTime = moment().toISOString();
-        const startTime = moment().subtract(30, 'minutes').toISOString();
+        const now = new Date();
+        const endTime = now.toISOString();
+        const startTime = new Date(now.getTime() - 30 * 60 * 1000).toISOString();
         body = {
           startTime,
           endTime,
@@ -212,7 +214,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           trigger,
-          timestamp: moment.tz('Asia/Shanghai').toISOString(), // 使用新的时间工具
+          timestamp: TimeZoneUtils.nowUTC(),
           metadata: {
             source: 'manual_trigger',
             user_initiated: true,
@@ -287,6 +289,18 @@ export default function Home() {
     );
   }
 
+  const beijingDateText = beijingNow ? TimeZoneUtils.format(beijingNow, TIME_FORMATS.CHINESE_DATE) : '';
+  const beijingTimeText = beijingNow ? TimeZoneUtils.format(beijingNow, TIME_FORMATS.TIME_SHORT) : '';
+  const beijingWeekday = beijingNow
+    ? new Intl.DateTimeFormat('zh-CN', {
+        timeZone: TimeZoneUtils.DEFAULT_TIMEZONE,
+        weekday: 'long',
+      }).format(beijingNow)
+    : '';
+  const beijingDisplayText = beijingNow
+    ? `${beijingDateText} ${beijingWeekday} ${beijingTimeText}`
+    : '时间加载中';
+
   return (
     <Layout>
       {contextHolder}
@@ -309,7 +323,7 @@ export default function Home() {
               你的理财大学生
             </div>
             <div className="newspaper-time">
-              {moment().tz('Asia/Shanghai').format('YYYY年MM月DD日 dddd HH:mm')} • 北京时间
+              {beijingDisplayText} • 北京时间
             </div>
           </div>
 
@@ -478,9 +492,10 @@ export default function Home() {
                       <strong>最后更新：</strong>
                       <span className="newspaper-time" style={{ marginLeft: '8px' }}>
                         {systemStatus?.scheduler?.server_time
-                          ? moment(systemStatus.scheduler.server_time)
-                              .tz('Asia/Shanghai')
-                              .format('MM-DD HH:mm:ss')
+                          ? TimeZoneUtils.formatBeijingTime(
+                              systemStatus.scheduler.server_time,
+                              'MM-DD HH:mm:ss'
+                            )
                           : '未知'}
                       </span>
                     </div>

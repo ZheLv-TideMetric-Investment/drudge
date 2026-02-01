@@ -1,0 +1,10 @@
+{
+  "name": "@drudge/common",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "types": "index.d.ts",
+  "dependencies": {
+    "ts-enum-util": "^4.1.0"
+  }
+}

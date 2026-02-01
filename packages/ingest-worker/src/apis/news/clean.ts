@@ -9,7 +9,7 @@ import { logErrorWithDetails } from '../../utils/error';
 export async function cleanOldNews(days: number = 7): Promise<any> {
   try {
     logger.info(`🧹 开始清理 ${days} 天前的旧新闻...`);
-    
+
     const result = await fileStorage.cleanOldFiles(days);
 
     return {
@@ -17,7 +17,7 @@ export async function cleanOldNews(days: number = 7): Promise<any> {
       deletedCount: result.deletedCount,
       remainingCount: result.remainingCount,
       message: result.message,
-      timestamp: formatReadable()
+      timestamp: formatReadable(),
     };
   } catch (error: any) {
     const errorDetails = logErrorWithDetails('❌ 清理旧新闻失败:', error);
@@ -25,7 +25,7 @@ export async function cleanOldNews(days: number = 7): Promise<any> {
       success: false,
       error: errorDetails.message,
       details: errorDetails,
-      timestamp: formatReadable()
+      timestamp: formatReadable(),
     };
   }
 }

@@ -23,14 +23,14 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const command = args[0] || 'help';
   const cmdArgs = args.slice(1);
-  
+
   await initializeCli();
   await cliHandler.execute(command, ...cmdArgs);
   process.exit(0);
 }
 
 // 启动CLI
-main().catch((error) => {
+main().catch(error => {
   logErrorWithDetails('CLI启动失败:', error);
   process.exit(1);
 });

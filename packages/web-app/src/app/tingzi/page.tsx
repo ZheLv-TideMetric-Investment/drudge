@@ -75,6 +75,8 @@ export default function TingziTestPage() {
           onChange={(e) => setMessage(e.target.value)}
           placeholder="请输入要测试的消息内容..."
           className="mb-4"
+          id="tingzi-message"
+          name="tingzi-message"
         />
         
         <div className="space-x-4">

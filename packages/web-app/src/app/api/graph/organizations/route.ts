@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import moment from 'moment-timezone';
-import { queryService } from '../../../../lib/services/query';
+import { TimeZoneUtils } from '../../../../lib/utils/timezone';
+import { neo4jEntitiesService } from '../../../../lib/neo4j';
 
 export async function GET(request: Request) {
   try {
@@ -12,17 +12,17 @@ export async function GET(request: Request) {
 
     if (searchTerm) {
       // 搜索特定机构
-      organizations = await queryService.searchEntities(searchTerm, 'organization', limit);
+      organizations = await neo4jEntitiesService.searchEntities(searchTerm, 'organization', limit);
     } else {
       // 获取所有机构（按连接数排序）
-      organizations = await queryService.searchEntities('', 'organization', limit);
+      organizations = await neo4jEntitiesService.searchEntities('', 'organization', limit);
     }
 
     return NextResponse.json({
       success: true,
       data: organizations,
       count: organizations.length,
-      timestamp: moment.tz('Asia/Shanghai').toISOString()
+      timestamp: TimeZoneUtils.nowUTC()
     });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -31,7 +31,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: false,
       error: errorMessage,
-      timestamp: moment.tz('Asia/Shanghai').toISOString()
+      timestamp: TimeZoneUtils.nowUTC()
     }, { status: 500 });
   }
 } 

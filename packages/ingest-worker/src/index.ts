@@ -23,17 +23,16 @@ async function initialize(): Promise<void> {
 async function startMainService(): Promise<void> {
   try {
     await initialize();
-    
+
     // 启动定时任务调度器
     scheduler.start();
-    
+
     // 启动HTTP服务器
     await startHttpServer();
-    
+
     logger.info('🎉 ingest-worker服务启动完成');
     logger.info('📅 定时任务: 每1分钟获取一次新闻');
     logger.info('🌐 HTTP API: 端口 39110');
-    
   } catch (error: any) {
     logErrorWithDetails('❌ 启动主服务失败:', error);
     process.exit(1);
@@ -46,9 +45,9 @@ async function startMainService(): Promise<void> {
 function setupGracefulShutdown(): void {
   const shutdown = (signal: string) => {
     logger.info(`收到${signal}信号，正在优雅关闭服务...`);
-    
+
     scheduler.stop();
-    
+
     setTimeout(() => {
       logger.info('ingest-worker服务已关闭');
       process.exit(0);
@@ -69,7 +68,7 @@ async function main(): Promise<void> {
 }
 
 // 启动应用
-main().catch((error) => {
+main().catch(error => {
   logErrorWithDetails('应用启动失败:', error);
   process.exit(1);
 });

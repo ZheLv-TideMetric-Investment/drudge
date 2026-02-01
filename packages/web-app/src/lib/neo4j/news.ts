@@ -1,4 +1,3 @@
-import moment from 'moment-timezone';
 import { neo4jConnection } from './connection';
 import { NodeType, EventLevel, SystemRelationshipType, RelationshipType } from '../../../constants/enums';
 import { TimeZoneUtils } from '../utils/timezone';
@@ -8,6 +7,22 @@ import { TimeZoneUtils } from '../utils/timezone';
  * 包含所有与新闻节点相关的查询操作
  */
 class Neo4jNewsService {
+  private normalizeNewsLevel(level?: string): string | undefined {
+    if (!level) return undefined;
+    const trimmed = level.trim();
+    if (/^Level\s+\d+$/i.test(trimmed)) {
+      return trimmed.replace(/^Level\s+/i, 'Level ');
+    }
+    if (/^\d+$/.test(trimmed)) {
+      return `Level ${trimmed}`;
+    }
+    return trimmed;
+  }
+
+  private normalizeNeo4jInteger(value: any): any {
+    return value && typeof value.toNumber === 'function' ? value.toNumber() : value;
+  }
+
   /**
    * 获取时间范围内的新闻数据
    * @param startTime 开始时间（北京时间）
@@ -171,6 +186,7 @@ class Neo4jNewsService {
         sortOrder = 'desc'
       } = params;
 
+      const normalizedLevel = this.normalizeNewsLevel(level);
       const offset = (page - 1) * limit;
       const whereConditions: string[] = [];
       const queryParams: any = { limit, offset };
@@ -187,9 +203,9 @@ class Neo4jNewsService {
       }
 
       // 新闻级别筛选
-      if (level) {
+      if (normalizedLevel) {
         whereConditions.push('n.news_level = $level');
-        queryParams.level = level;
+        queryParams.level = normalizedLevel;
       }
 
       // 关键词搜索
@@ -235,19 +251,23 @@ class Neo4jNewsService {
         neo4jConnection.executeQuery(countQuery, queryParams)
       ]);
 
-      const news = newsResult.records.map((record: any) => ({
-        id: record.get('id'),
-        title: record.get('title'),
-        content: record.get('content'),
-        level: record.get('level'),
-        timestamp: record.get('timestamp'),
-        processedAt: record.get('processedAt'),
-        source: record.get('source'),
-        url: record.get('url'),
-        // 保留原始UTC时间，时区格式化交给时区感知包装器处理
-        displayTime: record.get('timestamp'),
-        processedDisplayTime: record.get('processedAt')
-      }));
+      const news = newsResult.records.map((record: any) => {
+        const processedAt = this.normalizeNeo4jInteger(record.get('processedAt'));
+
+        return {
+          id: record.get('id'),
+          title: record.get('title'),
+          content: record.get('content'),
+          level: record.get('level'),
+          timestamp: record.get('timestamp'),
+          processedAt,
+          source: record.get('source'),
+          url: record.get('url'),
+          // 保留原始UTC时间，时区格式化交给时区感知包装器处理
+          displayTime: record.get('timestamp'),
+          processedDisplayTime: processedAt
+        };
+      });
 
       const total = countResult.records[0]?.get('total')?.toNumber() || 0;
 
@@ -285,6 +305,7 @@ class Neo4jNewsService {
         sortBy = 'relevance'
       } = params;
 
+      const normalizedLevel = this.normalizeNewsLevel(level);
       const offset = (page - 1) * limit;
       const whereConditions: string[] = [];
       const queryParams: any = { limit, offset, keyword };
@@ -301,9 +322,9 @@ class Neo4jNewsService {
       }
 
       // 新闻级别筛选
-      if (level) {
+      if (normalizedLevel) {
         whereConditions.push('n.news_level = $level');
-        queryParams.level = level;
+        queryParams.level = normalizedLevel;
       }
 
       // 构建搜索字段条件
@@ -384,6 +405,7 @@ class Neo4jNewsService {
       const news = searchResult.records.map((record: any) => {
         const title = record.get('title') || '';
         const content = record.get('content') || '';
+        const processedAt = this.normalizeNeo4jInteger(record.get('processedAt'));
         
         // 简单的关键词高亮处理
         const highlightKeyword = (text: string, keyword: string) => {
@@ -398,7 +420,7 @@ class Neo4jNewsService {
           content: record.get('content'),
           level: record.get('level'),
           timestamp: record.get('timestamp'),
-          processedAt: record.get('processedAt'),
+          processedAt,
           source: record.get('source'),
           url: record.get('url'),
           relevanceScore: record.get('relevanceScore'),
@@ -407,7 +429,7 @@ class Neo4jNewsService {
           highlightedContent: content ? highlightKeyword(content.substring(0, 200) + '...', keyword) : '',
           // 保留原始UTC时间，时区格式化交给时区感知包装器处理
           displayTime: record.get('timestamp'),
-          processedDisplayTime: record.get('processedAt')
+          processedDisplayTime: processedAt
         };
       });
 

@@ -1,0 +1,71 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`news list api formats list response with defaults 1`] = `
+{
+  "count": 2,
+  "news": [
+    {
+      "id": "1",
+      "source": "futu_live",
+      "time": "2024-01-01 08:00:00",
+      "title": "A",
+    },
+    {
+      "id": "2",
+      "source": "futu_live",
+      "time": "2024-01-01 08:00:00",
+      "title": "B",
+    },
+  ],
+  "success": true,
+  "timestamp": "2024-01-01 08:00:00",
+}
+`;
+
+exports[`news list api formats time range response 1`] = `
+{
+  "count": 1,
+  "news": [
+    {
+      "id": "1",
+      "source": "futu_live",
+      "time": "2024-01-01 08:00:00",
+      "title": "A",
+    },
+  ],
+  "success": true,
+  "timestamp": "2024-01-01 08:00:00",
+}
+`;
+
+exports[`news list api returns error details on failure 1`] = `
+{
+  "count": 0,
+  "details": {
+    "cause": undefined,
+    "code": undefined,
+    "message": "boom",
+    "name": "Error",
+    "stack": "<stack>",
+  },
+  "error": "boom",
+  "success": false,
+  "timestamp": "2024-01-01 08:00:00",
+}
+`;
+
+exports[`news list api returns error on time range failure 1`] = `
+{
+  "count": 0,
+  "details": {
+    "cause": undefined,
+    "code": undefined,
+    "message": "bad range",
+    "name": "Error",
+    "stack": "<stack>",
+  },
+  "error": "bad range",
+  "success": false,
+  "timestamp": "2024-01-01 08:00:00",
+}
+`;

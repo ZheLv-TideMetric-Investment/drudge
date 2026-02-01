@@ -171,7 +171,7 @@ WEBHOOK_URL=your_dingtalk_webhook
 **packages/ingest-worker/.env**:
 ```env
 PORT=39110
-STORAGE_PATH=../../data
+STORAGE_PATH=/absolute/path/to/drudge/data
 NEWS_API_URL=https://news.futunn.com/news-site-api/main/get-flash-list
 WEBHOOK_URL=your_dingtalk_webhook
 ```
@@ -183,7 +183,8 @@ NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_password
 DEEPSEEK_API_KEY=your_deepseek_key
-NEWS_DIRECTORY=../../data/news
+NEWS_DIRECTORY=/absolute/path/to/drudge/data/news
+FAILED_NEWS_DIRECTORY=/absolute/path/to/drudge/data/news/failed
 ```
 
 ### 4. 启动数据库

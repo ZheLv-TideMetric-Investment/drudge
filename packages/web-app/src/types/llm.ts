@@ -1,35 +1,17 @@
 import { z } from 'zod';
+import type {
+  LLMMessage as CommonLLMMessage,
+  LLMCallOptions as CommonLLMCallOptions,
+  LLMResponse as CommonLLMResponse
+} from '@drudge/common';
 
-/**
- * LLM消息接口
- */
-export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
+export type LLMMessage = CommonLLMMessage;
 
-/**
- * LLM调用选项
- */
-export interface LLMCallOptions {
-  temperature?: number;
-  timeout?: number;
+export type LLMCallOptions = Omit<CommonLLMCallOptions, 'schema'> & {
   schema?: z.ZodSchema<unknown>;
-}
+};
 
-/**
- * LLM响应接口
- */
-export interface LLMResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  error?: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
-}
+export type LLMResponse<T = unknown> = CommonLLMResponse<T>;
 
 /**
  * AI提供商类型

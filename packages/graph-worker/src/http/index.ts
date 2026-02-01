@@ -28,7 +28,7 @@ export function createHttpServer(): Application {
       service: 'graph-worker',
       version: '2.0',
       status: 'running',
-      timestamp: getCurrentTime()
+      timestamp: getCurrentTime(),
     });
   });
 
@@ -40,14 +40,14 @@ export function createHttpServer(): Application {
         version: '2.0',
         status: 'healthy',
         port: config.server.port,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     } catch (error: any) {
       res.status(500).json({
         service: 'graph-worker',
         status: 'unhealthy',
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -64,7 +64,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -79,7 +79,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -94,7 +94,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -109,7 +109,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -121,7 +121,7 @@ export function createHttpServer(): Application {
         res.status(400).json({
           success: false,
           error: '缺少查询参数 q',
-          timestamp: getCurrentTime()
+          timestamp: getCurrentTime(),
         });
         return;
       }
@@ -132,7 +132,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -145,7 +145,7 @@ export function createHttpServer(): Application {
         res.status(400).json({
           success: false,
           error: '缺少实体名称参数',
-          timestamp: getCurrentTime()
+          timestamp: getCurrentTime(),
         });
         return;
       }
@@ -156,7 +156,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -171,7 +171,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -183,7 +183,7 @@ export function createHttpServer(): Application {
         res.status(400).json({
           success: false,
           error: '缺少新闻ID参数',
-          timestamp: getCurrentTime()
+          timestamp: getCurrentTime(),
         });
         return;
       }
@@ -194,7 +194,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -209,7 +209,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -222,7 +222,7 @@ export function createHttpServer(): Application {
         res.status(400).json({
           success: false,
           error: '缺少实体名称参数',
-          timestamp: getCurrentTime()
+          timestamp: getCurrentTime(),
         });
         return;
       }
@@ -233,7 +233,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -247,7 +247,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -262,7 +262,7 @@ export function createHttpServer(): Application {
       res.status(500).json({
         success: false,
         error: error.message,
-        timestamp: getCurrentTime()
+        timestamp: getCurrentTime(),
       });
     }
   });
@@ -277,7 +277,7 @@ export async function startHttpServer() {
   try {
     // 初始化知识图谱服务
     await knowledgeGraphService.initialize();
-    
+
     // 初始化调度器（但不启动定时任务）
     await schedulerService.initialize();
 
@@ -292,9 +292,8 @@ export async function startHttpServer() {
       logger.info(`📈 图谱统计: http://localhost:${port}/api/stats`);
       logger.info(`📁 处理模式: 本地文件扫描`);
     });
-
   } catch (error) {
     logger.error('❌ 启动HTTP服务器失败:', error);
     throw error;
   }
-} 
+}

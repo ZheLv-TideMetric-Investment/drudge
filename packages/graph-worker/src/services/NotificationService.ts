@@ -4,19 +4,12 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
 import config from '../config/config';
-
-export interface NotificationPayload {
-  msgtype: string;
-  markdown: {
-    title: string;
-    text: string;
-  };
-  at?: {
-    isAtAll: boolean;
-    atUserIds?: string[];
-    atMobiles?: string[];
-  };
-}
+import {
+  buildNotificationTitle,
+  createMarkdownPayload,
+  formatBeijingLocaleString,
+} from '@drudge/common';
+import type { NotificationPayload } from '@drudge/common';
 
 export class NotificationService {
   private config: any;
@@ -28,7 +21,11 @@ export class NotificationService {
   /**
    * 发送实体提取失败通知
    */
-  async sendEntityExtractionFailureNotification(newsId: string, error: string, retryCount?: number): Promise<void> {
+  async sendEntityExtractionFailureNotification(
+    newsId: string,
+    error: string,
+    retryCount?: number
+  ): Promise<void> {
     if (!this.config.enableWebhookNotification || !this.config.webhookUrl) {
       logger.debug('Webhook通知未启用或未配置URL');
       return;
@@ -42,19 +39,14 @@ export class NotificationService {
     if (retryCount !== undefined) {
       markdownText += `**重试次数**: ${retryCount}\n\n`;
     }
-    markdownText += `**时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`;
+    markdownText += `**时间**: ${formatBeijingLocaleString()}\n\n`;
     markdownText += `**建议**: 检查AI服务配置或新闻内容格式\n\n`;
 
-    const payload: NotificationPayload = {
-      msgtype: 'markdown',
-      markdown: {
-        title: '[tide] Graph Worker - 实体提取失败',
-        text: markdownText
-      },
-      at: {
-        isAtAll: false
-      }
-    };
+    const payload: NotificationPayload = createMarkdownPayload(
+      buildNotificationTitle('Graph Worker', '实体提取失败'),
+      markdownText,
+      { isAtAll: false }
+    );
 
     await this.sendWebhook(payload);
   }
@@ -62,7 +54,11 @@ export class NotificationService {
   /**
    * 发送知识图谱写入失败通知
    */
-  async sendGraphWriteFailureNotification(newsId: string, entityType: string, error: string): Promise<void> {
+  async sendGraphWriteFailureNotification(
+    newsId: string,
+    entityType: string,
+    error: string
+  ): Promise<void> {
     if (!this.config.enableWebhookNotification || !this.config.webhookUrl) {
       return;
     }
@@ -73,19 +69,14 @@ export class NotificationService {
     markdownText += `**新闻ID**: ${newsId}\n\n`;
     markdownText += `**实体类型**: ${entityType}\n\n`;
     markdownText += `**错误信息**: ${error}\n\n`;
-    markdownText += `**时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`;
+    markdownText += `**时间**: ${formatBeijingLocaleString()}\n\n`;
     markdownText += `**影响**: 部分实体数据可能丢失\n\n`;
 
-    const payload: NotificationPayload = {
-      msgtype: 'markdown',
-      markdown: {
-        title: '[tide] Graph Worker - 知识图谱写入失败',
-        text: markdownText
-      },
-      at: {
-        isAtAll: true  // 图谱写入失败比较严重，@all
-      }
-    };
+    const payload: NotificationPayload = createMarkdownPayload(
+      buildNotificationTitle('Graph Worker', '知识图谱写入失败'),
+      markdownText,
+      { isAtAll: true } // 图谱写入失败比较严重，@all
+    );
 
     await this.sendWebhook(payload);
   }
@@ -103,20 +94,15 @@ export class NotificationService {
     markdownText += `**模块**: Neo4j数据库\n\n`;
     markdownText += `**错误类型**: 数据库连接失败\n\n`;
     markdownText += `**错误信息**: ${error}\n\n`;
-    markdownText += `**时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`;
+    markdownText += `**时间**: ${formatBeijingLocaleString()}\n\n`;
     markdownText += `**影响**: 所有知识图谱功能不可用\n\n`;
     markdownText += `**建议**: 检查Neo4j服务状态和连接配置\n\n`;
 
-    const payload: NotificationPayload = {
-      msgtype: 'markdown',
-      markdown: {
-        title: '[tide] Graph Worker - Neo4j连接失败',
-        text: markdownText
-      },
-      at: {
-        isAtAll: true  // 数据库连接失败非常严重，@all
-      }
-    };
+    const payload: NotificationPayload = createMarkdownPayload(
+      buildNotificationTitle('Graph Worker', 'Neo4j连接失败'),
+      markdownText,
+      { isAtAll: true } // 数据库连接失败非常严重，@all
+    );
 
     await this.sendWebhook(payload);
   }
@@ -124,7 +110,11 @@ export class NotificationService {
   /**
    * 发送AI服务失败通知
    */
-  async sendAiServiceFailureNotification(provider: string, model: string, error: string): Promise<void> {
+  async sendAiServiceFailureNotification(
+    provider: string,
+    model: string,
+    error: string
+  ): Promise<void> {
     if (!this.config.enableWebhookNotification || !this.config.webhookUrl) {
       return;
     }
@@ -135,20 +125,15 @@ export class NotificationService {
     markdownText += `**Provider**: ${provider}\n\n`;
     markdownText += `**Model**: ${model}\n\n`;
     markdownText += `**错误信息**: ${error}\n\n`;
-    markdownText += `**时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`;
+    markdownText += `**时间**: ${formatBeijingLocaleString()}\n\n`;
     markdownText += `**影响**: 实体提取功能暂不可用\n\n`;
     markdownText += `**建议**: 检查API密钥、网络连接或切换备用模型\n\n`;
 
-    const payload: NotificationPayload = {
-      msgtype: 'markdown',
-      markdown: {
-        title: '[tide] Graph Worker - AI服务失败',
-        text: markdownText
-      },
-      at: {
-        isAtAll: false
-      }
-    };
+    const payload: NotificationPayload = createMarkdownPayload(
+      buildNotificationTitle('Graph Worker', 'AI服务失败'),
+      markdownText,
+      { isAtAll: false }
+    );
 
     await this.sendWebhook(payload);
   }
@@ -156,7 +141,12 @@ export class NotificationService {
   /**
    * 发送新闻处理失败通知
    */
-  async sendNewsProcessingFailureNotification(fileName: string, newsCount: number, processedCount: number, error: string): Promise<void> {
+  async sendNewsProcessingFailureNotification(
+    fileName: string,
+    newsCount: number,
+    processedCount: number,
+    error: string
+  ): Promise<void> {
     if (!this.config.enableWebhookNotification || !this.config.webhookUrl) {
       return;
     }
@@ -167,20 +157,15 @@ export class NotificationService {
     markdownText += `**文件名**: ${fileName}\n\n`;
     markdownText += `**总新闻数**: ${newsCount} 条\n\n`;
     markdownText += `**已处理**: ${processedCount} 条\n\n`;
-    markdownText += `**失败率**: ${((newsCount - processedCount) / newsCount * 100).toFixed(1)}%\n\n`;
+    markdownText += `**失败率**: ${(((newsCount - processedCount) / newsCount) * 100).toFixed(1)}%\n\n`;
     markdownText += `**错误信息**: ${error}\n\n`;
-    markdownText += `**时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`;
+    markdownText += `**时间**: ${formatBeijingLocaleString()}\n\n`;
 
-    const payload: NotificationPayload = {
-      msgtype: 'markdown',
-      markdown: {
-        title: '[tide] Graph Worker - 新闻处理失败',
-        text: markdownText
-      },
-      at: {
-        isAtAll: newsCount - processedCount > newsCount * 0.5  // 失败率超过50%时@all
-      }
-    };
+    const payload: NotificationPayload = createMarkdownPayload(
+      buildNotificationTitle('Graph Worker', '新闻处理失败'),
+      markdownText,
+      { isAtAll: newsCount - processedCount > newsCount * 0.5 } // 失败率超过50%时@all
+    );
 
     await this.sendWebhook(payload);
   }
@@ -188,7 +173,11 @@ export class NotificationService {
   /**
    * 发送服务异常通知
    */
-  async sendServiceErrorNotification(serviceName: string, error: string, context?: any): Promise<void> {
+  async sendServiceErrorNotification(
+    serviceName: string,
+    error: string,
+    context?: any
+  ): Promise<void> {
     if (!this.config.enableWebhookNotification || !this.config.webhookUrl) {
       return;
     }
@@ -200,19 +189,14 @@ export class NotificationService {
     if (context) {
       markdownText += `**上下文**: ${JSON.stringify(context, null, 2)}\n\n`;
     }
-    markdownText += `**时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`;
+    markdownText += `**时间**: ${formatBeijingLocaleString()}\n\n`;
     markdownText += `**建议**: 检查服务日志并及时处理\n\n`;
 
-    const payload: NotificationPayload = {
-      msgtype: 'markdown',
-      markdown: {
-        title: '[tide] Graph Worker - 服务异常',
-        text: markdownText
-      },
-      at: {
-        isAtAll: true  // 服务异常比较严重，@all
-      }
-    };
+    const payload: NotificationPayload = createMarkdownPayload(
+      buildNotificationTitle('Graph Worker', '服务异常'),
+      markdownText,
+      { isAtAll: true } // 服务异常比较严重，@all
+    );
 
     await this.sendWebhook(payload);
   }
@@ -232,15 +216,12 @@ export class NotificationService {
     if (details) {
       markdownText += `**详情**: ${details}\n\n`;
     }
-    markdownText += `**时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`;
+    markdownText += `**时间**: ${formatBeijingLocaleString()}\n\n`;
 
-    const payload: NotificationPayload = {
-      msgtype: 'markdown',
-      markdown: {
-        title: '[tide] Graph Worker - 服务恢复正常',
-        text: markdownText
-      }
-    };
+    const payload: NotificationPayload = createMarkdownPayload(
+      buildNotificationTitle('Graph Worker', '服务恢复正常'),
+      markdownText
+    );
 
     await this.sendWebhook(payload);
   }
@@ -250,33 +231,36 @@ export class NotificationService {
    */
   private async sendWebhook(payload: NotificationPayload): Promise<void> {
     try {
-      logger.info('发送Webhook通知', { title: payload.markdown.title, url: this.config.webhookUrl });
+      logger.info('发送Webhook通知', {
+        title: payload.markdown.title,
+        url: this.config.webhookUrl,
+      });
 
       const response = await axios.post(this.config.webhookUrl!, payload, {
         timeout: 10000,
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Graph-Worker-Webhook/2.0'
-        }
+          'User-Agent': 'Graph-Worker-Webhook/2.0',
+        },
       });
 
       if (response.status >= 200 && response.status < 300) {
-        logger.info('Webhook通知发送成功', { 
-          title: payload.markdown.title, 
-          status: response.status 
+        logger.info('Webhook通知发送成功', {
+          title: payload.markdown.title,
+          status: response.status,
         });
       } else {
-        logger.warn('Webhook通知响应异常', { 
-          title: payload.markdown.title, 
+        logger.warn('Webhook通知响应异常', {
+          title: payload.markdown.title,
           status: response.status,
-          data: response.data 
+          data: response.data,
         });
       }
     } catch (error: any) {
-      logger.error('发送Webhook通知失败', { 
+      logger.error('发送Webhook通知失败', {
         title: payload.markdown.title,
         error: error.message,
-        url: this.config.webhookUrl 
+        url: this.config.webhookUrl,
       });
     }
   }
@@ -294,4 +278,4 @@ export class NotificationService {
 }
 
 // 导出单例
-export default new NotificationService(); 
+export default new NotificationService();

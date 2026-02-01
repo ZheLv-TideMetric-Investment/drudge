@@ -1,8 +1,5 @@
 import axios from 'axios';
-import moment from 'moment-timezone';
-
-// 设置默认时区
-moment.tz.setDefault('Asia/Shanghai');
+import { TimeZoneUtils, TIME_FORMATS } from '../utils/timezone';
 
 export interface JinaResponse {
   content: string;
@@ -33,7 +30,7 @@ function calculateCost(usage: { total_tokens: number }): number {
 
 // 获取当前北京时间
 function getCurrentBeijingTime(): string {
-  return moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss');
+  return TimeZoneUtils.now(TIME_FORMATS.FULL);
 }
 
 // 基础Jina API调用

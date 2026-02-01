@@ -1,4 +1,5 @@
 import dayjs from 'dayjs';
+import { BEIJING_TIMEZONE, normalizeTimestampMs } from '@drudge/common';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
 
@@ -7,18 +8,19 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 
 // 设置默认时区为北京时间
-dayjs.tz.setDefault('Asia/Shanghai');
+dayjs.tz.setDefault(BEIJING_TIMEZONE);
 
 /**
  * 获取当前北京时间
  */
-export const now = () => dayjs().tz('Asia/Shanghai');
+export const now = () => dayjs().tz(BEIJING_TIMEZONE);
 
 /**
  * 解析时间并转换为北京时间
  */
 export const parseTime = (time: string | number | Date) => {
-  return dayjs(time).tz('Asia/Shanghai');
+  const normalized = normalizeTimestampMs(time);
+  return dayjs(normalized ?? time).tz(BEIJING_TIMEZONE);
 };
 
 /**
@@ -65,4 +67,4 @@ export const startOfToday = () => {
  */
 export const daysAgo = (days: number) => {
   return now().subtract(days, 'day');
-}; 
+};

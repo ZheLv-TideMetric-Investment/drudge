@@ -16,7 +16,7 @@ export class Neo4jService {
   async initialize(): Promise<void> {
     try {
       logger.info('🔗 正在连接Neo4j数据库...');
-      
+
       this.driver = neo4j.driver(
         config.neo4j.uri,
         neo4j.auth.basic(config.neo4j.user, config.neo4j.password)
@@ -28,17 +28,15 @@ export class Neo4jService {
         await session.run('RETURN 1');
         this.isConnected = true;
         logger.info('✅ Neo4j数据库连接成功');
-        
+
         // 创建唯一约束
         await this.createUniqueConstraints();
-        
       } finally {
         await session.close();
       }
-
     } catch (error: any) {
       logger.error('❌ Neo4j数据库连接失败:', error);
-      
+
       // 发送数据库连接失败通知
       try {
         await notificationService.sendNeo4jConnectionFailureNotification(
@@ -47,7 +45,7 @@ export class Neo4jService {
       } catch (notifyError) {
         logger.error('发送Neo4j连接失败通知失败:', notifyError);
       }
-      
+
       throw error;
     }
   }
@@ -81,7 +79,7 @@ export class Neo4jService {
   async executeTransaction(queries: Array<{ query: string; params?: any }>): Promise<any> {
     const session = this.getSession();
     try {
-      return await session.writeTransaction(async (tx) => {
+      return await session.writeTransaction(async tx => {
         const results = [];
         for (const { query, params } of queries) {
           const result = await tx.run(query, params || {});
@@ -101,56 +99,50 @@ export class Neo4jService {
     const session = this.getSession();
     try {
       logger.info('🔍 创建数据库索引...');
-      
+
       // 新闻节点索引
-      await session.run(
-        'CREATE INDEX news_id_index IF NOT EXISTS FOR (n:News) ON (n.id)'
-      );
-      
+      await session.run('CREATE INDEX news_id_index IF NOT EXISTS FOR (n:News) ON (n.id)');
+
       await session.run(
         'CREATE RANGE INDEX news_timestamp_range_index IF NOT EXISTS FOR (n:News) ON (n.timestamp)'
       );
-      
+
       await session.run(
         'CREATE INDEX news_level_index IF NOT EXISTS FOR (n:News) ON (n.news_level)'
       );
-      
+
       // 实体节点索引
       await session.run(
         'CREATE INDEX company_name_index IF NOT EXISTS FOR (c:Company) ON (c.company_name)'
       );
-      
+
       await session.run(
         'CREATE INDEX person_name_index IF NOT EXISTS FOR (p:Person) ON (p.person_name)'
       );
-      
+
       await session.run(
         'CREATE INDEX organization_name_index IF NOT EXISTS FOR (o:Organization) ON (o.organization_name)'
       );
-      
+
       await session.run(
         'CREATE INDEX location_name_index IF NOT EXISTS FOR (l:Location) ON (l.location_name)'
       );
-      
 
-      
       // 事件节点索引
-      await session.run(
-        'CREATE INDEX event_id_index IF NOT EXISTS FOR (e:Event) ON (e.event_id)'
-      );
-      
+      await session.run('CREATE INDEX event_id_index IF NOT EXISTS FOR (e:Event) ON (e.event_id)');
+
       await session.run(
         'CREATE INDEX event_type_index IF NOT EXISTS FOR (e:Event) ON (e.event_type)'
       );
-      
+
       await session.run(
         'CREATE RANGE INDEX event_timestamp_range_index IF NOT EXISTS FOR (e:Event) ON (e.timestamp)'
       );
-      
+
       await session.run(
         'CREATE INDEX event_level_index IF NOT EXISTS FOR (e:Event) ON (e.event_level)'
       );
-      
+
       logger.info('✅ 数据库索引创建完成');
     } catch (error) {
       logger.error('❌ 创建数据库索引失败:', error);
@@ -172,33 +164,33 @@ export class Neo4jService {
         RETURN labels(n) as labels, count(n) as count
         ORDER BY count DESC
       `);
-      
+
       // 获取关系统计
       const relStats = await session.run(`
         MATCH ()-[r]->()
         RETURN type(r) as type, count(r) as count
         ORDER BY count DESC
       `);
-      
+
       // 获取总数
       const totalNodes = await session.run('MATCH (n) RETURN count(n) as total');
       const totalRels = await session.run('MATCH ()-[r]->() RETURN count(r) as total');
-      
+
       return {
         nodes: {
           byLabel: nodeStats.records.map(record => ({
             labels: record.get('labels'),
-            count: record.get('count').toNumber()
+            count: record.get('count').toNumber(),
           })),
-          total: totalNodes.records[0]?.get('total').toNumber() || 0
+          total: totalNodes.records[0]?.get('total').toNumber() || 0,
         },
         relationships: {
           byType: relStats.records.map(record => ({
             type: record.get('type'),
-            count: record.get('count').toNumber()
+            count: record.get('count').toNumber(),
           })),
-          total: totalRels.records[0]?.get('total').toNumber() || 0
-        }
+          total: totalRels.records[0]?.get('total').toNumber() || 0,
+        },
       };
     } catch (error) {
       logger.error('获取数据库统计失败:', error);
@@ -215,13 +207,13 @@ export class Neo4jService {
     const session = this.getSession();
     try {
       logger.info('🗑️ 清理数据库...');
-      
+
       // 删除所有关系
       await session.run('MATCH ()-[r]->() DELETE r');
-      
+
       // 删除所有节点
       await session.run('MATCH (n) DELETE n');
-      
+
       logger.info('✅ 数据库清理完成');
     } catch (error) {
       logger.error('❌ 数据库清理失败:', error);
@@ -254,46 +246,46 @@ export class Neo4jService {
     const session = this.getSession();
     try {
       logger.info('🔒 创建唯一约束...');
-      
+
       // 先删除可能存在的冲突索引
       await this.dropConflictingIndexes(session);
-      
+
       // 公司唯一约束
       await session.run(`
         CREATE CONSTRAINT IF NOT EXISTS
         FOR (c:Company) REQUIRE c.company_name IS UNIQUE
       `);
-      
+
       // 人物唯一约束
       await session.run(`
         CREATE CONSTRAINT IF NOT EXISTS
         FOR (p:Person) REQUIRE p.person_name IS UNIQUE
       `);
-      
+
       // 机构唯一约束
       await session.run(`
         CREATE CONSTRAINT IF NOT EXISTS
         FOR (o:Organization) REQUIRE o.organization_name IS UNIQUE
       `);
-      
+
       // 地点唯一约束
       await session.run(`
         CREATE CONSTRAINT IF NOT EXISTS
         FOR (l:Location) REQUIRE l.location_name IS UNIQUE
       `);
-      
+
       // 新闻唯一约束
       await session.run(`
         CREATE CONSTRAINT IF NOT EXISTS
         FOR (n:News) REQUIRE n.id IS UNIQUE
       `);
-      
+
       // 事件唯一约束
       await session.run(`
         CREATE CONSTRAINT IF NOT EXISTS
         FOR (e:Event) REQUIRE e.event_id IS UNIQUE
       `);
-      
+
       logger.info('✅ 唯一约束创建完成');
     } catch (error) {
       logger.error('❌ 创建唯一约束失败:', error);
@@ -309,17 +301,17 @@ export class Neo4jService {
   private async dropConflictingIndexes(session: Session): Promise<void> {
     try {
       logger.info('🧹 删除可能冲突的索引...');
-      
+
       // 尝试删除可能存在的冲突索引
       const potentialIndexes = [
         'company_name_index',
-        'person_name_index', 
+        'person_name_index',
         'organization_name_index',
         'location_name_index',
         'news_id_index',
-        'event_id_index'
+        'event_id_index',
       ];
-      
+
       for (const indexName of potentialIndexes) {
         try {
           await session.run(`DROP INDEX ${indexName} IF EXISTS`);
@@ -329,7 +321,7 @@ export class Neo4jService {
           logger.debug(`索引不存在或已删除: ${indexName}`);
         }
       }
-      
+
       logger.info('✅ 冲突索引清理完成');
     } catch (error) {
       logger.warn('⚠️ 清理冲突索引失败，继续执行...', error);
@@ -341,13 +333,13 @@ export class Neo4jService {
    */
   async batchMergeEntities(entityType: string, entities: any[]): Promise<void> {
     if (entities.length === 0) return;
-    
+
     const session = this.getSession();
     try {
       logger.info(`🔄 批量MERGE写入 ${entityType}: ${entities.length} 个实体`);
-      
+
       let cypher = '';
-      
+
       switch (entityType) {
         case 'Company':
           cypher = `
@@ -358,7 +350,7 @@ export class Neo4jService {
             RETURN co
           `;
           break;
-          
+
         case 'Person':
           cypher = `
             UNWIND $entities AS p
@@ -368,7 +360,7 @@ export class Neo4jService {
             RETURN pe
           `;
           break;
-          
+
         case 'Organization':
           cypher = `
             UNWIND $entities AS o
@@ -378,7 +370,7 @@ export class Neo4jService {
             RETURN org
           `;
           break;
-          
+
         case 'Location':
           cypher = `
             UNWIND $entities AS l
@@ -397,7 +389,7 @@ export class Neo4jService {
             RETURN loc
           `;
           break;
-          
+
         case 'Event':
           cypher = `
             UNWIND $entities AS e
@@ -407,7 +399,7 @@ export class Neo4jService {
             RETURN ev
           `;
           break;
-          
+
         case 'News':
           cypher = `
             UNWIND $entities AS n
@@ -417,14 +409,13 @@ export class Neo4jService {
             RETURN news
           `;
           break;
-          
+
         default:
           throw new Error(`不支持的实体类型: ${entityType}`);
       }
-      
+
       await session.run(cypher, { entities });
       logger.debug(`✅ ${entityType} 批量MERGE完成`);
-      
     } catch (error) {
       logger.error(`❌ ${entityType} 批量MERGE失败:`, error);
       throw error;
@@ -436,22 +427,24 @@ export class Neo4jService {
   /**
    * 批量创建关系（MERGE模板）
    */
-  async batchMergeRelationships(relationships: Array<{
-    fromType: string;
-    fromKey: string;
-    fromValue: string;
-    toType: string;
-    toKey: string;
-    toValue: string;
-    relType: string;
-    properties?: any;
-  }>): Promise<void> {
+  async batchMergeRelationships(
+    relationships: Array<{
+      fromType: string;
+      fromKey: string;
+      fromValue: string;
+      toType: string;
+      toKey: string;
+      toValue: string;
+      relType: string;
+      properties?: any;
+    }>
+  ): Promise<void> {
     if (relationships.length === 0) return;
-    
+
     const session = this.getSession();
     try {
       logger.info(`🔄 批量MERGE关系: ${relationships.length} 个关系`);
-      
+
       for (const rel of relationships) {
         const cypher = `
           MERGE (from:${rel.fromType} {${rel.fromKey}: $fromValue})
@@ -461,16 +454,15 @@ export class Neo4jService {
           ON MATCH SET r += $properties, r.updated_at = timestamp()
           RETURN r
         `;
-        
+
         await session.run(cypher, {
           fromValue: rel.fromValue,
           toValue: rel.toValue,
-          properties: rel.properties || {}
+          properties: rel.properties || {},
         });
       }
-      
+
       logger.debug(`✅ 关系批量MERGE完成`);
-      
     } catch (error) {
       logger.error(`❌ 关系批量MERGE失败:`, error);
       throw error;
@@ -491,4 +483,4 @@ export class Neo4jService {
   }
 }
 
-export default new Neo4jService(); 
+export default new Neo4jService();

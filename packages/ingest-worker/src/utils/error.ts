@@ -28,16 +28,19 @@ export interface ErrorDetails {
 // 仅保留可序列化的信息，避免循环引用
 function sanitizeValue(value: any): any {
   if (value === undefined || value === null) return value;
-  if (typeof value === 'string') return value.length > 2000 ? `${value.slice(0, 2000)}...<truncated>` : value;
+  if (typeof value === 'string')
+    return value.length > 2000 ? `${value.slice(0, 2000)}...<truncated>` : value;
   if (typeof value === 'number' || typeof value === 'boolean') return value;
   if (value instanceof Date) return value.toISOString();
   if (Buffer.isBuffer(value)) return value.toString('utf8');
   if (Array.isArray(value)) return value.slice(0, 20).map(item => sanitizeValue(item));
   if (typeof value === 'object') {
     const result: Record<string, any> = {};
-    Object.keys(value).slice(0, 20).forEach(key => {
-      result[key] = sanitizeValue(value[key]);
-    });
+    Object.keys(value)
+      .slice(0, 20)
+      .forEach(key => {
+        result[key] = sanitizeValue(value[key]);
+      });
     return result;
   }
   try {

@@ -1,0 +1,14 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`api/graph/organizations returns organizations by search term 1`] = `
+{
+  "count": 1,
+  "data": [
+    {
+      "name": "Org A",
+    },
+  ],
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;

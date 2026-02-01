@@ -1,0 +1,41 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`api/news returns 400 for invalid time range 1`] = `
+{
+  "error": "开始时间格式无效",
+  "success": false,
+  "timestamp": "2024-01-01 08:00:00",
+  "timezone": "Asia/Shanghai",
+}
+`;
+
+exports[`api/news returns paginated news list 1`] = `
+{
+  "data": {
+    "filters": {
+      "sortBy": "timestamp",
+      "sortOrder": "desc",
+    },
+    "news": [
+      {
+        "id": "news_1",
+        "timestamp": "2024-01-01 08:00:00",
+        "timestamp_display": "2024-01-01 08:00:00",
+        "title": "Title",
+      },
+    ],
+    "pagination": {
+      "hasNext": false,
+      "hasPrev": false,
+      "limit": 20,
+      "page": 1,
+      "total": 1,
+      "totalPages": 1,
+    },
+  },
+  "message": "成功获取1条新闻",
+  "success": true,
+  "timestamp": "2024-01-01 08:00:00",
+  "timezone": "Asia/Shanghai",
+}
+`;

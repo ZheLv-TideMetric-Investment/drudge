@@ -1,0 +1,99 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`news process api batchProcessNews rejects empty list 1`] = `
+{
+  "error": "newsItems 必须是非空数组",
+  "success": false,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`news process api batchProcessNews returns error when processing throws 1`] = `
+{
+  "error": "boom",
+  "success": false,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`news process api batchProcessNews returns summary counts 1`] = `
+{
+  "data": [
+    {
+      "success": true,
+    },
+    {
+      "success": false,
+    },
+  ],
+  "success": true,
+  "summary": {
+    "failed": 1,
+    "success": 1,
+    "total": 2,
+  },
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`news process api checkNewsStatus returns error when query fails 1`] = `
+{
+  "error": "boom",
+  "success": false,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`news process api checkNewsStatus validates input and returns status 1`] = `
+{
+  "error": "newsIds 必须是数组",
+  "success": false,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`news process api checkNewsStatus validates input and returns status 2`] = `
+{
+  "data": {
+    "processed": 2,
+    "processedIds": [
+      "1",
+      "3",
+    ],
+    "total": 3,
+    "unprocessed": 1,
+    "unprocessedIds": [
+      "2",
+    ],
+  },
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`news process api processNews returns error when graph processing throws 1`] = `
+{
+  "error": "boom",
+  "success": false,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`news process api processes single news item 1`] = `
+{
+  "data": {
+    "newsId": "news_1",
+    "success": true,
+  },
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`news process api rejects invalid news item 1`] = `
+{
+  "error": "缺少必要的新闻数据字段 (id, title, content)",
+  "success": false,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;

@@ -1,0 +1,56 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`api/scan GET returns status 1`] = `
+{
+  "example_requests": {
+    "auto_scan": {
+      "body": {},
+      "description": "自动扫描（使用上次扫描时间到现在）",
+    },
+    "manual_scan": {
+      "body": {
+        "sendNotifications": true,
+        "skipProcessed": false,
+      },
+      "description": "手动扫描最近30分钟（不跳过已处理）",
+    },
+    "query_only": {
+      "body": {
+        "endTime": "2025-01-15T11:00:00.000Z",
+        "sendNotifications": false,
+        "skipProcessed": false,
+        "startTime": "2025-01-15T10:00:00.000Z",
+      },
+      "description": "仅查询不发送通知",
+    },
+    "time_range_scan": {
+      "body": {
+        "endTime": "2025-01-15T11:00:00.000Z",
+        "sendNotifications": true,
+        "skipProcessed": false,
+        "startTime": "2025-01-15T10:00:00.000Z",
+      },
+      "description": "指定时间范围扫描",
+    },
+  },
+  "scanner_status": {
+    "running": false,
+  },
+  "server_time": "2024-01-01T00:00:00.000Z",
+  "supported_formats": [
+    "ISO 8601 datetime string",
+  ],
+}
+`;
+
+exports[`api/scan POST triggers scan 1`] = `
+{
+  "found": 1,
+  "high_level_news": [],
+  "message": "ok",
+  "period": "period",
+  "sent": 0,
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;

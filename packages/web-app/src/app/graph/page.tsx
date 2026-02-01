@@ -125,6 +125,8 @@ const GraphPage = () => {
               onChange={(e) => setQuery(e.target.value)}
               onPressEnter={() => handleSearch(query)}
               size="large"
+              id="graph-search"
+              name="graph-search"
             />
             <Button 
               type="primary" 

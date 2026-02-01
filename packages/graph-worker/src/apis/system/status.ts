@@ -11,7 +11,8 @@ export async function getSystemStatus(): Promise<any> {
     logger.info('📊 获取系统状态信息');
 
     // 获取各服务状态
-    const knowledgeGraphHealth = await knowledgeGraphService['entityService']['neo4j'].healthCheck();
+    const knowledgeGraphHealth =
+      await knowledgeGraphService['entityService']['neo4j'].healthCheck();
     const schedulerHealth = await schedulerService.healthCheck();
 
     const systemStatus = {
@@ -21,29 +22,28 @@ export async function getSystemStatus(): Promise<any> {
       status: 'healthy',
       services: {
         knowledgeGraph: knowledgeGraphHealth,
-        scheduler: schedulerHealth
+        scheduler: schedulerHealth,
       },
       memory: {
         used: process.memoryUsage().heapUsed,
         total: process.memoryUsage().heapTotal,
-        external: process.memoryUsage().external
+        external: process.memoryUsage().external,
       },
       uptime: process.uptime(),
-      pid: process.pid
+      pid: process.pid,
     };
 
     return {
       success: true,
       data: systemStatus,
-      timestamp: getCurrentTime()
+      timestamp: getCurrentTime(),
     };
-
   } catch (error: any) {
     logger.error('获取系统状态失败:', error);
     return {
       success: false,
       error: error.message,
-      timestamp: getCurrentTime()
+      timestamp: getCurrentTime(),
     };
   }
-} 
+}

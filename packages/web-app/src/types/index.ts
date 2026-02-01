@@ -14,9 +14,12 @@ export interface NewsItem {
   source: string;
   url?: string;
   timestamp: string;
-  news_level: string;
-  level: number;
+  timestamp_display?: string;
+  news_level?: string;
+  level: string;
   processed: boolean;
+  processedAt?: string | number;
+  processedAt_display?: string;
   created_at: string;
   updated_at: string;
 }

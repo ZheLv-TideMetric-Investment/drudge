@@ -1,6 +1,8 @@
 import * as chrono from 'chrono-node';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import { normalizeTimestampMs } from '@drudge/common';
+import { logger } from './logger';
 
 // 扩展 dayjs
 dayjs.extend(utc);
@@ -23,14 +25,11 @@ function parseTimeToDate(timeInput: any): Date {
   try {
     // 1. 处理数字类型的 timestamp
     if (typeof timeInput === 'number') {
-      const timestamp = timeInput;
-      if (timestamp < 10000000000) {
-        // 秒级时间戳 - 转换为UTC
-        return dayjs.unix(timestamp).utc().toDate();
-      } else {
-        // 毫秒级时间戳 - 转换为UTC
-        return dayjs(timestamp).utc().toDate();
+      const normalized = normalizeTimestampMs(timeInput);
+      if (normalized === null) {
+        throw new Error(`时间解析失败: ${timeInput}`);
       }
+      return dayjs(normalized).utc().toDate();
     }
 
     // 2. 处理字符串类型
@@ -38,9 +37,9 @@ function parseTimeToDate(timeInput: any): Date {
       // 首先检查是否为纯数字字符串（时间戳）
       const trimmed = timeInput.trim();
       if (/^\d+$/.test(trimmed)) {
-        const numericTime = Number(trimmed);
-        if (!isNaN(numericTime)) {
-          return parseTimeToDate(numericTime);
+        const normalized = normalizeTimestampMs(trimmed);
+        if (normalized !== null) {
+          return dayjs(normalized).utc().toDate();
         }
       }
 
@@ -60,7 +59,7 @@ function parseTimeToDate(timeInput: any): Date {
     // 如果所有解析都失败，抛出错误
     throw new Error(`时间解析失败: ${timeInput}`);
   } catch (error) {
-    console.error(`时间解析错误: ${timeInput}`, error);
+    logger.error(`时间解析错误: ${timeInput}`, error);
     throw new Error('时间解析错误');
   }
 }

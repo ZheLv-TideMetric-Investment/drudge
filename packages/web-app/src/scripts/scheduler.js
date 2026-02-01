@@ -1,7 +1,33 @@
 #!/usr/bin/env node
 const cron = require('node-cron');
 const axios = require('axios');
-const moment = require('moment-timezone');
+const { BEIJING_TIMEZONE } = require('@drudge/common');
+const beijingFormatter = new Intl.DateTimeFormat('zh-CN', {
+  timeZone: BEIJING_TIMEZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+});
+
+const getBeijingParts = (date = new Date()) => {
+  const parts = beijingFormatter.formatToParts(date);
+  const partMap = {};
+  for (const part of parts) {
+    partMap[part.type] = part.value;
+  }
+  return partMap;
+};
+
+const formatBeijingDateTime = (date = new Date()) => {
+  const { year, month, day, hour, minute, second } = getBeijingParts(date);
+  return `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+};
+
+const getNowISOString = () => new Date().toISOString();
 
 /**
  * 定时器触发器类型枚举
@@ -113,7 +139,7 @@ class CronScheduler {
       },
       {
         scheduled: false, // 先不启动，等所有设置完成后一起启动
-        timezone: 'Asia/Shanghai',
+        timezone: BEIJING_TIMEZONE,
       }
     );
 
@@ -126,7 +152,7 @@ class CronScheduler {
    * 执行触发器 - 调用API接口
    */
   async executeTrigger(trigger, description) {
-    const timestamp = moment().tz('Asia/Shanghai').toISOString();
+    const timestamp = getNowISOString();
 
     console.log(`[CronScheduler] 触发器执行: ${trigger} (${description}) at ${timestamp}`);
 
@@ -138,7 +164,7 @@ class CronScheduler {
           source: 'cron_scheduler',
           description,
           executedAt: timestamp,
-          timezone: 'Asia/Shanghai',
+          timezone: BEIJING_TIMEZONE,
         },
       };
 
@@ -236,9 +262,9 @@ class CronScheduler {
 async function main() {
   console.log('[CronScheduler] 启动轻量级定时器调度器');
   console.log(`[CronScheduler] Node.js 版本: ${process.version}`);
-  console.log(`[CronScheduler] 时区: Asia/Shanghai (北京时间)`);
+  console.log(`[CronScheduler] 时区: ${BEIJING_TIMEZONE} (北京时间)`);
   console.log(
-    `[CronScheduler] 当前时间: ${moment().tz('Asia/Shanghai').format('YYYY-MM-DD HH:mm:ss')}`
+    `[CronScheduler] 当前时间: ${formatBeijingDateTime()}`
   );
 
   const scheduler = new CronScheduler();
@@ -257,9 +283,11 @@ async function main() {
     // 保持进程运行
     setInterval(() => {
       // 每10分钟输出一次状态
-      const now = moment().tz('Asia/Shanghai');
-      if (now.minute() % 10 === 0 && now.second() === 0) {
-        console.log(`[CronScheduler] 心跳检查 - ${now.format('YYYY-MM-DD HH:mm:ss')}`);
+      const nowParts = getBeijingParts();
+      const minute = Number(nowParts.minute || 0);
+      const second = Number(nowParts.second || 0);
+      if (minute % 10 === 0 && second === 0) {
+        console.log(`[CronScheduler] 心跳检查 - ${formatBeijingDateTime()}`);
       }
     }, 1000);
   } catch (error) {

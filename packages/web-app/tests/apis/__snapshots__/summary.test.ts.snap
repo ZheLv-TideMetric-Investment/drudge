@@ -1,0 +1,23 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`api/summary returns 400 when missing params 1`] = `
+{
+  "error": "Missing required parameters",
+  "message": "缺少必要参数: startTime 和 endTime",
+  "period": "",
+  "success": false,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`api/summary returns summary result 1`] = `
+{
+  "data": {
+    "empty": true,
+  },
+  "message": "ok",
+  "period": "period",
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;

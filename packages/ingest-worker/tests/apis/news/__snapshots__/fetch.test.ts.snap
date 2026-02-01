@@ -1,0 +1,53 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`news fetch api merges and sorts news 1`] = `
+{
+  "count": 3,
+  "message": "成功获取 3 条新闻 (富途: 1, AWTMT: 2)",
+  "news": [
+    {
+      "id": "2",
+      "time": 300,
+    },
+    {
+      "id": "1",
+      "time": 200,
+    },
+    {
+      "id": "3",
+      "time": 100,
+    },
+  ],
+  "sources": {
+    "awtmt": 2,
+    "futu": 1,
+  },
+  "success": true,
+  "timestamp": "2024-01-01 08:00:00",
+}
+`;
+
+exports[`news fetch api returns empty message when no news 1`] = `
+{
+  "count": 0,
+  "message": "没有获取到新的新闻",
+  "success": true,
+  "timestamp": "2024-01-01 08:00:00",
+}
+`;
+
+exports[`news fetch api returns error on failure 1`] = `
+{
+  "count": 0,
+  "details": {
+    "cause": undefined,
+    "code": undefined,
+    "message": "boom",
+    "name": "Error",
+    "stack": "<stack>",
+  },
+  "error": "boom",
+  "success": false,
+  "timestamp": "2024-01-01 08:00:00",
+}
+`;

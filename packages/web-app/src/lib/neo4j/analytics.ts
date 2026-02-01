@@ -414,7 +414,7 @@ class Neo4jAnalyticsService {
       // 先检查数据存在性和格式
       const checkQuery = `
         MATCH (n:News)
-        RETURN n.timestamp as timestamp, n.level as level
+        RETURN n.timestamp as timestamp, n.news_level as level
         LIMIT 5
       `;
       
@@ -434,7 +434,7 @@ class Neo4jAnalyticsService {
         WHERE datetime(n.timestamp) >= datetime('${todayRange.startTime}')
         AND datetime(n.timestamp) < datetime('${todayRange.endTime}')
         WITH datetime(n.timestamp).hour + 8 as beijingHour, count(n) as newsCount,
-             sum(CASE WHEN n.level IN ['Level 1', 'Level 2'] THEN 1 ELSE 0 END) as highLevelCount
+             sum(CASE WHEN n.news_level IN ['${EventLevel.LEVEL_1}', '${EventLevel.LEVEL_2}'] THEN 1 ELSE 0 END) as highLevelCount
         WITH CASE WHEN beijingHour >= 24 THEN beijingHour - 24 ELSE beijingHour END as hour,
              newsCount, highLevelCount
         RETURN hour, newsCount, highLevelCount,
@@ -447,7 +447,7 @@ class Neo4jAnalyticsService {
         MATCH (n:News)
         WHERE datetime(n.timestamp) >= datetime('${sevenDaysRange.startTime}')
         WITH date(datetime(n.timestamp) + duration({hours: 8})) as beijingDate, count(n) as newsCount,
-             sum(CASE WHEN n.level IN ['Level 1', 'Level 2'] THEN 1 ELSE 0 END) as highLevelCount
+             sum(CASE WHEN n.news_level IN ['${EventLevel.LEVEL_1}', '${EventLevel.LEVEL_2}'] THEN 1 ELSE 0 END) as highLevelCount
         RETURN toString(beijingDate) as date,
                toString(beijingDate) as dateDisplay,
                newsCount, highLevelCount

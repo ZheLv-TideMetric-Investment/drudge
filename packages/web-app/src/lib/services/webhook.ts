@@ -1,21 +1,7 @@
 import axios from 'axios';
+import { buildNotificationTitle, createMarkdownPayload, formatBeijingLocaleString } from '@drudge/common';
+import type { NotificationPayload } from '@drudge/common';
 import { config } from '../config';
-
-/**
- * Webhook通知载荷接口
- */
-export interface NotificationPayload {
-  msgtype: string;
-  markdown: {
-    title: string;
-    text: string;
-  };
-  at?: {
-    isAtAll: boolean;
-    atUserIds?: string[];
-    atMobiles?: string[];
-  };
-}
 
 /**
  * Webhook 通知服务
@@ -43,18 +29,13 @@ class WebhookService {
       return false;
     }
 
-    const markdownTitle = title ? `[tide] Web App - ${title}` : '[tide] Web App - 系统通知';
+    const markdownTitle = buildNotificationTitle('Web App', title ?? '系统通知');
 
-    const payload: NotificationPayload = {
-      msgtype: 'markdown',
-      markdown: {
-        title: markdownTitle,
-        text: message,
-      },
-      at: {
-        isAtAll: false,
-      },
-    };
+    const payload: NotificationPayload = createMarkdownPayload(
+      markdownTitle,
+      message,
+      { isAtAll: false }
+    );
 
     const results = await Promise.allSettled(
       this.webhookUrls.map(async (webhookUrl) => {
@@ -126,18 +107,13 @@ class WebhookService {
     if (details) {
       markdownText += `**详情**: ${details}\n\n`;
     }
-    markdownText += `**时间**: ${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}\n\n`;
+    markdownText += `**时间**: ${formatBeijingLocaleString()}\n\n`;
 
-    const payload: NotificationPayload = {
-      msgtype: 'markdown',
-      markdown: {
-        title: `[tide] Web App - 系统${statusTexts[status]}`,
-        text: markdownText,
-      },
-      at: {
-        isAtAll: status === 'error', // 错误状态时@all
-      },
-    };
+    const payload: NotificationPayload = createMarkdownPayload(
+      buildNotificationTitle('Web App', `系统${statusTexts[status]}`),
+      markdownText,
+      { isAtAll: status === 'error' } // 错误状态时@all
+    );
 
     const results = await Promise.allSettled(
       this.webhookUrls.map(async (webhookUrl) => {

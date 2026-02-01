@@ -1,4 +1,5 @@
 import * as cron from 'node-cron';
+import { BEIJING_TIMEZONE } from '@drudge/common';
 import { logger } from '../utils/logger';
 import { getCurrentTime } from '../utils/timeUtils';
 
@@ -49,35 +50,41 @@ export class SchedulerService {
    * 每1分钟扫描一次文件
    */
   private startNewsProcessingTask(): void {
-    const newsTask = cron.schedule('* * * * *', async () => {
-      logger.info('⏰ 定时任务：开始扫描新闻文件');
-      const startTime = Date.now();
-      
-      try {
-        const result = await this.scanAndProcessNews();
-        
-        const duration = Date.now() - startTime;
-        
-        if (result.success) {
-          if (result.processed > 0) {
-            logger.info(`✅ 定时任务：图谱化完成，处理${result.processed}个文件，耗时${duration}ms`);
+    const newsTask = cron.schedule(
+      '* * * * *',
+      async () => {
+        logger.info('⏰ 定时任务：开始扫描新闻文件');
+        const startTime = Date.now();
+
+        try {
+          const result = await this.scanAndProcessNews();
+
+          const duration = Date.now() - startTime;
+
+          if (result.success) {
+            if (result.processed > 0) {
+              logger.info(
+                `✅ 定时任务：图谱化完成，处理${result.processed}个文件，耗时${duration}ms`
+              );
+            } else {
+              logger.debug(`✅ 定时任务：无新文件需要处理，耗时${duration}ms`);
+            }
           } else {
-            logger.debug(`✅ 定时任务：无新文件需要处理，耗时${duration}ms`);
+            logger.error(`❌ 定时任务：文件扫描失败 - ${result.error}`);
           }
-        } else {
-          logger.error(`❌ 定时任务：文件扫描失败 - ${result.error}`);
+        } catch (error: any) {
+          const duration = Date.now() - startTime;
+          logger.error(`❌ 定时任务：文件扫描异常，耗时${duration}ms`, error);
         }
-      } catch (error: any) {
-        const duration = Date.now() - startTime;
-        logger.error(`❌ 定时任务：文件扫描异常，耗时${duration}ms`, error);
+      },
+      {
+        timezone: BEIJING_TIMEZONE,
       }
-    }, {
-      timezone: 'Asia/Shanghai'
-    });
+    );
 
     this.tasks.set('news-processing', newsTask);
     newsTask.start();
-    
+
     logger.info('🔄 启动新闻图谱化定时任务 (每1分钟扫描一次)');
   }
 
@@ -89,15 +96,15 @@ export class SchedulerService {
       // 动态导入避免循环依赖
       const { scanUnprocessedFiles } = await import('../services/FileScanner');
       const { processNewsFilesInParallel } = await import('../services/NewsProcessor');
-      
+
       // 扫描未处理的文件
       const unprocessedFiles = await scanUnprocessedFiles();
-      
+
       if (unprocessedFiles.length === 0) {
         return {
           success: true,
           processed: 0,
-          message: '没有需要处理的新文件'
+          message: '没有需要处理的新文件',
         };
       }
 
@@ -105,7 +112,7 @@ export class SchedulerService {
 
       // 并行处理文件
       const results = await processNewsFilesInParallel(unprocessedFiles);
-      
+
       const successful = results.filter(r => r.success).length;
       const failed = results.filter(r => !r.success).length;
 
@@ -114,14 +121,13 @@ export class SchedulerService {
         processed: successful,
         failed,
         total: unprocessedFiles.length,
-        message: `成功处理 ${successful} 个文件${failed > 0 ? `，失败 ${failed} 个` : ''}`
+        message: `成功处理 ${successful} 个文件${failed > 0 ? `，失败 ${failed} 个` : ''}`,
       };
-
     } catch (error: any) {
       logger.error('扫描处理新闻文件失败:', error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -149,14 +155,14 @@ export class SchedulerService {
         service: 'SchedulerService',
         timestamp: getCurrentTime(),
         initialized: this.initialized,
-        activeTasks: this.tasks.size
+        activeTasks: this.tasks.size,
       };
     } catch (error: any) {
       return {
         status: 'unhealthy',
         service: 'SchedulerService',
         timestamp: getCurrentTime(),
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -170,7 +176,7 @@ export class SchedulerService {
       description: '调度器服务，负责定时扫描新闻文件并进行图谱化处理',
       initialized: this.initialized,
       activeTasks: this.tasks.size,
-      mainTask: '每分钟扫描新闻文件并进行图谱化处理'
+      mainTask: '每分钟扫描新闻文件并进行图谱化处理',
     };
   }
 
@@ -190,4 +196,4 @@ export class SchedulerService {
   }
 }
 
-export default new SchedulerService(); 
+export default new SchedulerService();

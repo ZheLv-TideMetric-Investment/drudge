@@ -1,0 +1,11 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`api/graph/entities/[entityId]/neighborhood returns neighborhood data 1`] = `
+{
+  "data": {
+    "nodes": [],
+  },
+  "success": true,
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;

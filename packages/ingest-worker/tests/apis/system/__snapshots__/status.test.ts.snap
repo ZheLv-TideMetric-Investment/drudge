@@ -1,0 +1,56 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`system status api returns error on failure 1`] = `
+{
+  "details": {
+    "cause": undefined,
+    "code": undefined,
+    "message": "boom",
+    "name": "Error",
+    "stack": "<stack>",
+  },
+  "error": "boom",
+  "success": false,
+  "timestamp": "2024-01-01 08:00:00",
+}
+`;
+
+exports[`system status api returns health check payload 1`] = `
+{
+  "port": 39110,
+  "service": "ingest-worker",
+  "sources": [
+    "futu_live",
+    "awtmt_live",
+  ],
+  "status": "ok",
+  "timestamp": "2024-01-01T00:00:00.000Z",
+}
+`;
+
+exports[`system status api returns service status with health mapping 1`] = `
+{
+  "connections": {
+    "awtmtLiveApi": "❌ 异常",
+    "futuLiveApi": "✅ 正常",
+  },
+  "service": "ingest-worker",
+  "serviceStatus": {
+    "awtmt": {
+      "name": "awtmt",
+    },
+    "futu": {
+      "name": "futu",
+    },
+  },
+  "sources": [
+    "futu_live",
+    "awtmt_live",
+  ],
+  "stats": {
+    "totalCount": 2,
+  },
+  "success": true,
+  "timestamp": "2024-01-01 08:00:00",
+}
+`;

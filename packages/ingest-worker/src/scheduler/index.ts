@@ -1,4 +1,5 @@
 import * as cron from 'node-cron';
+import { BEIJING_TIMEZONE } from '@drudge/common';
 import { logger } from '../utils/logger';
 import { fetchLatestNews } from '../apis/news/fetch';
 import { logErrorWithDetails } from '../utils/error';
@@ -35,40 +36,42 @@ export class Scheduler {
    * 每1分钟执行一次
    */
   private startNewsTask(): void {
-    const newsTask = cron.schedule('* * * * *', async () => {
-      logger.info('⏰ 定时任务：开始获取新闻数据');
-      const startTime = Date.now();
-      
-      try {
-        const result = await fetchLatestNews();
-        
-        const duration = Date.now() - startTime;
-        
-        if (result.success) {
-          logger.info(`✅ 定时任务：新闻获取完成，获取${result.count}条，耗时${duration}ms`);
-        } else {
-          logger.error(`❌ 定时任务：新闻获取失败 - ${result.error}`, {
-            details: result.details,
-            durationMs: duration
+    const newsTask = cron.schedule(
+      '* * * * *',
+      async () => {
+        logger.info('⏰ 定时任务：开始获取新闻数据');
+        const startTime = Date.now();
+
+        try {
+          const result = await fetchLatestNews();
+
+          const duration = Date.now() - startTime;
+
+          if (result.success) {
+            logger.info(`✅ 定时任务：新闻获取完成，获取${result.count}条，耗时${duration}ms`);
+          } else {
+            logger.error(`❌ 定时任务：新闻获取失败 - ${result.error}`, {
+              details: result.details,
+              durationMs: duration,
+            });
+          }
+        } catch (error: any) {
+          const duration = Date.now() - startTime;
+          logErrorWithDetails(`❌ 定时任务：新闻获取异常，耗时${duration}ms`, error, {
+            durationMs: duration,
           });
         }
-      } catch (error: any) {
-        const duration = Date.now() - startTime;
-        logErrorWithDetails(`❌ 定时任务：新闻获取异常，耗时${duration}ms`, error, {
-          durationMs: duration
-        });
+      },
+      {
+        timezone: BEIJING_TIMEZONE,
       }
-    }, {
-      timezone: 'Asia/Shanghai'
-    });
+    );
 
     this.tasks.set('news-fetch', newsTask);
     newsTask.start();
-    
+
     logger.info('🔄 启动新闻获取定时任务 (每1分钟执行一次)');
   }
-
-
 }
 
-export default new Scheduler(); 
+export default new Scheduler();
