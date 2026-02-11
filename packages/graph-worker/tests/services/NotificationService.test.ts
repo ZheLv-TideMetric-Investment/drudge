@@ -34,7 +34,7 @@ describe('NotificationService', () => {
   it('skips sending when webhook disabled', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'false',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     await service.sendAiServiceFailureNotification('deepseek', 'model', 'boom');
@@ -46,7 +46,7 @@ describe('NotificationService', () => {
   it('returns early for all notifications when disabled', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'false',
-      WEBHOOK_URL: ''
+      ALERT_WEBHOOK_URL: ''
     });
 
     await service.sendEntityExtractionFailureNotification('news-1', 'boom', 1);
@@ -63,7 +63,7 @@ describe('NotificationService', () => {
   it('sends notifications with expected payloads', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post.mockResolvedValue({ status: 200, data: {} } as any);
@@ -95,7 +95,7 @@ describe('NotificationService', () => {
   it('handles non-2xx responses and axios failures', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post
@@ -115,7 +115,7 @@ describe('NotificationService', () => {
   it('validateConfig returns false when enabled without url', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: ''
+      ALERT_WEBHOOK_URL: ''
     });
 
     expect(service.validateConfig()).toBe(false);
@@ -127,7 +127,7 @@ describe('NotificationService', () => {
   it('validateConfig returns true when disabled', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'false',
-      WEBHOOK_URL: ''
+      ALERT_WEBHOOK_URL: ''
     });
 
     expect(service.validateConfig()).toBe(true);

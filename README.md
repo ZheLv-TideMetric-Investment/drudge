@@ -176,8 +176,10 @@ QWEN_API_KEY=your_qwen_key
 NEWS_DIRECTORY=/absolute/path/to/drudge/data/news
 FAILED_NEWS_DIRECTORY=/absolute/path/to/drudge/data/news/failed
 
-WEBHOOK_URL=your_dingtalk_webhook
-WEBHOOK_URLS=your_dingtalk_webhook
+# ingest-worker / graph-worker 异常预警（单链接）
+ALERT_WEBHOOK_URL=your_alert_webhook
+# web-app 婷子机器人通知（多链接，逗号分隔）
+TINGZI_ROBOT_WEBHOOK_URLS=your_tingzi_webhook_1,your_tingzi_webhook_2
 ```
 
 更多可选项请参考根目录 `env.example`。
@@ -416,7 +418,7 @@ services:
     environment:
       - NEO4J_PASSWORD=your_secure_password
       - DEEPSEEK_API_KEY=your_api_key
-      - WEBHOOK_URL=your_webhook_url
+      - TINGZI_ROBOT_WEBHOOK_URLS=your_tingzi_webhook_urls
 ```
 
 ## 🔍 CLI工具

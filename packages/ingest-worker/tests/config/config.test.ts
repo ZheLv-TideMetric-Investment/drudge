@@ -28,7 +28,7 @@ describe('config', () => {
       NEWS_API_PAGE_SIZE: '',
       NEWS_API_REQUEST_INTERVAL: '',
       ENABLE_WEBHOOK_NOTIFICATION: 'false',
-      WEBHOOK_URL: '',
+      ALERT_WEBHOOK_URL: '',
       LOG_LEVEL: '',
       LOG_FILE: ''
     });
@@ -60,7 +60,7 @@ describe('config', () => {
       NEWS_API_PAGE_SIZE: '99',
       NEWS_API_REQUEST_INTERVAL: '1234',
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook',
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook',
       LOG_LEVEL: 'debug',
       LOG_FILE: 'custom.log'
     });
