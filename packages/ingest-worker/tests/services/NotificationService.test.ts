@@ -19,7 +19,7 @@ describe('NotificationService', () => {
   it('sends file save failure webhook with expected content', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post.mockResolvedValue({ status: 200, data: {} } as any);
@@ -40,7 +40,7 @@ describe('NotificationService', () => {
   it('skips sending when webhook disabled', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'false',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     await service.sendNewsApiFailureNotification('boom');
@@ -52,7 +52,7 @@ describe('NotificationService', () => {
   it('skips sending when webhook url missing', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: ''
+      ALERT_WEBHOOK_URL: ''
     });
 
     await service.sendNewsApiFailureNotification('boom');
@@ -68,7 +68,7 @@ describe('NotificationService', () => {
   it('omits retry count when not provided', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post.mockResolvedValue({ status: 200, data: {} } as any);
@@ -83,7 +83,7 @@ describe('NotificationService', () => {
   it('includes retry count in API failure notification', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post.mockResolvedValue({ status: 200, data: {} } as any);
@@ -99,7 +99,7 @@ describe('NotificationService', () => {
   it('omits context when none provided', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post.mockResolvedValue({ status: 200, data: {} } as any);
@@ -115,7 +115,7 @@ describe('NotificationService', () => {
   it('includes context in service error notification', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post.mockResolvedValue({ status: 200, data: {} } as any);
@@ -132,7 +132,7 @@ describe('NotificationService', () => {
   it('sends health check failure notification', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post.mockResolvedValue({ status: 200, data: {} } as any);
@@ -148,7 +148,7 @@ describe('NotificationService', () => {
   it('handles non-2xx webhook responses', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post.mockResolvedValue({ status: 500, data: { ok: false } } as any);
@@ -162,7 +162,7 @@ describe('NotificationService', () => {
   it('sends recovery notification with details', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post.mockResolvedValue({ status: 200, data: {} } as any);
@@ -178,7 +178,7 @@ describe('NotificationService', () => {
   it('sends recovery notification without details', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post.mockResolvedValue({ status: 200, data: {} } as any);
@@ -194,7 +194,7 @@ describe('NotificationService', () => {
   it('swallows webhook request errors', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com/webhook'
+      ALERT_WEBHOOK_URL: 'https://example.com/webhook'
     });
 
     mockedAxios.post.mockRejectedValueOnce(new Error('boom'));
@@ -208,7 +208,7 @@ describe('NotificationService', () => {
   it('validateConfig returns false when enabled without url', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: ''
+      ALERT_WEBHOOK_URL: ''
     });
 
     expect(service.validateConfig()).toBe(false);
@@ -218,7 +218,7 @@ describe('NotificationService', () => {
   it('validateConfig returns true when webhook disabled', async () => {
     const { service, restore } = await createService({
       ENABLE_WEBHOOK_NOTIFICATION: 'false',
-      WEBHOOK_URL: ''
+      ALERT_WEBHOOK_URL: ''
     });
 
     expect(service.validateConfig()).toBe(true);

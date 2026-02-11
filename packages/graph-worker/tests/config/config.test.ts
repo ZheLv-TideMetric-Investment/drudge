@@ -66,7 +66,7 @@ describe('graph-worker config', () => {
       CHUNK_DELAY_MS: '2500',
       ENABLE_AUTO_GC: 'false',
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URL: 'https://example.com',
+      ALERT_WEBHOOK_URL: 'https://example.com',
       LOG_LEVEL: 'debug',
       LOG_FORMAT: 'json'
     });
@@ -116,7 +116,7 @@ describe('graph-worker config', () => {
       CHUNK_DELAY_MS: undefined,
       ENABLE_AUTO_GC: undefined,
       ENABLE_WEBHOOK_NOTIFICATION: undefined,
-      WEBHOOK_URL: undefined,
+      ALERT_WEBHOOK_URL: undefined,
       LOG_LEVEL: undefined,
       LOG_FORMAT: undefined
     });

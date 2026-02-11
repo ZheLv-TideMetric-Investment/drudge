@@ -139,7 +139,11 @@ const buildIngestConfig = (options = {}) => {
     },
     notification: {
       enableWebhookNotification: readBoolean(env, 'ENABLE_WEBHOOK_NOTIFICATION', false),
-      webhookUrl: readString(env, 'INGEST_WORKER_WEBHOOK_URL', readString(env, 'WEBHOOK_URL', '')),
+      webhookUrl: readString(
+        env,
+        'INGEST_WORKER_ALERT_WEBHOOK_URL',
+        readString(env, 'ALERT_WEBHOOK_URL', '')
+      ),
     },
     log: {
       level: readString(env, 'INGEST_WORKER_LOG_LEVEL', readString(env, 'LOG_LEVEL', 'info')),
@@ -234,7 +238,11 @@ const buildGraphConfig = (options = {}) => {
     },
     notification: {
       enableWebhookNotification: readBoolean(env, 'ENABLE_WEBHOOK_NOTIFICATION', false),
-      webhookUrl: readString(env, 'GRAPH_WEBHOOK_URL', readString(env, 'WEBHOOK_URL', '')),
+      webhookUrl: readString(
+        env,
+        'GRAPH_ALERT_WEBHOOK_URL',
+        readString(env, 'ALERT_WEBHOOK_URL', '')
+      ),
     },
     logging: {
       level: readString(env, 'GRAPH_LOG_LEVEL', readString(env, 'LOG_LEVEL', 'info')),
@@ -250,7 +258,7 @@ const buildWebConfig = (options = {}) => {
     loadDotenv({ env });
   }
 
-  const webWebhookUrls = readString(env, 'WEB_WEBHOOK_URLS', '');
+  const webWebhookUrls = readString(env, 'WEB_TINGZI_ROBOT_WEBHOOK_URLS', '');
 
   return {
     nodeEnv: getNodeEnv(env),
@@ -308,7 +316,7 @@ const buildWebConfig = (options = {}) => {
             .split(',')
             .map(item => item.trim())
             .filter(Boolean)
-        : readCsv(env, 'WEBHOOK_URLS'),
+        : readCsv(env, 'TINGZI_ROBOT_WEBHOOK_URLS'),
     },
     cron: {
       highLevelScan: readString(env, 'CRON_HIGH_LEVEL_SCAN', '0 */5 * * * *'),

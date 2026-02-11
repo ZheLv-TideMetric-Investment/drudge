@@ -12,7 +12,7 @@ describe('webhookService', () => {
   it('skips sending when webhook is disabled', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'false',
-      WEBHOOK_URLS: 'https://example.com/webhook'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook'
     });
 
     try {
@@ -31,7 +31,7 @@ describe('webhookService', () => {
   it('sends markdown message to configured webhooks', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URLS: 'https://example.com/webhook1,https://example.com/webhook2'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook1,https://example.com/webhook2'
     });
 
     try {
@@ -54,7 +54,7 @@ describe('webhookService', () => {
   it('returns false when webhook urls are missing', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URLS: ''
+      TINGZI_ROBOT_WEBHOOK_URLS: ''
     });
 
     try {
@@ -73,7 +73,7 @@ describe('webhookService', () => {
   it('returns false when webhook responses are not ok', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URLS: 'https://example.com/webhook1'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook1'
     });
 
     try {
@@ -99,7 +99,7 @@ describe('webhookService', () => {
   it('returns false when webhook post throws', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URLS: 'https://example.com/webhook1'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook1'
     });
 
     try {
@@ -119,7 +119,7 @@ describe('webhookService', () => {
   it('sends system status notifications with at-all on errors', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URLS: 'https://example.com/webhook1'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook1'
     });
 
     try {
@@ -142,7 +142,7 @@ describe('webhookService', () => {
   it('returns false when system status notification is disabled', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'false',
-      WEBHOOK_URLS: 'https://example.com/webhook1'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook1'
     });
 
     try {
@@ -160,7 +160,7 @@ describe('webhookService', () => {
   it('handles system status notification failures', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URLS: 'https://example.com/webhook1'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook1'
     });
 
     try {
@@ -180,7 +180,7 @@ describe('webhookService', () => {
   it('tests connection via sendMessage', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URLS: 'https://example.com/webhook1'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook1'
     });
 
     try {
@@ -201,7 +201,7 @@ describe('webhookService', () => {
   it('returns false when test connection is disabled', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'false',
-      WEBHOOK_URLS: 'https://example.com/webhook1'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook1'
     });
 
     try {
@@ -219,7 +219,7 @@ describe('webhookService', () => {
   it('returns false when test connection fails', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URLS: 'https://example.com/webhook1'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook1'
     });
 
     try {
@@ -239,7 +239,7 @@ describe('webhookService', () => {
   it('handles errors thrown by sendMessage during testConnection', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URLS: 'https://example.com/webhook1'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook1'
     });
 
     try {
@@ -260,7 +260,7 @@ describe('webhookService', () => {
   it('returns status summary', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URLS: 'https://example.com/webhook1'
+      TINGZI_ROBOT_WEBHOOK_URLS: 'https://example.com/webhook1'
     });
 
     try {
@@ -279,7 +279,7 @@ describe('webhookService', () => {
   it('returns status with no configured urls', async () => {
     const restoreEnv = setEnv({
       ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      WEBHOOK_URLS: ''
+      TINGZI_ROBOT_WEBHOOK_URLS: ''
     });
 
     try {
