@@ -29,7 +29,7 @@ services:
     ports:
       - "39112:39112"
     env_file:
-      - ./packages/web-app/.env
+      - ./.env
     depends_on:
       - neo4j
     networks:
@@ -44,7 +44,7 @@ services:
     ports:
       - "39110:39110"
     env_file:
-      - ./packages/ingest-worker/.env
+      - ./.env
     depends_on:
       - neo4j
     networks:
@@ -62,7 +62,7 @@ services:
     ports:
       - "39111:39111"
     env_file:
-      - ./packages/graph-worker/.env
+      - ./.env
     depends_on:
       - neo4j
     networks:

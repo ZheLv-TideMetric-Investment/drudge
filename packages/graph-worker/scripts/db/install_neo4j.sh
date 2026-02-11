@@ -105,10 +105,15 @@ detect_os() {
     fi
 }
 
-# 从 .env 文件读取配置
+# 从仓库根 .env 文件读取配置
 load_env() {
-    if [ -f .env ]; then
-        print_info "正在从 .env 文件加载配置..."
+    local script_dir repo_root env_file
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    repo_root="$(cd "$script_dir/../../../.." && pwd)"
+    env_file="$repo_root/.env"
+
+    if [ -f "$env_file" ]; then
+        print_info "正在从 $env_file 加载配置..."
         # 安全地读取 .env 文件
         while IFS= read -r line || [ -n "$line" ]; do
             # 跳过注释和空行
@@ -119,9 +124,9 @@ load_env() {
             if [[ "$line" =~ ^[[:space:]]*([a-zA-Z_][a-zA-Z0-9_]*)=(.*)$ ]]; then
                 export "${BASH_REMATCH[1]}"="${BASH_REMATCH[2]}"
             fi
-        done < .env
+        done < "$env_file"
     else
-        print_warning ".env 文件不存在，将使用默认配置"
+        print_warning "环境文件不存在 ($env_file)，将使用默认配置"
     fi
     
     # 设置默认值

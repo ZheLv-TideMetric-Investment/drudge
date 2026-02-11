@@ -44,7 +44,7 @@ const logger = winston.createLogger({
 });
 
 // 如果不是生产环境，添加文件输出
-if (process.env.NODE_ENV !== 'production') {
+if (config.nodeEnv !== 'production') {
   // 确保有日志目录
   const fs = require('fs');
   const path = require('path');

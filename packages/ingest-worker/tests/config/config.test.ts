@@ -1,9 +1,27 @@
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { setEnv } from '../helpers/env';
 
+const emptyEnvPath = path.join(os.tmpdir(), `drudge-ingest-empty-env-${process.pid}`);
+
 describe('config', () => {
+  beforeAll(() => {
+    fs.writeFileSync(emptyEnvPath, '');
+  });
+
+  afterAll(() => {
+    try {
+      fs.unlinkSync(emptyEnvPath);
+    } catch {
+      // ignore
+    }
+  });
+
   it('uses defaults when env missing', async () => {
     const restore = setEnv({
+      DOTENV_CONFIG_PATH: emptyEnvPath,
+      INGEST_WORKER_PORT: '',
       STORAGE_PATH: '',
       PORT: '',
       NEWS_API_URL: '',
@@ -34,8 +52,10 @@ describe('config', () => {
   it('uses env overrides when provided', async () => {
     const storagePath = path.join(process.cwd(), 'tmp-storage');
     const restore = setEnv({
+      DOTENV_CONFIG_PATH: emptyEnvPath,
       STORAGE_PATH: storagePath,
-      PORT: '4567',
+      INGEST_WORKER_PORT: '4567',
+      PORT: '9999',
       NEWS_API_URL: 'https://example.com/news',
       NEWS_API_PAGE_SIZE: '99',
       NEWS_API_REQUEST_INTERVAL: '1234',

@@ -92,7 +92,7 @@ describe('system status api', () => {
   });
 
   it('returns health check payload', async () => {
-    const restore = setEnv({ PORT: '' });
+    const restore = setEnv({ PORT: '', INGEST_WORKER_PORT: '' });
     const result = await healthCheck();
 
     expect(result.status).toBe('ok');
@@ -104,10 +104,12 @@ describe('system status api', () => {
   });
 
   it('uses env port when provided', async () => {
-    const restore = setEnv({ PORT: '4567' });
-    const result = await healthCheck();
+    const restore = setEnv({ PORT: '9999', INGEST_WORKER_PORT: '4567' });
+    jest.resetModules();
+    const { healthCheck: healthCheckWithEnv } = await import('../../../src/apis/system/status');
+    const result = await healthCheckWithEnv();
 
-    expect(result.port).toBe('4567');
+    expect(result.port).toBe(4567);
     restore();
   });
 });

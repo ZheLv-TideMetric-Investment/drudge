@@ -13,6 +13,7 @@
     "start": "pnpm --parallel -r run start",
     "test": "pnpm -r run test",
     "lint": "pnpm -r run lint",
+    "lint:env": "bash scripts/check-env-usage.sh",
     "lint:fix": "pnpm -r run lint:fix",
     "format": "pnpm -r run format",
     "format:check": "pnpm -r run format:check",

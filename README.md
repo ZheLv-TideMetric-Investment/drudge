@@ -150,42 +150,37 @@ pnpm install
 
 ```bash
 # 复制环境变量模板
-cp packages/web-app/env.example packages/web-app/.env
-cp packages/ingest-worker/env.example packages/ingest-worker/.env
-cp packages/graph-worker/env.example packages/graph-worker/.env
+cp env.example .env
 ```
+
+> 注意：不再使用 `packages/*/.env`，所有服务统一读取仓库根目录 `.env`。
 
 ### 3. 配置环境变量
 
-**packages/web-app/.env**:
+**.env（仓库根目录）**:
 ```env
-PORT=39112
+WEB_APP_PORT=39112
+INGEST_WORKER_PORT=39110
+GRAPH_WORKER_PORT=39111
+
 NEO4J_URI=bolt://localhost:7687
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=your_password
-DEEPSEEK_API_KEY=your_deepseek_key
-GOOGLE_API_KEY=your_google_key
-WEBHOOK_URL=your_dingtalk_webhook
-```
-
-**packages/ingest-worker/.env**:
-```env
-PORT=39110
 STORAGE_PATH=/absolute/path/to/drudge/data
 NEWS_API_URL=https://news.futunn.com/news-site-api/main/get-flash-list
-WEBHOOK_URL=your_dingtalk_webhook
-```
 
-**packages/graph-worker/.env**:
-```env
-PORT=39111
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_password
 DEEPSEEK_API_KEY=your_deepseek_key
+GOOGLE_API_KEY=your_google_key
+QWEN_API_KEY=your_qwen_key
+
 NEWS_DIRECTORY=/absolute/path/to/drudge/data/news
 FAILED_NEWS_DIRECTORY=/absolute/path/to/drudge/data/news/failed
+
+WEBHOOK_URL=your_dingtalk_webhook
+WEBHOOK_URLS=your_dingtalk_webhook
 ```
+
+更多可选项请参考根目录 `env.example`。
 
 ### 4. 启动数据库
 
@@ -407,7 +402,7 @@ docker-compose down
 
 ### 环境变量配置
 
-在生产环境中，确保正确配置以下关键环境变量：
+在生产环境中，确保仓库根目录 `.env` 正确配置关键环境变量（Compose 统一读取 `./.env`）：
 
 ```yaml
 # docker-compose.yml
