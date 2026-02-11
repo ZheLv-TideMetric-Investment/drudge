@@ -1,6 +1,7 @@
 import express, { Request, Response, Express } from 'express';
 import { logger } from '../utils/logger';
 import { logErrorWithDetails } from '../utils/error';
+import config from '../config/config';
 
 // APIs
 import { fetchLatestNews } from '../apis/news/fetch';
@@ -156,7 +157,7 @@ app.post('/api/scheduler/trigger', async (req: Request, res: Response) => {
  * 启动HTTP服务器
  */
 export function startHttpServer(): Promise<any> {
-  const port = process.env.PORT || 39110;
+  const port = config.port;
 
   return new Promise((resolve, reject) => {
     const server = app.listen(port, () => {

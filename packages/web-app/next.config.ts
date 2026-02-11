@@ -1,4 +1,7 @@
 import type { NextConfig } from 'next';
+import { getNodeEnv } from '@drudge/common';
+
+const nodeEnv = getNodeEnv();
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -12,7 +15,7 @@ const nextConfig: NextConfig = {
     ],
   },
   // 如果在开发环境中使用，可以启用这些选项
-  ...(process.env.NODE_ENV === 'development' && {
+  ...(nodeEnv === 'development' && {
     reactStrictMode: true,
   }),
 };

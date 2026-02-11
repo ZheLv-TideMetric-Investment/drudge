@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { TimeZoneUtils, TIME_FORMATS } from '../utils/timezone';
+import { config } from '../config';
 
 export interface JinaResponse {
   content: string;
@@ -65,7 +66,7 @@ async function callJinaAPI(
     const response = await axios.post('https://deepsearch.jina.ai/v1/chat/completions', data, {
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+        Authorization: `Bearer ${config.ai.jina.apiKey}`,
       },
     });
 

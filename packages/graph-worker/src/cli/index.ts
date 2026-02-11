@@ -472,7 +472,7 @@ async function dbExportConfig(): Promise<void> {
     const dbConfig = {
       neo4j: config.neo4j,
       timestamp: getCurrentTime(),
-      environment: process.env.NODE_ENV || 'development',
+      environment: config.nodeEnv || 'development',
     };
 
     // 创建备份目录
@@ -724,7 +724,7 @@ async function dbBackup(): Promise<void> {
 
     const backupData = {
       timestamp: getCurrentTime(),
-      environment: process.env.NODE_ENV || 'development',
+      environment: config.nodeEnv || 'development',
       config: {
         neo4j: {
           uri: config.neo4j.uri,

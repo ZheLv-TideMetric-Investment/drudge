@@ -8,7 +8,11 @@ describe('logger', () => {
   it('formats meta values and creates log dir when missing', async () => {
     const temp = await createTempDir('drudge-logger-');
     const logFile = path.join(temp.path, 'logs', 'ingest-worker.log');
-    const restoreEnv = setEnv({ LOG_FILE: logFile, NODE_ENV: 'development' });
+    const restoreEnv = setEnv({
+      LOG_FILE: logFile,
+      INGEST_WORKER_LOG_FILE: logFile,
+      NODE_ENV: 'development'
+    });
 
     jest.resetModules();
     const { logger } = await import('../../src/utils/logger');
@@ -25,7 +29,11 @@ describe('logger', () => {
   });
 
   it('handles empty meta in formatter', async () => {
-    const restoreEnv = setEnv({ NODE_ENV: 'development', LOG_FILE: '' });
+    const restoreEnv = setEnv({
+      NODE_ENV: 'development',
+      LOG_FILE: '',
+      INGEST_WORKER_LOG_FILE: ''
+    });
 
     jest.resetModules();
     const { logger } = await import('../../src/utils/logger');

@@ -5,6 +5,7 @@
   "main": "index.js",
   "types": "index.d.ts",
   "dependencies": {
+    "dotenv": "^16.4.5",
     "ts-enum-util": "^4.1.0"
   }
 }

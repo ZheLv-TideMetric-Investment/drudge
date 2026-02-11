@@ -1,8 +1,28 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { setEnv } from '../helpers/env';
 
+const emptyEnvPath = path.join(os.tmpdir(), `drudge-web-empty-env-${process.pid}`);
+
 describe('config', () => {
+  beforeAll(() => {
+    fs.writeFileSync(emptyEnvPath, '');
+  });
+
+  afterAll(() => {
+    try {
+      fs.unlinkSync(emptyEnvPath);
+    } catch {
+      // ignore
+    }
+  });
+
   it('uses defaults when env vars are missing', async () => {
     const restoreEnv = setEnv({
+      DOTENV_CONFIG_PATH: emptyEnvPath,
+      WEB_APP_PORT: undefined,
+      PORT: undefined,
       NEO4J_URI: undefined,
       NEO4J_USER: undefined,
       NEO4J_PASSWORD: undefined,
@@ -52,6 +72,9 @@ describe('config', () => {
 
   it('uses environment overrides', async () => {
     const restoreEnv = setEnv({
+      DOTENV_CONFIG_PATH: emptyEnvPath,
+      WEB_APP_PORT: '5678',
+      PORT: '9999',
       NEO4J_URI: 'bolt://example:7687',
       NEO4J_USER: 'user',
       NEO4J_PASSWORD: 'pass',
@@ -80,6 +103,7 @@ describe('config', () => {
       jest.resetModules();
       const { config } = await import('../../src/lib/config');
 
+      expect(config.port).toBe(5678);
       expect(config.neo4j.uri).toBe('bolt://example:7687');
       expect(config.ai.provider).toBe('google');
       expect(config.ai.simpleProvider).toBe('xai');
@@ -95,6 +119,9 @@ describe('config', () => {
 
   it('uses defaults when running in browser context', async () => {
     const restoreEnv = setEnv({
+      DOTENV_CONFIG_PATH: emptyEnvPath,
+      WEB_APP_PORT: undefined,
+      PORT: undefined,
       NEO4J_URI: undefined,
       NEO4J_USER: undefined,
       NEO4J_PASSWORD: undefined,

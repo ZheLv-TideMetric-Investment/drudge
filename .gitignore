@@ -6,10 +6,20 @@ node_modules/
 
 # 环境配置
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*
 !.env.example
 
 # 包级别环境变量
 packages/*/.env
+packages/*/.env.local
+packages/*/.env.development.local
+packages/*/.env.test.local
+packages/*/.env.production.local
+packages/*/.env.*
 !packages/*/.env.example
 
 # 日志

@@ -299,6 +299,9 @@ importers:
 
   shared/common:
     dependencies:
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       ts-enum-util:
         specifier: ^4.1.0
         version: 4.1.0

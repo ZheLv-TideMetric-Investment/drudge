@@ -34,7 +34,8 @@ describe('graph-worker config', () => {
     const failedDir = path.join(os.tmpdir(), 'drudge-failed');
 
     const config = await loadConfig({
-      PORT: '4000',
+      GRAPH_WORKER_PORT: '4000',
+      PORT: '9999',
       NEWS_DIRECTORY: newsDir,
       FAILED_NEWS_DIRECTORY: failedDir,
       NEO4J_URI: 'bolt://example:7687',
@@ -83,6 +84,7 @@ describe('graph-worker config', () => {
 
   it('falls back to defaults when env is missing', async () => {
     const config = await loadConfig({
+      GRAPH_WORKER_PORT: undefined,
       PORT: undefined,
       NEWS_DIRECTORY: undefined,
       FAILED_NEWS_DIRECTORY: undefined,

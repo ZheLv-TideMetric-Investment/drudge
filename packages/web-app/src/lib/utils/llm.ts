@@ -1,7 +1,7 @@
 // AI SDK imports
 import { generateObject, generateText } from 'ai';
-import { deepseek } from '@ai-sdk/deepseek';
-import { google } from '@ai-sdk/google';
+import { createDeepSeek } from '@ai-sdk/deepseek';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import {
   buildLLMLogMeta,
@@ -629,17 +629,15 @@ class AiService {
         if (!config.ai.deepseek.apiKey) {
           throw new Error('DeepSeek API Key 未配置');
         }
-        // 设置环境变量给DeepSeek SDK使用
-        process.env.DEEPSEEK_API_KEY = config.ai.deepseek.apiKey;
-        return deepseek(config.ai.deepseek.model);
+        return createDeepSeek({ apiKey: config.ai.deepseek.apiKey }).chat(config.ai.deepseek.model);
 
       case 'google':
         if (!config.ai.google.apiKey) {
           throw new Error('Google API Key 未配置');
         }
-        // 设置环境变量给Google SDK使用
-        process.env.GOOGLE_GENERATIVE_AI_API_KEY = config.ai.google.apiKey;
-        return google(config.ai.google.model);
+        return createGoogleGenerativeAI({ apiKey: config.ai.google.apiKey }).chat(
+          config.ai.google.model
+        );
 
       case 'qwen':
         if (!config.ai.qwen.apiKey) {

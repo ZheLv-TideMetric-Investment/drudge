@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 const cron = require('node-cron');
 const axios = require('axios');
-const { BEIJING_TIMEZONE } = require('@drudge/common');
+const { BEIJING_TIMEZONE, buildWebConfig } = require('@drudge/common');
+
+const appConfig = buildWebConfig({ loadEnv: true });
 const beijingFormatter = new Intl.DateTimeFormat('zh-CN', {
   timeZone: BEIJING_TIMEZONE,
   year: 'numeric',
@@ -84,7 +86,7 @@ class CronScheduler {
     this.taskStatus = new Map();
 
     // 构建API基础URL
-    const port = process.env.PORT || 39112;
+    const port = appConfig.port || 39112;
     this.apiBaseUrl = `http://localhost:${port}/api`;
 
     console.log(`[CronScheduler] 初始化定时器调度器，API地址: ${this.apiBaseUrl}`);

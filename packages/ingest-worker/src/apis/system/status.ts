@@ -3,6 +3,7 @@ import futuLiveService from '../../services/FutuLiveService';
 import awtmtLiveService from '../../services/AwtmtLiveService';
 import fileStorage from '../../storage/FileStorage';
 import { logErrorWithDetails } from '../../utils/error';
+import config from '../../config/config';
 
 /**
  * 获取系统状态
@@ -57,6 +58,6 @@ export async function healthCheck(): Promise<any> {
     service: 'ingest-worker',
     sources: ['futu_live', 'awtmt_live'],
     timestamp: new Date().toISOString(),
-    port: process.env.PORT || 39110,
+    port: config.port,
   };
 }
