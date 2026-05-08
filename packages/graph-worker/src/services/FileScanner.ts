@@ -68,7 +68,9 @@ export async function scanUnprocessedFiles(): Promise<FileInfo[]> {
     }
 
     logger.debug(`📄 找到 ${newsFiles.length} 个未处理的新闻文件`);
-    return newsFiles.sort((a, b) => a.modifiedTime.getTime() - b.modifiedTime.getTime());
+
+    // Keep near-real-time summaries useful even when a large historical backlog exists.
+    return newsFiles.sort((a, b) => b.modifiedTime.getTime() - a.modifiedTime.getTime());
   } catch (error) {
     logger.error('扫描新闻文件失败:', error);
     throw error;

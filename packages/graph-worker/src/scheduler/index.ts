@@ -10,6 +10,7 @@ import { getCurrentTime } from '../utils/timeUtils';
 export class SchedulerService {
   private initialized: boolean = false;
   private tasks: Map<string, any> = new Map();
+  private isProcessing: boolean = false;
 
   /**
    * 初始化调度器
@@ -62,7 +63,9 @@ export class SchedulerService {
           const duration = Date.now() - startTime;
 
           if (result.success) {
-            if (result.processed > 0) {
+            if (result.skipped) {
+              logger.warn(`⏭️ 定时任务：${result.message}，耗时${duration}ms`);
+            } else if (result.processed > 0) {
               logger.info(
                 `✅ 定时任务：图谱化完成，处理${result.processed}个文件，耗时${duration}ms`
               );
@@ -92,6 +95,18 @@ export class SchedulerService {
    * 扫描并处理新闻文件
    */
   private async scanAndProcessNews(): Promise<any> {
+    if (this.isProcessing) {
+      logger.warn('⏭️ 上一轮新闻图谱化仍在运行，跳过本轮扫描');
+      return {
+        success: true,
+        processed: 0,
+        skipped: true,
+        message: '上一轮扫描仍在运行',
+      };
+    }
+
+    this.isProcessing = true;
+
     try {
       // 动态导入避免循环依赖
       const { scanUnprocessedFiles } = await import('../services/FileScanner');
@@ -108,10 +123,26 @@ export class SchedulerService {
         };
       }
 
-      logger.info(`📄 发现 ${unprocessedFiles.length} 个未处理的新闻文件`);
+      const maxFilesPerScan = Math.max(
+        1,
+        Number.parseInt(
+          process.env.GRAPH_MAX_FILES_PER_SCAN || process.env.MAX_FILES_PER_SCAN || '200',
+          10
+        ) || 200
+      );
+      const filesToProcess = unprocessedFiles.slice(0, maxFilesPerScan);
+      const remainingFiles = unprocessedFiles.length - filesToProcess.length;
 
-      // 并行处理文件
-      const results = await processNewsFilesInParallel(unprocessedFiles);
+      logger.info(
+        `📄 发现 ${unprocessedFiles.length} 个未处理的新闻文件，本轮处理 ${filesToProcess.length} 个`
+      );
+
+      if (remainingFiles > 0) {
+        logger.warn(`⏳ 仍有 ${remainingFiles} 个文件留待后续扫描处理`);
+      }
+
+      // 并行处理本轮文件
+      const results = await processNewsFilesInParallel(filesToProcess);
 
       const successful = results.filter(r => r.success).length;
       const failed = results.filter(r => !r.success).length;
@@ -120,7 +151,8 @@ export class SchedulerService {
         success: true,
         processed: successful,
         failed,
-        total: unprocessedFiles.length,
+        total: filesToProcess.length,
+        remaining: remainingFiles,
         message: `成功处理 ${successful} 个文件${failed > 0 ? `，失败 ${failed} 个` : ''}`,
       };
     } catch (error: any) {
@@ -129,6 +161,8 @@ export class SchedulerService {
         success: false,
         error: error.message,
       };
+    } finally {
+      this.isProcessing = false;
     }
   }
 

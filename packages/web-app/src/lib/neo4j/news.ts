@@ -33,10 +33,12 @@ class Neo4jNewsService {
       // 转换北京时间为UTC时间进行数据库查询
       const utcStartTime = TimeZoneUtils.toUTC(startTime);
       const utcEndTime = TimeZoneUtils.toUTC(endTime);
+      const processedStartTime = new Date(utcStartTime).getTime();
+      const processedEndTime = new Date(utcEndTime).getTime();
 
-      const cypher = `
+      const buildSummaryQuery = (whereClause: string) => `
         MATCH (n:${NodeType.NEWS})
-        WHERE n.timestamp >= $startTime AND n.timestamp <= $endTime
+        WHERE ${whereClause}
         OPTIONAL MATCH (n)-[:${SystemRelationshipType.DESCRIBES}]->(e:${NodeType.EVENT})
         OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(c:${NodeType.COMPANY})
         OPTIONAL MATCH (e)-[:${RelationshipType.PARTICIPATES_IN}]-(p:${NodeType.PERSON})
@@ -61,10 +63,29 @@ class Neo4jNewsService {
           }) as news_items
       `;
 
-      const result = await neo4jConnection.executeQuery(cypher, {
+      let result = await neo4jConnection.executeQuery(buildSummaryQuery('n.timestamp >= $startTime AND n.timestamp <= $endTime'), {
         startTime: utcStartTime,
         endTime: utcEndTime
       });
+
+      let record = result.records[0];
+      let newsCount = record?.get('news_count')?.toNumber() || 0;
+
+      if (newsCount === 0) {
+        console.warn(
+          `按新闻时间未找到数据，改用 processedAt 查询: ${utcStartTime} - ${utcEndTime}`
+        );
+
+        result = await neo4jConnection.executeQuery(
+          buildSummaryQuery('n.processedAt >= $processedStartTime AND n.processedAt < $processedEndTime'),
+          {
+            processedStartTime,
+            processedEndTime
+          }
+        );
+        record = result.records[0];
+        newsCount = record?.get('news_count')?.toNumber() || 0;
+      }
 
       if (result.records.length === 0) {
         return {
@@ -80,9 +101,8 @@ class Neo4jNewsService {
         };
       }
 
-      const record = result.records[0];
       return {
-        news_count: record.get('news_count').toNumber(),
+        news_count: newsCount,
         event_count: record.get('event_count').toNumber(),
         high_level_count: record.get('high_level_count').toNumber(),
         critical_count: record.get('critical_count').toNumber(),
