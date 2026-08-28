@@ -29,63 +29,110 @@
 
 ---
 
-## 1. 仓库专用配置（可选维护）
+## 1. Drudge 仓库专用规则（优先级最高）
 
-> 本节用于“每个仓库不同情况”的扩展与覆盖。首次接入时请尽快补齐。
-> Agent 必须优先读取本节；若为空，则按第 2/3 节自动探测。
+> 本节是 Drudge 的事实入口。若与后面的通用模板、`README.md` 或旧注释冲突，先以当前代码、`package.json`、测试配置和本节为准；发布操作以 `docs/deployment.md` 为准，并在执行前重新核验动态环境。
 
 ### 1.1 关键命令
 
-
-- **安装依赖**：``
-- **构建/编译**：``
-- **运行测试**：``
-- **单测（快速）**：``
-- **lint**：``
-- **format**：``
-- **typecheck**：``
-- **本地运行/启动**：``
-- **生成制品/发布**：``
-- **端到端 / UI 验证（可选）**：``（例如：Playwright/Cypress；若不用自动化则留空）
+- **安装依赖**：`pnpm install --frozen-lockfile`
+- **构建/编译**：`pnpm run build`
+- **运行全部测试**：`pnpm run test`
+- **单包测试（快速）**：
+  - `pnpm --filter @drudge/ingest-worker run test -- --runInBand`
+  - `pnpm --filter @drudge/graph-worker run test -- --runInBand`
+  - `pnpm --filter web run test -- --runInBand`
+- **lint**：`pnpm run lint:env && pnpm run lint`
+- **format 检查/修复**：`pnpm run format:check` / `pnpm run format`
+- **typecheck**：没有独立根脚本；两个 worker 的 `tsc` 和 Web 的 Next build 已包含在 `pnpm run build` 中
+- **本地运行**：`pnpm run dev` 会同时启动采集、图谱和 Web，可能访问真实新闻源、写入数据、调用 AI 或发送通知；默认只启动目标包，并先使用隔离配置。仅看 UI 时用 `pnpm --filter web run dev`。
+- **生成制品/发布**：严格遵循 [`docs/deployment.md`](docs/deployment.md)；未经本次明确批准，不得 commit、push、部署或重启服务
+- **端到端 / UI 验证**：仓库当前没有 Playwright/Cypress；涉及 UI 时启动 Web 包并用真实浏览器验证页面、Console 和失败请求
+- **禁止作为日常检查执行**：`pnpm run clean`、`pnpm run clean:neo4j`、Graph CLI 的清库/清理命令、采集清理 API、`start.sh`、`docker-compose down/up`
 
 ### 1.2 代码风格与规范
 
-- 语言/框架：``
-- 主要代码风格参考目录（例如 `src/`、`lib/`）：``
-- 关键规范文件（存在则填）：
-  - `CONTRIBUTING.md`：``
-  - `STYLEGUIDE.md` / `coding-standards`：``
-  - `eslint/prettier/ruff/black/gofmt` 等：``
-- 约定：
-  - 错误处理：``
-  - 日志：``
-  - 配置：``
-  - 测试风格：``
+- **语言/框架**：pnpm workspace；Node.js/TypeScript；Express 5 worker；Next.js 15.3.5 + React 18 Web；Neo4j 5；Jest 29
+- **主要代码目录**：`packages/ingest-worker/src/`、`packages/graph-worker/src/`、`packages/web-app/src/`、`shared/common/`
+- **规范文件**：根 `.eslintrc.js`、`.prettierrc.js`、各包 `tsconfig*.json` 和 `jest.config.ts`；仓库暂无 `CONTRIBUTING.md`/`STYLEGUIDE.md`
+- **错误处理**：沿用边界层的 `try/catch`、结构化 API 错误和 worker 日志；不要吞掉会影响数据一致性或发布验收的错误
+- **日志**：worker 主要使用 Winston，Web 仍有 `console`；不得记录 API Key、密码、完整 Webhook URL 或私人新闻正文。现有代码中打印 URL 的做法不是可复制规范
+- **配置**：根 `.env` 是唯一运行配置入口，模板为 `env.example`；通过 `@drudge/common` 的 `buildIngestConfig`、`buildGraphConfig`、`buildWebConfig` 读取。不要在包目录新增 `.env`，不要绕过 `pnpm run lint:env`
+- **测试风格**：Jest + `ts-jest`；测试默认禁网，并禁止写入仓库 `data/`、`neo4j/` 和 `/var/lib`。新增测试继续写临时目录并 mock 网络/数据库/通知
+- **覆盖率**：三个包的 CI 配置均声明全局 lines/branches/functions/statements 95%；普通 `pnpm run test` 不采集覆盖率，覆盖率验收用各包 `test:ci`
+- **文档漂移**：`README.md` 和 `PROJECT_LOGIC.md` 可用于理解背景，但已有版本号、环境变量或运行命令过时的可能；改动前以源码和清单复核，不把旧文档直接当生产事实
 
 ### 1.3 启用的扩展模块
 
 > 勾选后，Agent 必须遵循对应扩展章节的规则。
-- [ ] EXT: Monorepo（多包/多语言）
-- [ ] EXT: Backend Service（后端服务）
-- [ ] EXT: Frontend/Web（前端/网页）
+
+- [x] EXT: Monorepo（多包/多语言）
+- [x] EXT: Backend Service（后端服务）
+- [x] EXT: Frontend/Web（前端/网页）
 - [ ] EXT: Mobile（移动端）
 - [ ] EXT: Library/SDK（类库/SDK）
 - [ ] EXT: Data/ML（数据/机器学习）
-- [ ] EXT: Infra/IaC（基础设施/部署）
-- [ ] EXT: Security-sensitive（高安全敏感：鉴权/支付/密钥/合规）
+- [x] EXT: Infra/IaC（基础设施/部署）
+- [x] EXT: Security-sensitive（API Key、Webhook、数据库凭据和私人新闻内容）
 - [ ] EXT: Performance-critical（性能敏感/低延迟）
-- [ ] EXT: Legacy/Compatibility（强兼容/历史包袱）
+- [x] EXT: Legacy/Compatibility（历史脚本、Compose 文件、文档和已合并分支待后续收口）
 
 ### 1.4 前端页面验证配置
 
 > 若本仓库涉及 UI/页面展示，请尽量补齐，以便 Agent 稳定复用 “已登录环境 + 截图证据” 完成验证。
 
-- **UI_BASE_URL（开发或测试环境地址）**：``
-- **需要验证的关键页面/路由**：``
-- **页面稳定判定的关键选择器**：``
-- **默认截图输出目录**：``
-- **默认视口**：``
-- **登录策略**：复杂登录（SSO/2FA/验证码/风控）时，**默认复用用户已登录的 Chrome 会话**；不要求自动化登录（如需自动化另行说明）
+- **UI_BASE_URL（本地）**：`http://127.0.0.1:39112`
+- **关键页面/路由**：`/`、`/news`、`/graph`、`/stats`、`/monitor`、`/summary`、`/tingzi`
+- **页面稳定判定**：页面主标题可见（如“新闻浏览”“知识图谱”）且关键查询完成；同时检查 Console 和失败请求
+- **默认截图输出目录**：`artifacts/ui/`
+- **默认视口**：`1440x900`
+- **登录策略**：源码中未发现登录/鉴权层；如后续增加，以真实环境复核为准
+- **副作用边界**：首页操作、`POST /api/scan`、`POST /api/scheduler`、`POST /api/tingzi` 以及带通知参数的摘要请求可能调用 AI、查询生产图谱或发送外部消息。UI 验证默认只读；未经明确授权不得点击触发、构造请求或启动 `web-scheduler`
+
+### 1.5 系统用途与主链路
+
+Drudge 是一个实时财经快讯采集、AI 结构化、知识图谱查询和消息通知系统。当前主链路是：
+
+```text
+富途快讯 + AWTMT（华尔街见闻）
+  -> ingest-worker 每分钟拉取、按来源 ID 去重并写入 data/news/*.json
+  -> graph-worker 每分钟扫描未处理文件，调用 LLM 抽取实体/事件/关系
+  -> Neo4j 保存 News、Company、Person、Organization、Event 等节点和关系
+  -> web-app 查询图谱，展示新闻/关系/统计，生成分级摘要并按配置发送机器人通知
+```
+
+- `packages/ingest-worker`：Futu/AWTMT 数据源、文件存储、采集 API、采集调度和失败告警
+- `packages/graph-worker`：文件扫描、AI 实体抽取、失败新闻队列、Neo4j 写入、查询 API 和图谱调度
+- `packages/web-app`：Next 页面/API、图谱查询、Level 1 扫描、摘要、婷子机器人和独立 `web-scheduler`
+- `shared/common`：北京时间、枚举、LLM/通知辅助和三个服务的集中环境变量解析
+- `packages/graph-worker/src/services/Neo4jService.ts`：当前索引与约束的实际创建入口；数据模型变更必须单独评估迁移与回滚
+- 当前未发现《华尔街日报》（WSJ）的独立采集实现；`test-news-data.json` 正文中出现 WSJ 只是测试新闻内容，不代表数据源接入
+
+### 1.6 数据、密钥和运行态保护边界
+
+- `.env`、`data/`、`old_data/`、`neo4j/`、日志、`*.bak-*`、PM2 状态及容器卷不是“仓库垃圾”，不得因代码整理而读取正文、移动、覆盖、提交或删除
+- `data/news/.processed/*.processed` 是 graph-worker 的消费位点；删除会导致历史文件重新处理。`data/news/failed/` 是失败重试证据，也不得随意清理
+- `FileStorage.cleanOldFiles`、失败新闻清理、Graph CLI 清理命令和 `Neo4jService.clearDatabase` 都是业务数据删除能力；只有单独、精确、可回滚的用户授权才可调用
+- 所有 API Key、数据库密码和 Webhook 只保存在环境变量；示例、测试、日志、截图、diff 和文档中均不得出现真实值
+- 测试必须沿用 `tests/setup.ts` 的禁网和生产路径保护，不得为了“方便测试”关闭这些 guard
+
+### 1.7 GitHub 与 PVE 发布边界
+
+- GitHub 是共享代码基线和审计中转；PVE 是生产运行环境。发布成功要求本地、GitHub `main` 和 PVE 的 commit/tree SHA 一致，而不只是“代码看起来一样”
+- 完整流程、预检、停止条件和回滚见 [`docs/deployment.md`](docs/deployment.md)。发布前动态确认 PVE 容器 ID、分支、旧 SHA、tracked 状态和进程，不把文档中的动态值视为永久事实
+- 每次外部写入使用一个目标 SHA 固定、命令固定的 `DRUDGE-DEPLOY-*` CHANGE_ID。只有用户批准该 ID 后才能 push、传输 Git 对象、构建或重启；命令、目标或范围变化必须重新批准
+- PVE 只通过既有 `ssh home-pve` 链路操作；不自动重试、不切换 SSH/HTTPS 等备用方案、不解决冲突、不 force push
+- 日常应用发布只重启 `ingest-worker`、`graph-worker`、`web-app`、`web-scheduler`。Neo4j Docker 容器、数据库、卷和宿主机系统不在该链路内
+- 自动化重启使用包级 `pm2:restart` 并逐项检查；不要把根 `pm2-manager.cjs` 的“全部重启”当严格失败门，因为它会捕获单应用错误后继续
+- 未经明确授权，不 commit、不 push、不部署、不发机器人消息；必须区分静态检查、本地运行、GitHub 已更新、PVE 已生效四层证据
+
+### 1.8 后续仓库整理规则
+
+整理前先输出清单并将每项分类为：当前源码、构建产物、运行态数据、密钥配置、历史文档/脚本、已合并分支或未知用途。先确认引用和生产依赖，再提出最小删除批次。
+
+当前仅登记、尚未授权删除的候选包括：已合并 `feature/*`/`fix/*` 分支、两个 Compose 文件、`start.sh`、`test-news-data.json`、可能过时的 README/PROJECT_LOGIC 段落，以及仅存在于 PVE 的 `old_data/`/备份文件。最后一类默认保留，不进入普通仓库清理。
+
+任何清理都必须先展示精确目标、依据、影响、验证和恢复方式，单独取得批准；不使用宽泛 glob、`git clean`、`rm -rf`、`git reset --hard`，并保留用户现有未提交改动。
 
 ---
 
@@ -144,6 +191,7 @@
 > “完成”必须可验证，且与仓库标准一致。
 
 最少满足：
+
 1. **实现满足需求**（功能/修复点明确）
 2. **新增或更新测试**（能覆盖关键路径与边界条件；若仓库无测试框架则至少提供可复现脚本/最小验证方式）
 3. **通过本仓库常规检查**
@@ -228,6 +276,7 @@
 当任务影响 UI 展示/交互效果时，必须按以下流程使用 **MCP server：优先使用`chrome-devtools`** 验证并产出证据（截图 + Console 结论）。本仓库登录环境可能复杂（SSO/2FA/验证码/风控），默认策略是**复用用户已登录的 Chrome 会话**，不强制自动化登录。
 
 **必须触发验证的改动类型：**
+
 - CSS/布局/主题/响应式/动效
 - 组件渲染结构、文案溢出、图标
 - 路由、权限/登录态相关的显示差异
@@ -235,15 +284,17 @@
 - 修复“页面空白/样式错乱/按钮不可用/控制台报错/资源加载失败”等问题
 
 **推荐执行流程（思路必须一致）：**
-1) 优先复用用户已登录标签页（复杂登录场景更稳定）
-2) 导航到目标 URL
-3) 等待页面稳定（关键元素出现、loading 消失、关键请求完成）
-4) 截图保存到 `artifacts/ui/<页面>-<场景>-<viewport>.png`（或仓库约定目录）
-5) 读取 Console：
+
+1. 优先复用用户已登录标签页（复杂登录场景更稳定）
+2. 导航到目标 URL
+3. 等待页面稳定（关键元素出现、loading 消失、关键请求完成）
+4. 截图保存到 `artifacts/ui/<页面>-<场景>-<viewport>.png`（或仓库约定目录）
+5. 读取 Console：
    - 若出现 error/uncaught/rejected：必须记录要点并定位原因
-6) 若页面资源加载异常：再检查网络失败请求（如 MCP 工具支持）
+6. 若页面资源加载异常：再检查网络失败请求（如 MCP 工具支持）
 
 **输出要求（做完 UI 相关任务必须包含）：**
+
 - 验证 URL + 环境（dev/staging）
 - 验证场景（登录态/权限/主题/语言/视口）
 - 截图路径列表
@@ -329,6 +380,7 @@
 ## 8. 输出规范（Agent 交付内容）
 
 交付时请提供：
+
 - 做了什么改动（概述）
 - 关键设计/取舍（为什么选择这个简单方案）
 - 如何验证（具体命令与结果）
