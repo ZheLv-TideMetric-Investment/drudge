@@ -4,6 +4,7 @@ import config from '../config/config';
 import fileStorage, { NewsItem } from '../storage/FileStorage';
 import notificationService from './NotificationService';
 import { logErrorWithDetails } from '../utils/error';
+import { ApiFailureAlertTracker } from '../utils/apiFailureAlert';
 
 /**
  * 随机生成 User-Agent
@@ -42,6 +43,8 @@ export class AwtmtLiveService {
   private lastRequestTime: number = 0;
   private minRequestInterval: number = 2000; // 最小请求间隔 2 秒
   private baseUrl: string = 'https://api-one-wscn.awtmt.com/apiv1/content/lives';
+  private failureAlertTracker = new ApiFailureAlertTracker('AWTMT新闻API');
+  private lastRequestFailedByTimeout: boolean = false;
 
   /**
    * 过滤新新闻
@@ -144,16 +147,24 @@ export class AwtmtLiveService {
       });
 
       this.lastRequestTime = Date.now();
+      this.lastRequestFailedByTimeout = false;
+      this.failureAlertTracker.recordSuccess();
       return response;
     } catch (error: any) {
       const errorDetails = logErrorWithDetails('[AWTMT] 请求AWTMT新闻API失败:', error, {
         params,
         cursor,
       });
+      const isTimeoutError = this.failureAlertTracker.isTimeoutError(error);
+      this.lastRequestFailedByTimeout = isTimeoutError;
 
       // 发送API失败通知
       try {
-        await notificationService.sendNewsApiFailureNotification(`[AWTMT] ${errorDetails.message}`);
+        if (!isTimeoutError || this.failureAlertTracker.shouldNotifyTimeout(errorDetails.message)) {
+          await notificationService.sendNewsApiFailureNotification(
+            `[AWTMT] ${errorDetails.message}`
+          );
+        }
       } catch (notifyError) {
         logger.error('[AWTMT] 发送API失败通知失败:', notifyError);
       }
@@ -187,10 +198,12 @@ export class AwtmtLiveService {
           logger.error(`❌ ${errorMsg}`);
 
           // 发送API响应格式错误通知
-          try {
-            await notificationService.sendNewsApiFailureNotification(errorMsg);
-          } catch (notifyError) {
-            logger.error('[AWTMT] 发送API响应格式错误通知失败:', notifyError);
+          if (!this.lastRequestFailedByTimeout) {
+            try {
+              await notificationService.sendNewsApiFailureNotification(errorMsg);
+            } catch (notifyError) {
+              logger.error('[AWTMT] 发送API响应格式错误通知失败:', notifyError);
+            }
           }
 
           return [];

@@ -54,6 +54,8 @@ describe('graph-worker config', () => {
       XAI_MODEL: 'grok-test',
       XAI_PROXY_URL: 'http://proxy',
       BATCH_SIZE: '12',
+      GRAPH_MAX_FILES_PER_SCAN: '25',
+      MAX_FILES_PER_SCAN: '99',
       RETRY_ATTEMPTS: '4',
       RETRY_DELAY: '1500',
       EXTRACTION_CHUNK_SIZE: '9',
@@ -77,6 +79,7 @@ describe('graph-worker config', () => {
     expect(config.neo4j.uri).toBe('bolt://example:7687');
     expect(config.ai.provider).toBe('deepseek');
     expect(config.processing.batchSize).toBe(12);
+    expect(config.processing.maxFilesPerScan).toBe(25);
     expect(config.processing.memory.enableAutoGC).toBe(false);
     expect(config.notification.enableWebhookNotification).toBe(true);
     expect(config.logging.format).toBe('json');
@@ -104,6 +107,8 @@ describe('graph-worker config', () => {
       XAI_MODEL: undefined,
       XAI_PROXY_URL: undefined,
       BATCH_SIZE: undefined,
+      GRAPH_MAX_FILES_PER_SCAN: undefined,
+      MAX_FILES_PER_SCAN: undefined,
       RETRY_ATTEMPTS: undefined,
       RETRY_DELAY: undefined,
       EXTRACTION_CHUNK_SIZE: undefined,
@@ -124,7 +129,17 @@ describe('graph-worker config', () => {
     expect(config.port).toBe(39111);
     expect(config.neo4j.uri).toBe('bolt://localhost:7687');
     expect(config.processing.batchSize).toBe(10);
+    expect(config.processing.maxFilesPerScan).toBe(200);
     expect(config.processing.memory.enableAutoGC).toBe(true);
     expect(config.notification.enableWebhookNotification).toBe(false);
+  });
+
+  it('supports the legacy max files per scan variable', async () => {
+    const config = await loadConfig({
+      GRAPH_MAX_FILES_PER_SCAN: undefined,
+      MAX_FILES_PER_SCAN: '15'
+    });
+
+    expect(config.processing.maxFilesPerScan).toBe(15);
   });
 });

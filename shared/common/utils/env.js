@@ -222,6 +222,10 @@ const buildGraphConfig = (options = {}) => {
     },
     processing: {
       batchSize: readInt(env, 'BATCH_SIZE', 10),
+      maxFilesPerScan: Math.max(
+        1,
+        readInt(env, 'GRAPH_MAX_FILES_PER_SCAN', readInt(env, 'MAX_FILES_PER_SCAN', 200))
+      ),
       retryAttempts: readInt(env, 'RETRY_ATTEMPTS', 3),
       retryDelay: readInt(env, 'RETRY_DELAY', 1000),
       memory: {

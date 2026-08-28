@@ -4,6 +4,7 @@ import config from '../config/config';
 import fileStorage, { NewsItem } from '../storage/FileStorage';
 import notificationService from './NotificationService';
 import { logErrorWithDetails } from '../utils/error';
+import { ApiFailureAlertTracker } from '../utils/apiFailureAlert';
 
 /**
  * 随机生成 User-Agent
@@ -41,6 +42,8 @@ export class FutuLiveService {
   private isFirstRun: boolean = true;
   private lastRequestTime: number = 0;
   private minRequestInterval: number = 2000; // 最小请求间隔 2 秒
+  private failureAlertTracker = new ApiFailureAlertTracker('富途新闻API');
+  private lastRequestFailedByTimeout: boolean = false;
 
   /**
    * 转换富途数据格式为标准NewsItem格式
@@ -140,16 +143,22 @@ export class FutuLiveService {
       });
 
       this.lastRequestTime = Date.now();
+      this.lastRequestFailedByTimeout = false;
+      this.failureAlertTracker.recordSuccess();
       return response;
     } catch (error: any) {
       const errorDetails = logErrorWithDetails('请求富途新闻API失败:', error, {
         params,
         seqMark,
       });
+      const isTimeoutError = this.failureAlertTracker.isTimeoutError(error);
+      this.lastRequestFailedByTimeout = isTimeoutError;
 
       // 发送API失败通知
       try {
-        await notificationService.sendNewsApiFailureNotification(errorDetails.message, undefined);
+        if (!isTimeoutError || this.failureAlertTracker.shouldNotifyTimeout(errorDetails.message)) {
+          await notificationService.sendNewsApiFailureNotification(errorDetails.message, undefined);
+        }
       } catch (notifyError) {
         logger.error('发送API失败通知失败:', notifyError);
       }
@@ -177,10 +186,12 @@ export class FutuLiveService {
           logger.error(`❌ ${errorMsg}`);
 
           // 发送API响应格式错误通知
-          try {
-            await notificationService.sendNewsApiFailureNotification(errorMsg);
-          } catch (notifyError) {
-            logger.error('发送API响应格式错误通知失败:', notifyError);
+          if (!this.lastRequestFailedByTimeout) {
+            try {
+              await notificationService.sendNewsApiFailureNotification(errorMsg);
+            } catch (notifyError) {
+              logger.error('发送API响应格式错误通知失败:', notifyError);
+            }
           }
 
           return [];

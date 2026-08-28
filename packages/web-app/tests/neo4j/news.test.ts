@@ -125,13 +125,61 @@ describe('neo4j/news', () => {
   });
 
   it('returns empty stats for time range queries', async () => {
-    const toUTCSpy = jest.spyOn(TimeZoneUtils, 'toUTC').mockReturnValue('utc');
+    const toUTCSpy = jest
+      .spyOn(TimeZoneUtils, 'toUTC')
+      .mockImplementation((value: any) => String(value));
     executeQuery.mockResolvedValue({ records: [] });
 
-    const result = await neo4jNewsService.getNewsInTimeRange('start', 'end');
+    const result = await neo4jNewsService.getNewsInTimeRange(
+      '2024-01-01T00:00:00.000Z',
+      '2024-01-02T00:00:00.000Z'
+    );
 
     expect(result.news_count).toBe(0);
     expect(toUTCSpy).toHaveBeenCalled();
+    expect(executeQuery).toHaveBeenCalledTimes(2);
+    toUTCSpy.mockRestore();
+  });
+
+  it('falls back to processedAt when the news timestamp query is empty', async () => {
+    const toUTCSpy = jest
+      .spyOn(TimeZoneUtils, 'toUTC')
+      .mockImplementation((value: any) => String(value));
+    const emptyRecord = createRecord({
+      news_count: toNeo4jInt(0)
+    });
+    const fallbackRecord = createRecord({
+      news_count: toNeo4jInt(1),
+      event_count: toNeo4jInt(0),
+      high_level_count: toNeo4jInt(0),
+      critical_count: toNeo4jInt(0),
+      companies: [],
+      persons: [],
+      organizations: [],
+      locations: [],
+      news_items: [{ title: 'Fallback news' }]
+    });
+    executeQuery
+      .mockResolvedValueOnce({ records: [emptyRecord] })
+      .mockResolvedValueOnce({ records: [fallbackRecord] });
+
+    const result = await neo4jNewsService.getNewsInTimeRange(
+      '2024-01-01T00:00:00.000Z',
+      '2024-01-02T00:00:00.000Z'
+    );
+
+    expect(executeQuery).toHaveBeenCalledTimes(2);
+    const [fallbackQuery, fallbackParams] = executeQuery.mock.calls[1];
+    expect(fallbackQuery).toContain(
+      'n.processedAt >= $processedStartTime AND n.processedAt < $processedEndTime'
+    );
+    expect(fallbackParams).toEqual({
+      processedStartTime: Date.parse('2024-01-01T00:00:00.000Z'),
+      processedEndTime: Date.parse('2024-01-02T00:00:00.000Z')
+    });
+    expect(result.news_count).toBe(1);
+    expect(result.news_items).toEqual([{ title: 'Fallback news' }]);
+
     toUTCSpy.mockRestore();
   });
 

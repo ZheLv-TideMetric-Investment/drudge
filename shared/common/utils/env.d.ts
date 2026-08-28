@@ -68,6 +68,7 @@ export type GraphConfig = {
   };
   processing: {
     batchSize: number;
+    maxFilesPerScan: number;
     retryAttempts: number;
     retryDelay: number;
     memory: {

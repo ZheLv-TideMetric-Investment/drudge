@@ -1,5 +1,6 @@
 import * as cron from 'node-cron';
 import { BEIJING_TIMEZONE } from '@drudge/common';
+import config from '../config/config';
 import { logger } from '../utils/logger';
 import { getCurrentTime } from '../utils/timeUtils';
 
@@ -123,13 +124,7 @@ export class SchedulerService {
         };
       }
 
-      const maxFilesPerScan = Math.max(
-        1,
-        Number.parseInt(
-          process.env.GRAPH_MAX_FILES_PER_SCAN || process.env.MAX_FILES_PER_SCAN || '200',
-          10
-        ) || 200
-      );
+      const maxFilesPerScan = config.processing.maxFilesPerScan;
       const filesToProcess = unprocessedFiles.slice(0, maxFilesPerScan);
       const remainingFiles = unprocessedFiles.length - filesToProcess.length;
 

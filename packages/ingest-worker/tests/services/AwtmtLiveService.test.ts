@@ -465,6 +465,28 @@ describe('AwtmtLiveService', () => {
     }
   });
 
+  it('suppresses an initial Axios timeout alert and its response-format duplicate', async () => {
+    const service = createService();
+    const restoreTime = freezeTime('2024-01-01T00:00:01.000Z');
+    const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+    const error = Object.assign(new Error('timeout of 10000ms exceeded'), {
+      code: 'ECONNABORTED'
+    });
+    mockedAxios.get.mockRejectedValueOnce(error);
+
+    try {
+      const fetchPromise = service.fetchNews();
+      await jest.runAllTimersAsync();
+      const result = await fetchPromise;
+
+      expect(result).toEqual([]);
+      expect(mockNotification.sendNewsApiFailureNotification).not.toHaveBeenCalled();
+    } finally {
+      restoreTime();
+      randomSpy.mockRestore();
+    }
+  });
+
   it('healthCheck returns true for valid response', async () => {
     const service = createService();
     (service as any).makeRequest = jest.fn().mockResolvedValue({

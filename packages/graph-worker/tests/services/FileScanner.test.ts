@@ -55,15 +55,19 @@ describe('FileScanner', () => {
       await fs.promises.writeFile(recordFile, JSON.stringify({ fileName: path.basename(fileA) }));
 
       const fileTime = new Date('2024-01-01T00:00:00.000Z');
+      const fileBTime = new Date('2024-01-01T00:00:01.000Z');
+      const fileCTime = new Date('2024-01-01T00:00:02.000Z');
       const recordTime = new Date('2024-01-01T00:10:00.000Z');
       fs.utimesSync(fileA, fileTime, fileTime);
+      fs.utimesSync(fileB, fileBTime, fileBTime);
+      fs.utimesSync(fileC, fileCTime, fileCTime);
       fs.utimesSync(recordFile, recordTime, recordTime);
 
       const results = await scanUnprocessedFiles();
 
       expect(results.map((item) => item.fileName)).toEqual([
-        path.basename(fileB),
-        path.basename(fileC)
+        path.basename(fileC),
+        path.basename(fileB)
       ]);
     });
   });
