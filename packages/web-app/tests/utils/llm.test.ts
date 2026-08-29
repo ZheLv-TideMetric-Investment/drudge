@@ -166,7 +166,7 @@ describe('llm utils', () => {
   it('uses custom temperature for xai proxy text', async () => {
     config.ai.xai.proxyUrl = 'http://proxy';
     config.ai.xai.apiKey = 'key';
-    config.ai.xai.model = 'grok';
+    config.ai.xai.model = 'grok-4.3';
 
     (global as any).fetch = jest.fn().mockResolvedValue({
       ok: true,
@@ -181,6 +181,7 @@ describe('llm utils', () => {
 
     const body = JSON.parse((global as any).fetch.mock.calls[0][1].body);
     expect(body.temperature).toBe(0.2);
+    expect(body.reasoning_effort).toBe('none');
   });
 
   it('handles xai proxy error and JSON parsing', async () => {
@@ -694,7 +695,7 @@ describe('llm utils', () => {
     config.ai.google.apiKey = 'key';
     config.ai.google.model = 'google-model';
     config.ai.qwen.apiKey = 'key';
-    config.ai.qwen.model = 'qwen-model';
+    config.ai.qwen.model = 'qwen3.7-flash';
     config.ai.xai.apiKey = 'key';
     config.ai.xai.model = 'xai-model';
     config.ai.xai.proxyUrl = 'http://proxy';
@@ -706,8 +707,13 @@ describe('llm utils', () => {
 
     expect(deepseekModel).toBeDefined();
     expect(googleModel).toBeDefined();
-    expect(createOpenAI).toHaveBeenCalled();
-    expect(qwenModel).toEqual({ provider: 'openai', model: 'qwen-model' });
+    expect(createOpenAI).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        fetch: expect.any(Function)
+      })
+    );
+    expect(qwenModel).toEqual({ provider: 'openai', model: 'qwen3.7-flash' });
     expect(xaiModel).toEqual({ provider: 'openai', model: 'xai-model' });
   });
 

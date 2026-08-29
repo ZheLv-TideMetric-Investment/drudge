@@ -190,7 +190,7 @@ const buildGraphConfig = (options = {}) => {
         model: readString(
           env,
           'GRAPH_DEEPSEEK_MODEL',
-          readString(env, 'DEEPSEEK_MODEL', 'deepseek-reasoner')
+          readString(env, 'DEEPSEEK_MODEL', 'deepseek-v4-flash')
         ),
       },
       google: {
@@ -198,16 +198,16 @@ const buildGraphConfig = (options = {}) => {
         model: readString(
           env,
           'GRAPH_GOOGLE_MODEL',
-          readString(env, 'GOOGLE_MODEL', 'gemini-1.5-flash')
+          readString(env, 'GOOGLE_MODEL', 'gemini-2.5-flash-lite')
         ),
       },
       qwen: {
         apiKey: readString(env, 'GRAPH_QWEN_API_KEY', readString(env, 'QWEN_API_KEY', '')),
-        model: readString(env, 'GRAPH_QWEN_MODEL', readString(env, 'QWEN_MODEL', 'qwen-turbo')),
+        model: readString(env, 'GRAPH_QWEN_MODEL', readString(env, 'QWEN_MODEL', 'qwen3.7-flash')),
       },
       xai: {
         apiKey: readString(env, 'GRAPH_XAI_API_KEY', readString(env, 'XAI_API_KEY', '')),
-        model: readString(env, 'GRAPH_XAI_MODEL', readString(env, 'XAI_MODEL', 'grok-3-mini')),
+        model: readString(env, 'GRAPH_XAI_MODEL', readString(env, 'XAI_MODEL', 'grok-4.3')),
         proxyUrl: readString(env, 'GRAPH_XAI_PROXY_URL', readString(env, 'XAI_PROXY_URL', '')),
       },
     },
@@ -284,7 +284,7 @@ const buildWebConfig = (options = {}) => {
         model: readString(
           env,
           'WEB_DEEPSEEK_MODEL',
-          readString(env, 'DEEPSEEK_MODEL', 'deepseek-reasoner')
+          readString(env, 'DEEPSEEK_MODEL', 'deepseek-v4-flash')
         ),
         apiKey: readString(env, 'WEB_DEEPSEEK_API_KEY', readString(env, 'DEEPSEEK_API_KEY', '')),
       },
@@ -292,16 +292,16 @@ const buildWebConfig = (options = {}) => {
         model: readString(
           env,
           'WEB_GOOGLE_MODEL',
-          readString(env, 'GOOGLE_MODEL', 'gemini-1.5-flash')
+          readString(env, 'GOOGLE_MODEL', 'gemini-2.5-flash-lite')
         ),
         apiKey: readString(env, 'WEB_GOOGLE_API_KEY', readString(env, 'GOOGLE_API_KEY', '')),
       },
       qwen: {
-        model: readString(env, 'WEB_QWEN_MODEL', readString(env, 'QWEN_MODEL', 'qwen-max')),
+        model: readString(env, 'WEB_QWEN_MODEL', readString(env, 'QWEN_MODEL', 'qwen3.7-flash')),
         apiKey: readString(env, 'WEB_QWEN_API_KEY', readString(env, 'QWEN_API_KEY', '')),
       },
       xai: {
-        model: readString(env, 'WEB_XAI_MODEL', readString(env, 'XAI_MODEL', 'grok-4')),
+        model: readString(env, 'WEB_XAI_MODEL', readString(env, 'XAI_MODEL', 'grok-4.3')),
         apiKey: readString(env, 'WEB_XAI_API_KEY', readString(env, 'XAI_API_KEY', '')),
         proxyUrl: readString(env, 'WEB_XAI_PROXY_URL', readString(env, 'XAI_PROXY_URL', '')),
       },

@@ -1,5 +1,5 @@
 import { generateObject } from 'ai';
-import { deepseek } from '@ai-sdk/deepseek';
+import { createDeepSeek } from '@ai-sdk/deepseek';
 import { google } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import { z } from 'zod';
@@ -9,6 +9,7 @@ import notificationService from './NotificationService';
 import { LLMMessage, LLMCallOptions, LLMResponse } from '../types/index';
 import {
   buildLLMLogMeta,
+  createJsonBodyFetch,
   getLLMErrorMessage,
   normalizeLLMUsage,
   parseJsonContent,
@@ -87,7 +88,10 @@ export class AiService {
           throw new Error('DeepSeek模型配置不存在');
         }
         logger.info(`创建 DeepSeek 模型: ${config.ai.deepseek.model}`);
-        return deepseek(config.ai.deepseek.model);
+        return createDeepSeek({
+          apiKey: config.ai.deepseek.apiKey,
+          fetch: createJsonBodyFetch({ thinking: { type: 'disabled' } }),
+        })(config.ai.deepseek.model);
 
       case 'google':
         if (!config.ai.google?.model) {
@@ -104,6 +108,9 @@ export class AiService {
         const qwenOpenAI = createOpenAI({
           apiKey: config.ai.qwen.apiKey,
           baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          ...(config.ai.qwen.model.startsWith('qwen3')
+            ? { fetch: createJsonBodyFetch({ enable_thinking: false }) }
+            : {}),
         });
         logger.info(`创建 千问 模型: ${config.ai.qwen.model}`);
         return qwenOpenAI(config.ai.qwen.model);
@@ -309,6 +316,7 @@ export class AiService {
       })),
       temperature,
       response_format: { type: 'json_object' },
+      ...(config.ai.xai!.model === 'grok-4.3' ? { reasoning_effort: 'none' } : {}),
     };
 
     const abortController = new AbortController();

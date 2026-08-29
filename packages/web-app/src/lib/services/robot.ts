@@ -149,8 +149,13 @@ async function callXaiService(
     throw new Error(response.error || 'xAI 调用失败');
   }
 
-  // xAI 目前没有提供实际的 cost 信息，这里返回预估值
-  const estimatedCost = (response.usage?.totalTokens || 0) * (15 / 1000000); // 假设每token 15/1000000美元
+  // Grok 4.3 按输入/输出 Token 分开计价；若只有总量，则按较高的输出价保守估算。
+  const promptTokens = response.usage?.promptTokens || 0;
+  const completionTokens = response.usage?.completionTokens || 0;
+  const estimatedCost =
+    promptTokens || completionTokens
+      ? (promptTokens * 1.25 + completionTokens * 2.5) / 1_000_000
+      : ((response.usage?.totalTokens || 0) * 2.5) / 1_000_000;
 
   return {
     content: response.data || '',

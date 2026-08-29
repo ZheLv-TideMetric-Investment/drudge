@@ -6,8 +6,11 @@ import { setEnv } from '../helpers/env';
 
 const generateObject = jest.fn();
 const deepseekMock = jest.fn();
+const createDeepSeekMock = jest.fn((_options?: any) =>
+  jest.fn((...args: any[]) => deepseekMock(...args))
+);
 const googleMock = jest.fn();
-const createOpenAIMock = jest.fn(() => jest.fn());
+const createOpenAIMock = jest.fn((_options?: any) => jest.fn());
 const notificationService = {
   sendAiServiceFailureNotification: jest.fn().mockResolvedValue(undefined)
 };
@@ -21,7 +24,7 @@ jest.mock('ai', () => ({
 
 jest.mock('@ai-sdk/deepseek', () => ({
   __esModule: true,
-  deepseek: (...args: any[]) => deepseekMock(...args)
+  createDeepSeek: createDeepSeekMock
 }));
 
 jest.mock('@ai-sdk/google', () => ({
@@ -65,6 +68,10 @@ describe('AiService', () => {
   beforeEach(() => {
     generateObject.mockReset();
     deepseekMock.mockReset();
+    createDeepSeekMock.mockReset();
+    createDeepSeekMock.mockImplementation((_options?: any) =>
+      jest.fn((...args: any[]) => deepseekMock(...args))
+    );
     googleMock.mockReset();
     createOpenAIMock.mockReset();
     createOpenAIMock.mockImplementation(() => jest.fn());
@@ -218,6 +225,48 @@ describe('AiService', () => {
     restore();
   });
 
+  it('disables DeepSeek thinking mode for the low-cost path', async () => {
+    deepseekMock.mockReturnValue({ provider: 'deepseek' });
+
+    const { aiService, restore } = await loadService({
+      AI_PROVIDER: 'deepseek',
+      AI_FALLBACK_PROVIDER: '',
+      DEEPSEEK_API_KEY: 'deepseek-key',
+      DEEPSEEK_MODEL: 'deepseek-v4-flash'
+    });
+
+    await aiService.initialize();
+
+    expect(createDeepSeekMock).toHaveBeenCalledWith({
+      apiKey: 'deepseek-key',
+      fetch: expect.any(Function)
+    });
+    expect(deepseekMock).toHaveBeenCalledWith('deepseek-v4-flash');
+
+    const deepseekOptions = createDeepSeekMock.mock.calls[0]?.[0] as any;
+    const originalFetch = globalThis.fetch;
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true });
+    (globalThis as any).fetch = fetchMock;
+
+    try {
+      await deepseekOptions.fetch('https://example.invalid', {
+        method: 'POST',
+        body: JSON.stringify({
+          model: 'deepseek-v4-flash',
+          thinking: { type: 'enabled' }
+        })
+      });
+
+      const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(requestBody.thinking).toEqual({ type: 'disabled' });
+    } finally {
+      (globalThis as any).fetch = originalFetch;
+    }
+
+    aiService.reset();
+    restore();
+  });
+
   it('throws when provider missing', async () => {
     const restore = setEnv({
       DOTENV_CONFIG_PATH: emptyEnvPath
@@ -309,16 +358,34 @@ describe('AiService', () => {
       AI_PROVIDER: 'qwen',
       AI_FALLBACK_PROVIDER: '',
       QWEN_API_KEY: 'qwen-key',
-      QWEN_MODEL: 'qwen-test'
+      QWEN_MODEL: 'qwen3.7-flash'
     });
 
     await aiService.initialize();
 
     expect(createOpenAIMock).toHaveBeenCalledWith({
       apiKey: 'qwen-key',
-      baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1'
+      baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      fetch: expect.any(Function)
     });
-    expect(modelFn).toHaveBeenCalledWith('qwen-test');
+    expect(modelFn).toHaveBeenCalledWith('qwen3.7-flash');
+
+    const qwenOptions = createOpenAIMock.mock.calls[0]?.[0] as any;
+    const originalFetch = globalThis.fetch;
+    const fetchMock = jest.fn().mockResolvedValue({ ok: true });
+    (globalThis as any).fetch = fetchMock;
+
+    try {
+      await qwenOptions.fetch('https://example.invalid', {
+        method: 'POST',
+        body: JSON.stringify({ model: 'qwen3.7-flash', enable_thinking: true })
+      });
+
+      const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+      expect(requestBody.enable_thinking).toBe(false);
+    } finally {
+      (globalThis as any).fetch = originalFetch;
+    }
 
     aiService.reset();
     restore();
@@ -600,13 +667,14 @@ describe('AiService', () => {
       AI_PROVIDER: 'xai',
       AI_FALLBACK_PROVIDER: '',
       XAI_API_KEY: 'xai',
-      XAI_MODEL: 'grok-test',
+      XAI_MODEL: 'grok-4.3',
       XAI_PROXY_URL: 'http://proxy'
     });
 
     const result = await aiService.callLLMWithJsonResponse([{ role: 'user', content: 'hello' }]);
     expect(result.success).toBe(true);
     expect(result.data).toEqual({ foo: 1 });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).reasoning_effort).toBe('none');
 
     fetchMock.mockResolvedValueOnce({
       ok: true,

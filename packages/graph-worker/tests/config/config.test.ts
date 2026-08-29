@@ -78,6 +78,10 @@ describe('graph-worker config', () => {
     expect(config.dataSource.failedNewsDirectory).toBe(path.resolve(failedDir));
     expect(config.neo4j.uri).toBe('bolt://example:7687');
     expect(config.ai.provider).toBe('deepseek');
+    expect(config.ai.deepseek.model).toBe('deepseek-test');
+    expect(config.ai.google.model).toBe('gemini-test');
+    expect(config.ai.qwen.model).toBe('qwen-test');
+    expect(config.ai.xai.model).toBe('grok-test');
     expect(config.processing.batchSize).toBe(12);
     expect(config.processing.maxFilesPerScan).toBe(25);
     expect(config.processing.memory.enableAutoGC).toBe(false);
@@ -97,12 +101,16 @@ describe('graph-worker config', () => {
       NEO4J_DATABASE: undefined,
       AI_PROVIDER: undefined,
       AI_FALLBACK_PROVIDER: undefined,
+      GRAPH_DEEPSEEK_MODEL: undefined,
       DEEPSEEK_API_KEY: undefined,
       DEEPSEEK_MODEL: undefined,
+      GRAPH_GOOGLE_MODEL: undefined,
       GOOGLE_API_KEY: undefined,
       GOOGLE_MODEL: undefined,
+      GRAPH_QWEN_MODEL: undefined,
       QWEN_API_KEY: undefined,
       QWEN_MODEL: undefined,
+      GRAPH_XAI_MODEL: undefined,
       XAI_API_KEY: undefined,
       XAI_MODEL: undefined,
       XAI_PROXY_URL: undefined,
@@ -128,6 +136,10 @@ describe('graph-worker config', () => {
 
     expect(config.port).toBe(39111);
     expect(config.neo4j.uri).toBe('bolt://localhost:7687');
+    expect(config.ai.deepseek.model).toBe('deepseek-v4-flash');
+    expect(config.ai.google.model).toBe('gemini-2.5-flash-lite');
+    expect(config.ai.qwen.model).toBe('qwen3.7-flash');
+    expect(config.ai.xai.model).toBe('grok-4.3');
     expect(config.processing.batchSize).toBe(10);
     expect(config.processing.maxFilesPerScan).toBe(200);
     expect(config.processing.memory.enableAutoGC).toBe(true);

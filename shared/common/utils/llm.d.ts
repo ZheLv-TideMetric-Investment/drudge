@@ -26,6 +26,11 @@ export interface LLMResponse<T = unknown> {
 
 export function createMessages(systemPrompt: string, userPrompt: string): PromptMessage[];
 
+export function createJsonBodyFetch(
+  extraBody: Record<string, unknown>,
+  fetchImpl?: typeof globalThis.fetch
+): typeof globalThis.fetch;
+
 export function formatPromptFields(
   fields: Array<[string, string | number | boolean | null | undefined]>,
   options?: {

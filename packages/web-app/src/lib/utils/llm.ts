@@ -5,6 +5,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
 import {
   buildLLMLogMeta,
+  createJsonBodyFetch,
   createMessages,
   getLLMErrorMessage,
   normalizeLLMUsage,
@@ -257,6 +258,7 @@ export class ModelWrapper {
       // 基础性能参数 - 最强配置
       // max_completion_tokens: 32768, // 最大输出token数
       temperature,
+      ...(config.ai.xai!.model === 'grok-4.3' ? { reasoning_effort: 'none' } : {}),
       // top_p: 0.95, // 核采样，保持创造性和准确性的平衡
 
       // // 日志概率 - 获取模型置信度信息
@@ -399,6 +401,7 @@ export class ModelWrapper {
       // 基础性能参数 - 最强配置
       // max_completion_tokens: 32768, // 最大输出token数
       temperature,
+      ...(config.ai.xai!.model === 'grok-4.3' ? { reasoning_effort: 'none' } : {}),
       // top_p: 0.95, // 核采样，保持创造性和准确性的平衡
 
       // 日志概率 - 获取模型置信度信息
@@ -629,7 +632,10 @@ class AiService {
         if (!config.ai.deepseek.apiKey) {
           throw new Error('DeepSeek API Key 未配置');
         }
-        return createDeepSeek({ apiKey: config.ai.deepseek.apiKey }).chat(config.ai.deepseek.model);
+        return createDeepSeek({
+          apiKey: config.ai.deepseek.apiKey,
+          fetch: createJsonBodyFetch({ thinking: { type: 'disabled' } }),
+        }).chat(config.ai.deepseek.model);
 
       case 'google':
         if (!config.ai.google.apiKey) {
@@ -647,6 +653,9 @@ class AiService {
         const qwen = createOpenAI({
           apiKey: config.ai.qwen.apiKey,
           baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+          ...(config.ai.qwen.model.startsWith('qwen3')
+            ? { fetch: createJsonBodyFetch({ enable_thinking: false }) }
+            : {}),
         });
         return qwen(config.ai.qwen.model);
 

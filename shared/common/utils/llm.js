@@ -3,6 +3,40 @@ const createMessages = (systemPrompt, userPrompt) => [
   { role: 'user', content: userPrompt }
 ];
 
+const createJsonBodyFetch = (extraBody, fetchImpl) => {
+  const bodyOverrides =
+    extraBody && typeof extraBody === 'object' && !Array.isArray(extraBody)
+      ? { ...extraBody }
+      : {};
+
+  return async (input, init = {}) => {
+    const targetFetch = fetchImpl || globalThis.fetch;
+    if (typeof targetFetch !== 'function') {
+      throw new Error('fetch 不可用');
+    }
+
+    if (typeof init.body !== 'string') {
+      return targetFetch(input, init);
+    }
+
+    let parsedBody;
+    try {
+      parsedBody = JSON.parse(init.body);
+    } catch (_error) {
+      return targetFetch(input, init);
+    }
+
+    if (!parsedBody || typeof parsedBody !== 'object' || Array.isArray(parsedBody)) {
+      return targetFetch(input, init);
+    }
+
+    return targetFetch(input, {
+      ...init,
+      body: JSON.stringify({ ...parsedBody, ...bodyOverrides }),
+    });
+  };
+};
+
 const formatPromptFields = (fields, options = {}) => {
   const separator = options.separator || '\n';
   const joiner = options.joiner || '：';
@@ -76,6 +110,7 @@ const buildLLMLogMeta = (params = {}) => {
 
 module.exports = {
   createMessages,
+  createJsonBodyFetch,
   formatPromptFields,
   getLLMErrorMessage,
   normalizeLLMUsage,

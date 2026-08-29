@@ -29,12 +29,16 @@ describe('config', () => {
       NEO4J_DATABASE: undefined,
       AI_PROVIDER: undefined,
       SIMPLE_AI_PROVIDER: undefined,
+      WEB_DEEPSEEK_MODEL: undefined,
       DEEPSEEK_MODEL: undefined,
       DEEPSEEK_API_KEY: undefined,
+      WEB_GOOGLE_MODEL: undefined,
       GOOGLE_MODEL: undefined,
       GOOGLE_API_KEY: undefined,
+      WEB_QWEN_MODEL: undefined,
       QWEN_MODEL: undefined,
       QWEN_API_KEY: undefined,
+      WEB_XAI_MODEL: undefined,
       XAI_MODEL: undefined,
       XAI_API_KEY: undefined,
       XAI_PROXY_URL: undefined,
@@ -56,6 +60,10 @@ describe('config', () => {
 
       expect(config.neo4j.uri).toBe('bolt://localhost:7687');
       expect(config.ai.provider).toBe('deepseek');
+      expect(config.ai.deepseek.model).toBe('deepseek-v4-flash');
+      expect(config.ai.google.model).toBe('gemini-2.5-flash-lite');
+      expect(config.ai.qwen.model).toBe('qwen3.7-flash');
+      expect(config.ai.xai.model).toBe('grok-4.3');
       expect(config.notification.enableWebhookNotification).toBe(false);
       expect(config.notification.webhookUrls).toEqual([]);
       expect(config.cron.highLevelScan).toBe('0 */5 * * * *');
@@ -107,6 +115,10 @@ describe('config', () => {
       expect(config.neo4j.uri).toBe('bolt://example:7687');
       expect(config.ai.provider).toBe('google');
       expect(config.ai.simpleProvider).toBe('xai');
+      expect(config.ai.deepseek.model).toBe('ds-model');
+      expect(config.ai.google.model).toBe('g-model');
+      expect(config.ai.qwen.model).toBe('q-model');
+      expect(config.ai.xai.model).toBe('x-model');
       expect(config.ai.xai.proxyUrl).toBe('http://proxy');
       expect(config.notification.enableWebhookNotification).toBe(true);
       expect(config.notification.webhookUrls).toEqual(['http://a', 'http://b']);
