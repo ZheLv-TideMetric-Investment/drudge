@@ -6,7 +6,8 @@ cd "$ROOT_DIR"
 
 # Allowed direct env access:
 # 1. shared/common/utils/env.js: centralized env loading and parsing.
-ALLOWLIST_REGEX='^(shared/common/utils/env\.js)$'
+# 2. public-surface.ts: reads only the non-secret host injected by next.config.ts.
+ALLOWLIST_REGEX='^(shared/common/utils/env\.js|packages/web-app/src/lib/public-surface\.ts)$'
 
 RAW_MATCHES="$(
   rg -n \

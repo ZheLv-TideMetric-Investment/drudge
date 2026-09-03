@@ -20,7 +20,6 @@ packages/*/.env.development.local
 packages/*/.env.test.local
 packages/*/.env.production.local
 packages/*/.env.*
-!packages/*/.env.example
 
 # 日志
 logs/
@@ -31,12 +30,14 @@ yarn-error.log*
 
 # 运行时数据（仅根目录；避免误忽略源码中的 data 路由）
 /data/
+/neo4j/
 *.pid
 *.seed
 *.pid.lock
 
 # 构建/测试产物
 artifacts/
+.playwright-cli/
 
 # 测试覆盖率
 coverage/

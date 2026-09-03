@@ -1,584 +1,151 @@
-# Drudge - 智能新闻知识图谱系统
+# Drudge
 
-## 📋 项目概述
+Drudge 是一个持续采集实时财经快讯、使用 AI 结构化与总结，并将重要内容主动推送到钉钉的系统。
 
-Drudge 是一个基于 AI 驱动的新闻处理和知识图谱系统，采用现代化的微服务架构设计。系统能够自动获取新闻数据，进行智能评级，提取实体和关系，构建知识图谱，并提供实时可视化分析。
+当前接入的数据源只有：
 
-### 🏗️ 系统架构
+- 富途快讯（`futu_live`）
+- AWTMT / 华尔街见闻（`awtmt_live`）
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Drudge News Graph System                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐            │
-│  │   web-app    │ │ingest-worker │ │graph-worker  │            │
-│  │   :39112     │ │   :39110     │ │   :39111     │            │
-│  │              │ │              │ │              │            │
-│  │ • Next.js UI │ │ • 新闻获取   │ │ • 实体提取   │            │
-│  │ • 定时调度   │ │ • 数据预处理 │ │ • 图谱构建   │            │
-│  │ • 可视化    │ │ • 级别评估   │ │ • AI分析     │            │
-│  └──────────────┘ └──────────────┘ └──────────────┘            │
-│         │               │               │                     │
-└─────────┼───────────────┼───────────────┼─────────────────────┘
-          │               │               │
-          └───────────────▼───────────────▼─────────────────────┐
-                          │                                     │
-                    ┌─────▼─────┐   ┌──────────┐   ┌─────────┐   │
-                    │  Neo4j    │   │   AI     │   │  存储   │   │
-                    │ 图数据库  │   │  APIs    │   │ 文件系统│   │
-                    │ :7474/7687│   │DeepSeek  │   │  /data  │   │
-                    └───────────┘   │Google AI │   └─────────┘   │
-                                    │OpenAI    │                 │
-                                    └──────────┘                 │
+仓库目前没有独立的《华尔街日报》（WSJ）采集器。历史样例里出现 WSJ 文本，不代表已接入该数据源。
+
+## 系统链路
+
+```text
+富途 + AWTMT
+  -> ingest-worker 拉取、按来源去重、写入新闻文件
+  -> graph-worker 扫描新文件、调用 LLM、写入 Neo4j
+  -> web-app 查询、分级、聚合和生成总结
+  -> 钉钉企业机器人向显式指定用户推送图片摘要 + H5 详情
 ```
 
-## 🚀 核心功能
+三个运行服务都以北京时间执行调度：
 
-### 📰 智能新闻处理
-- **自动获取**: 从富途新闻API自动获取最新财经新闻
-- **智能评级**: 基于AI算法将新闻分为5个重要级别 (Level 1-5)
-- **内容分析**: 提取关键信息、时间、地点等结构化数据
+| 模块                     | 责任                                     | 默认端口   |
+| ------------------------ | ---------------------------------------- | ---------- |
+| `packages/ingest-worker` | 数据源接入、文件落盘、采集状态与告警     | `39110`    |
+| `packages/graph-worker`  | AI 实体/事件/关系抽取、Neo4j 写入与查询  | `39111`    |
+| `packages/web-app`       | 页面、查询 API、Level 1 扫描、总结与通知 | `39112`    |
+| `shared/common`          | 环境变量、枚举、时区、LLM 与通知公共能力 | 不单独运行 |
 
-### 🧠 知识图谱构建
-- **实体识别**: AI驱动的实体提取（公司、人物、地点、事件等）
-- **关系挖掘**: 自动发现实体间的关系（投资、合作、竞争等）
-- **图谱维护**: 增量更新、去重、关系强化
+产品目的、数据契约和可变边界见 [架构手册](docs/architecture.md)。
 
-### ⏰ 智能调度系统
-- **高级别新闻扫描**: 每5分钟扫描Level 1-2重要新闻
-- **小时总结**: 每小时生成新闻摘要
-- **日报生成**: 每日综合分析报告
-- **实时通知**: 钉钉Webhook通知重要事件
+## 仓库结构
 
-### 🎨 可视化界面
-- **图谱可视化**: 交互式知识图谱展示
-- **实时监控**: 系统状态和处理进度监控
-- **数据分析**: 新闻趋势、实体统计、关系分析
-
-## 📦 项目结构
-
-```
-drudge/
-├── packages/                          # 微服务包
-│   ├── web-app/                      # 前端应用 (Next.js)
-│   │   ├── src/
-│   │   │   ├── app/                  # Next.js App Router
-│   │   │   │   ├── api/              # API路由
-│   │   │   │   │   ├── graph/        # 图谱API
-│   │   │   │   │   ├── scheduler/    # 调度API
-│   │   │   │   │   ├── scan/         # 扫描API
-│   │   │   │   │   └── summary/      # 总结API
-│   │   │   │   └── page.tsx          # 主页面
-│   │   │   ├── components/           # React组件
-│   │   │   ├── lib/                  # 服务和工具
-│   │   │   └── types/                # 类型定义
-│   │   └── package.json
-│   │
-│   ├── ingest-worker/                # 数据摄取服务
-│   │   ├── src/
-│   │   │   ├── apis/                 # API端点
-│   │   │   │   ├── news/             # 新闻相关API
-│   │   │   │   └── system/           # 系统状态API
-│   │   │   ├── services/             # 业务服务
-│   │   │   ├── scheduler/            # 定时任务
-│   │   │   └── storage/              # 存储服务
-│   │   └── package.json
-│   │
-│   └── graph-worker/                 # 图谱处理服务
-│       ├── src/
-│       │   ├── apis/                 # API端点
-│       │   │   ├── graph/            # 图谱查询API
-│       │   │   ├── news/             # 新闻处理API
-│       │   │   └── system/           # 系统API
-│       │   ├── services/             # 核心服务
-│       │   │   ├── AiService.ts      # AI服务
-│       │   │   ├── KnowledgeGraphService.ts
-│       │   │   ├── EntityService.ts  # 实体服务
-│       │   │   └── Neo4jService.ts   # 数据库服务
-│       │   └── cli/                  # 命令行工具
-│       └── package.json
-│
-├── docker-compose.yml                # Docker编排
-├── package.json                      # 根配置
-└── pnpm-workspace.yaml              # pnpm工作空间
+```text
+.
+├── AGENTS.md                       # AI 必须遵守的仓库工作约定
+├── README.md                       # 项目入口
+├── docs/
+│   ├── architecture.md             # 产品核心、架构与已知债务
+│   ├── dingtalk-briefing.md         # 图片摘要、H5、收件人与机器人配置
+│   ├── development.md              # 本地开发、AI 迭代与 review
+│   ├── deployment.md               # GitHub -> PVE 唯一发布手册
+│   └── decisions/                   # 经用户批准的重大工程决定
+├── env.example                     # 唯一环境变量模板
+├── packages/
+│   ├── ingest-worker/
+│   ├── graph-worker/
+│   └── web-app/
+├── shared/common/                  # Workspace 公共包
+└── scripts/check-env-usage.sh      # 环境变量入口检查
 ```
 
-## 🛠️ 技术栈
+运行数据、处理位点、日志、密钥和数据库卷不属于源码，均不会提交到 Git：
 
-### 前端技术
-- **框架**: Next.js 15.3.5 + React 19
-- **语言**: TypeScript
-- **UI库**: Ant Design + Tailwind CSS
-- **图表**: Recharts + Vis.js (图谱可视化)
-- **状态管理**: React Hooks
+- `.env`
+- `data/`，包括 `data/news/.processed/` 和 `data/news/failed/`
+- `neo4j/`
+- `logs/`、`*.log`
+- 各包的 `dist/`、`.next/`、根 `node_modules/`
 
-### 后端技术
-- **运行时**: Node.js 18+
-- **框架**: Express.js
-- **语言**: TypeScript
-- **数据库**: Neo4j 5.x (图数据库)
-- **AI集成**: DeepSeek、Google AI、OpenAI
+不要将这些目录当作“缓存”清理；它们可能是生产数据或恢复依据。
 
-### 开发工具
-- **包管理**: pnpm (Monorepo)
-- **构建工具**: TypeScript Compiler
-- **代码规范**: ESLint + Prettier
-- **进程管理**: PM2
-- **容器化**: Docker + Docker Compose
+## 快速开始
 
-## 🚀 快速开始
-
-### 环境要求
-- **Node.js**: 18.0.0+
-- **pnpm**: 8.0.0+
-- **Neo4j**: 5.0.0+
-- **Docker**: 20.0.0+ (可选)
-
-### 1. 克隆和安装
+要求：Node.js `>=18`、pnpm `>=8`，以及一个可连接的 Neo4j 5 实例。
 
 ```bash
-# 克隆项目
-git clone <repository-url>
-cd drudge
-
-# 安装依赖
-pnpm install
-```
-
-### 2. 环境配置
-
-```bash
-# 复制环境变量模板
+pnpm install --frozen-lockfile
 cp env.example .env
 ```
 
-> 注意：不再使用 `packages/*/.env`，所有服务统一读取仓库根目录 `.env`。
+然后只在根 `.env` 中填写当前环境需要的配置。不要在包目录创建第二份 `.env`。
 
-### 3. 配置环境变量
+常用配置包括：
 
-**.env（仓库根目录）**:
-```env
-WEB_APP_PORT=39112
-INGEST_WORKER_PORT=39110
-GRAPH_WORKER_PORT=39111
+- Neo4j：`NEO4J_URI`、`NEO4J_USER`、`NEO4J_PASSWORD`
+- AI：`AI_PROVIDER`、对应提供商 API Key 与模型名
+- 数据目录：`STORAGE_PATH`、`NEWS_DIRECTORY`、`FAILED_NEWS_DIRECTORY`
+- 通知：异常告警使用 `ALERT_WEBHOOK_URL`；主动推送使用企业机器人、一个显式的 `DINGTALK_TARGET_USER_ID` 与简报公网地址
 
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=your_password
-STORAGE_PATH=/absolute/path/to/drudge/data
-NEWS_API_URL=https://news.futunn.com/news-site-api/main/get-flash-list
+完整字段和安全占位值都在 [env.example](env.example) 中。
 
-DEEPSEEK_API_KEY=your_deepseek_key
-GOOGLE_API_KEY=your_google_key
-QWEN_API_KEY=your_qwen_key
+主动推送默认关闭且没有默认收件人。机器人消息不依赖钉钉卡片模板，只承载一张紧凑摘要图和一个 H5 详情入口；配置与启用顺序见[钉钉简报手册](docs/dingtalk-briefing.md)。
 
-NEWS_DIRECTORY=/absolute/path/to/drudge/data/news
-FAILED_NEWS_DIRECTORY=/absolute/path/to/drudge/data/news/failed
+## 验证
 
-# ingest-worker / graph-worker 异常预警（单链接）
-ALERT_WEBHOOK_URL=your_alert_webhook
-# web-app 婷子机器人通知（多链接，逗号分隔）
-TINGZI_ROBOT_WEBHOOK_URLS=your_tingzi_webhook_1,your_tingzi_webhook_2
-```
-
-更多可选项请参考根目录 `env.example`。
-
-### 4. 启动数据库
+仓库级完整检查只有一个入口：
 
 ```bash
-# 使用Docker启动Neo4j
-docker run -d --name neo4j \
-  -p 7474:7474 -p 7687:7687 \
-  -e NEO4J_AUTH=neo4j/your_password \
-  -e NEO4J_PLUGINS='["apoc"]' \
-  neo4j:latest
+pnpm run verify
 ```
 
-### 5. 启动服务
+它依次执行环境变量规范、格式、lint、全部 Jest 测试和构建。测试默认禁止真实网络，并阻止写入仓库数据目录和常见生产路径。
+
+快速验证单个包：
 
 ```bash
-# 开发模式 - 启动所有服务
-pnpm run dev
-
-# 或者分别启动各个服务
-pnpm --filter web run dev           # Web界面 :39112
-pnpm --filter @drudge/ingest-worker run dev  # 摄取服务 :39110
-pnpm --filter @drudge/graph-worker run dev   # 图谱服务 :39111
+pnpm --filter @drudge/ingest-worker run test --runInBand
+pnpm --filter @drudge/graph-worker run test --runInBand
+pnpm --filter web run test --runInBand
 ```
 
-### 6. 访问应用
+覆盖率验收使用各包的 `test:ci`；普通 `test` 不采集覆盖率。
 
-- **Web界面**: http://localhost:39112
-- **Ingest Worker**: http://localhost:39110/health
-- **Graph Worker**: http://localhost:39111/health
-- **Neo4j浏览器**: http://localhost:7474
+## 本地运行
 
-## 📊 新闻级别分类
-
-| 级别 | 名称 | 标识 | 描述 | 处理方式 |
-|------|------|------|------|----------|
-| Level 1 | 极重要 | 🔴 | 重大突发事件、市场危机 | 立即处理+通知 |
-| Level 2 | 重要 | 🟠 | 重要政策、公司重大事件 | 优先处理 |
-| Level 3 | 中等 | 🟡 | 行业动态、一般公告 | 正常处理 |
-| Level 4 | 一般 | 🟢 | 日常新闻、常规报道 | 批量处理 |
-| Level 5 | 低级 | ⚪ | 轻松内容、边缘信息 | 可选处理 |
-
-## 🔗 API接口文档
-
-### 核心服务端点
-
-| 服务 | 端口 | 健康检查 | 主要功能 |
-|------|------|----------|----------|
-| web-app | 39112 | `/api/health` | 前端界面、调度管理 |
-| ingest-worker | 39110 | `/health` | 新闻获取、数据预处理 |
-| graph-worker | 39111 | `/health` | 实体提取、图谱构建 |
-| Neo4j | 7474/7687 | - | 图数据库 |
-
-### Web App API
-
-#### 扫描相关
-```bash
-# 触发新闻扫描
-POST /api/scan
-{
-  "startTime": "2025-01-15T10:00:00.000Z",
-  "endTime": "2025-01-15T11:00:00.000Z",
-  "sendNotifications": true,
-  "skipProcessed": false
-}
-
-# 获取扫描状态
-GET /api/scan
-```
-
-#### 总结生成
-```bash
-# 生成新闻总结
-GET /api/summary?startTime=2025-01-15T10:00:00.000Z&endTime=2025-01-15T11:00:00.000Z&sendNotification=true
-```
-
-#### 调度管理
-```bash
-# 触发调度任务
-POST /api/scheduler
-{
-  "trigger": "HIGH_LEVEL_SCAN",
-  "timestamp": "2025-01-15T10:00:00.000Z"
-}
-
-# 获取调度状态
-GET /api/scheduler
-```
-
-#### 图谱查询
-```bash
-# 获取图谱统计
-GET /api/graph/stats
-
-# 搜索实体
-GET /api/graph/entities/search?searchTerm=小米&limit=10
-
-# 获取实体邻域
-GET /api/graph/entities/{entityId}/neighborhood
-```
-
-### Ingest Worker API
+仅查看 Web：
 
 ```bash
-# 获取新闻列表
-GET /api/news/list?limit=10&level=1
-
-# 获取新闻数量统计
-GET /api/news/count
-
-# 获取时间范围内新闻
-GET /api/news/time-range?startTime=2025-01-15T00:00:00.000Z&endTime=2025-01-15T23:59:59.000Z
-
-# 清理旧新闻
-DELETE /api/news/clean?days=30
-
-# 获取系统状态
-GET /api/system/status
-```
-
-### Graph Worker API
-
-```bash
-# 处理单条新闻
-POST /api/news/process
-{
-  "newsId": "news_123",
-  "title": "新闻标题",
-  "content": "新闻内容",
-  "level": 1
-}
-
-# 批量处理新闻
-POST /api/news/batch
-{
-  "newsItems": [...]
-}
-
-# 获取图谱统计
-GET /api/stats
-
-# 搜索实体
-GET /api/entities/search?q=关键词&limit=10
-
-# 获取实体关系
-GET /api/entities/{name}/relations?depth=2
-
-# 获取新闻列表
-GET /api/news?limit=10&level=1
-```
-
-## 🔧 开发命令
-
-### 根目录命令
-```bash
-# 开发模式
-pnpm run dev                 # 启动所有服务
-
-# 构建
-pnpm run build              # 构建所有包
-pnpm run start              # 生产模式启动
-
-# 代码质量
-pnpm run lint               # 代码检查
-pnpm run lint:fix           # 自动修复
-pnpm run format             # 代码格式化
-
-# 清理
-pnpm run clean              # 清理构建文件
-
-# Docker
-pnpm run docker:build       # 构建镜像
-pnpm run docker:up          # 启动容器
-pnpm run docker:down        # 停止容器
-pnpm run docker:logs        # 查看日志
-
-# PM2进程管理
-pnpm run pm2:start          # 启动所有进程
-pnpm run pm2:stop           # 停止所有进程
-pnpm run pm2:restart        # 重启所有进程
-pnpm run pm2:status         # 查看进程状态
-```
-
-### 单包命令
-```bash
-# Web App
 pnpm --filter web run dev
-pnpm --filter web run build
-pnpm --filter web run scheduler        # 运行调度器
+```
 
-# Ingest Worker
+页面地址为 <http://127.0.0.1:39112>。页面会读取配置的 Neo4j；不要在未隔离的环境中点击扫描、总结、调度或机器人测试按钮。
+
+单独启动 worker：
+
+```bash
 pnpm --filter @drudge/ingest-worker run dev
-pnpm --filter @drudge/ingest-worker run cli fetch    # 获取新闻
-pnpm --filter @drudge/ingest-worker run cli list     # 列出新闻
-
-# Graph Worker
 pnpm --filter @drudge/graph-worker run dev
-pnpm --filter @drudge/graph-worker run cli process   # 处理新闻
-pnpm --filter @drudge/graph-worker run cli stats     # 显示统计
-pnpm --filter @drudge/graph-worker run cli query     # 查询图谱
 ```
 
-## 🐳 Docker部署
+`ingest-worker` 会访问真实新闻源并写文件；`graph-worker` 会读取文件、调用 AI 并写 Neo4j。只有在数据、数据库和通知均已隔离时才运行。
 
-### 使用Docker Compose
+`pnpm run dev` 会并行启动全部包，副作用最大，不应作为普通 UI 检查命令。
 
-```bash
-# 启动完整环境
-docker-compose up -d
+健康检查：
 
-# 查看服务状态
-docker-compose ps
-
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
+```text
+GET http://127.0.0.1:39110/health
+GET http://127.0.0.1:39111/health
+GET http://127.0.0.1:39112/
 ```
 
-### 环境变量配置
+## 开发与发布
 
-在生产环境中，确保仓库根目录 `.env` 正确配置关键环境变量（Compose 统一读取 `./.env`）：
+- AI 或开发者开始修改前，先读 [AGENTS.md](AGENTS.md) 和 [开发手册](docs/development.md)。
+- Neo4j 节点、关系、约束和迁移规则见 [数据库结构](packages/graph-worker/DATABASE_SCHEMA.md)。
+- GitHub 是共享代码基线，PVE 是生产运行环境。发布必须使用 [发布手册](docs/deployment.md)，不能直接在 PVE 修改源码。
+- 未经明确批准，不 commit、不 push、不部署、不重启生产服务，也不发送钉钉消息。
 
-```yaml
-# docker-compose.yml
-services:
-  neo4j:
-    environment:
-      NEO4J_AUTH: neo4j/your_secure_password
-      NEO4J_PLUGINS: '["apoc"]'
-      
-  web-app:
-    environment:
-      - NEO4J_PASSWORD=your_secure_password
-      - DEEPSEEK_API_KEY=your_api_key
-      - TINGZI_ROBOT_WEBHOOK_URLS=your_tingzi_webhook_urls
-```
+## 当前工程基线
 
-## 🔍 CLI工具
+- pnpm workspace monorepo
+- TypeScript workers，Express 5
+- Next.js 15.3.5，React 18
+- Neo4j Driver 5.28
+- Jest 29
+- PVE 上使用包级 PM2 配置运行四个进程：`ingest-worker`、`graph-worker`、`web-app`、`web-scheduler`
 
-### Graph Worker CLI
-
-```bash
-# 进入graph-worker目录
-cd packages/graph-worker
-
-# 处理新闻
-pnpm run cli process 100              # 处理最新100条新闻
-pnpm run cli process-recent 24        # 处理最近24小时新闻
-pnpm run cli reprocess news_123       # 重新处理指定新闻
-
-# 查询图谱
-pnpm run cli query "小米" 10          # 搜索小米相关实体
-pnpm run cli stats                    # 显示图谱统计
-
-# 数据管理
-pnpm run cli export json              # 导出数据
-pnpm run cli rebuild                  # 重建图谱
-pnpm run cli setup-db                 # 初始化数据库
-```
-
-### Ingest Worker CLI
-
-```bash
-# 进入ingest-worker目录
-cd packages/ingest-worker
-
-# 获取新闻
-pnpm run cli fetch                    # 获取最新新闻
-pnpm run cli batch 3                  # 批量获取3天内新闻
-pnpm run cli list 20                  # 列出最新20条新闻
-
-# 数据管理
-pnpm run cli count                    # 统计新闻数量
-pnpm run cli clean 30                 # 清理30天前新闻
-pnpm run cli status                   # 查看系统状态
-```
-
-## 📈 监控与运维
-
-### 系统监控
-
-访问各服务的健康检查端点：
-- http://localhost:39112/api/health
-- http://localhost:39110/health  
-- http://localhost:39111/health
-
-### 日志管理
-
-```bash
-# 查看实时日志
-pnpm run pm2:logs
-
-# 查看特定服务日志
-pm2 logs web-app
-pm2 logs ingest-worker
-pm2 logs graph-worker
-
-# Docker日志
-docker-compose logs -f web-app
-docker-compose logs -f ingest-worker
-docker-compose logs -f graph-worker
-```
-
-### 性能监控
-
-```bash
-# PM2监控面板
-pm2 monit
-
-# 系统资源监控
-pm2 status
-```
-
-## 🐛 故障排除
-
-### 常见问题
-
-#### 1. 端口冲突
-```bash
-# 检查端口占用
-lsof -i :39110,39111,39112,7474,7687
-
-# 终止占用进程
-kill -9 <PID>
-```
-
-#### 2. Neo4j连接失败
-```bash
-# 检查Neo4j状态
-docker ps | grep neo4j
-
-# 重启Neo4j
-docker restart neo4j
-
-# 检查连接
-curl http://localhost:7474
-```
-
-#### 3. AI API配置问题
-```bash
-# 检查API密钥配置
-cat packages/*/env
-
-# 测试API连接
-curl -H "Authorization: Bearer YOUR_API_KEY" \
-  https://api.deepseek.com/v1/models
-```
-
-#### 4. 依赖安装问题
-```bash
-# 清理并重新安装
-pnpm run clean
-rm -rf node_modules pnpm-lock.yaml
-pnpm install
-```
-
-#### 5. 构建失败
-```bash
-# 检查TypeScript错误
-pnpm run lint
-
-# 强制重新构建
-pnpm run clean
-pnpm run build
-```
-
-### 调试模式
-
-```bash
-# 启用详细日志
-export LOG_LEVEL=debug
-
-# 调试单个服务
-DEBUG=* pnpm --filter @drudge/graph-worker run dev
-```
-
-## 📚 相关文档
-
-- [Neo4j数据库模式](packages/graph-worker/DATABASE_SCHEMA.md)
-- [API接口详细文档](docs/api.md)
-- [开发指南](docs/development.md)
-- [部署手册](docs/deployment.md)
-
-## 🤝 贡献指南
-
-1. Fork项目
-2. 创建特性分支 (`git checkout -b feature/new-feature`)
-3. 提交更改 (`git commit -am 'Add new feature'`)
-4. 推送分支 (`git push origin feature/new-feature`)
-5. 创建Pull Request
-
-## 📄 许可证
-
-本项目采用 ISC 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
----
-
-**🎉 开始使用 Drudge 构建智能新闻知识图谱！**
+版本、模型、容器 ID 和线上 SHA 都可能变化；动态状态必须在操作前重新检查，不能把文档快照当作当前事实。

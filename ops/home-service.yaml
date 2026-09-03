@@ -1,0 +1,22 @@
+apiVersion: home.microzj.com/v1
+kind: HomeService
+
+metadata:
+  name: drudge
+
+spec:
+  target:
+    environment: home-pve
+    guest: tide
+
+  components:
+    - name: briefing
+      protocol: http
+      port: 39112
+      health:
+        path: /briefings/health
+        method: GET
+      publication:
+        mode: public
+        host: news.microzj.com
+        auth: none

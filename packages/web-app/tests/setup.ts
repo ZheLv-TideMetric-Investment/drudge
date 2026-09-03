@@ -8,6 +8,7 @@ const baseTempDir = path.join(os.tmpdir(), `drudge-tests-${process.pid}`);
 
 process.env.TEST_MODE = 'true';
 process.env.NEWS_DIRECTORY ??= path.join(baseTempDir, 'news');
+process.env.BRIEFING_STORAGE_PATH ??= path.join(baseTempDir, 'briefings');
 
 jest.setTimeout(15000);
 

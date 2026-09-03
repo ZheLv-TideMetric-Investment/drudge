@@ -176,11 +176,7 @@ function formatPeriod(start: TimeInput, end: TimeInput): string {
   return `${startText}-${endText}`;
 }
 
-function createEmptyResult(
-  timeRangeDesc: string,
-  start: TimeInput,
-  end: TimeInput
-): SummaryResult {
+function createEmptyResult(timeRangeDesc: string, start: TimeInput, end: TimeInput): SummaryResult {
   return {
     success: true,
     message: `${timeRangeDesc} 时段没有新闻`,
@@ -277,15 +273,9 @@ async function fetchNewsEntities(newsId: string): Promise<any[]> {
   return await neo4jNewsService.getNewsEntities(newsId);
 }
 
-export async function fetchNews(
-  start: TimeInput,
-  end: TimeInput
-): Promise<any> {
+export async function fetchNews(start: TimeInput, end: TimeInput): Promise<any> {
   console.log(`📅 获取 ${formatPeriod(start, end)} 时间范围内的新闻`);
-  return await neo4jNewsService.getNewsInTimeRange(
-    toISOStringSafe(start),
-    toISOStringSafe(end)
-  );
+  return await neo4jNewsService.getNewsInTimeRange(toISOStringSafe(start), toISOStringSafe(end));
 }
 
 async function extractEntitiesFromNews(newsItems: any[]): Promise<any[]> {
@@ -303,11 +293,7 @@ async function extractEntitiesFromNews(newsItems: any[]): Promise<any[]> {
     };
   });
 
-  const results = await runTasks(
-    '获取新闻实体信息',
-    tasks,
-    DEFAULT_CONCURRENCY.database
-  );
+  const results = await runTasks('获取新闻实体信息', tasks, DEFAULT_CONCURRENCY.database);
 
   const allEntities = results
     .flatMap(result => result)
@@ -398,10 +384,7 @@ async function summarizeHistoricalNewsByEntities(
   return entitySummaries;
 }
 
-async function getHistoricalNewsForEntities(
-  entities: any[],
-  startTime: TimeInput
-): Promise<any[]> {
+async function getHistoricalNewsForEntities(entities: any[], startTime: TimeInput): Promise<any[]> {
   if (entities.length === 0) {
     console.log('没有实体，跳过历史新闻查询');
     return [];
@@ -436,15 +419,11 @@ async function generateEntitySummaries(
   const entityHistoricalNews: Record<string, any[]> = {};
   entities.forEach((entity: any) => {
     const entityName = entity.name;
-    const relatedNews = allHistoricalNews.filter(
-      (news: any) => news.relatedEntity === entityName
-    );
+    const relatedNews = allHistoricalNews.filter((news: any) => news.relatedEntity === entityName);
 
     if (relatedNews.length > 0) {
       entityHistoricalNews[entityName] = relatedNews
-        .sort(
-          (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        )
+        .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, 50);
     }
   });
@@ -475,7 +454,10 @@ async function enrichNewsWithHistoricalContext(
             [
               ['标题', item.title],
               ['内容', item.content],
-              ['时间', TimeZoneUtils.formatBeijingTime(new Date(item.time * 1000), TIME_FORMATS.FULL)],
+              [
+                '时间',
+                TimeZoneUtils.formatBeijingTime(new Date(item.time * 1000), TIME_FORMATS.FULL),
+              ],
             ],
             { separator: '\n' }
           );
@@ -625,18 +607,14 @@ export async function notify(
 ): Promise<void> {
   if (!sendNotification) return;
 
-  try {
-    const highLevelNews =
-      newsData.news_items?.filter((item: any) => item.level === EventLevel.LEVEL_1) || [];
-
-    await notificationService.sendNormalSummaryNotification(
-      { summary: summaryContent },
-      toISOStringSafe(start),
-      toISOStringSafe(end),
-      highLevelNews
-    );
-  } catch (error) {
-    console.error('发送通知失败:', error);
+  const sent = await notificationService.sendNormalSummaryNotification(
+    { summary: summaryContent },
+    toISOStringSafe(start),
+    toISOStringSafe(end),
+    newsData.news_items || []
+  );
+  if (!sent) {
+    throw new Error('钉钉总结通知未发送：通知未启用、配置不完整或投递失败');
   }
 }
 

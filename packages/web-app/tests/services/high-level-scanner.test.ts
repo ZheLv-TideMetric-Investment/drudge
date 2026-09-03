@@ -1,21 +1,21 @@
 import { freezeTime } from '../helpers/fake-time';
 
 const neo4jNewsService = {
-  getHighLevelNews: jest.fn()
+  getHighLevelNews: jest.fn(),
 };
 
 const notificationService = {
-  sendBatchHighLevelNewsNotification: jest.fn()
+  sendBatchHighLevelNewsNotification: jest.fn(),
 };
 
 jest.mock('../../src/lib/neo4j', () => ({
   __esModule: true,
-  neo4jNewsService
+  neo4jNewsService,
 }));
 
 jest.mock('../../src/lib/services/notification', () => ({
   __esModule: true,
-  notificationService
+  notificationService,
 }));
 
 describe('highLevelNewsScanner', () => {
@@ -51,7 +51,7 @@ describe('highLevelNewsScanner', () => {
       neo4jNewsService.getHighLevelNews.mockResolvedValue([]);
 
       const result = await highLevelNewsScanner.scanHighLevelNews(undefined, undefined, {
-        skipProcessed: false
+        skipProcessed: false,
       });
 
       expect(result.success).toBe(true);
@@ -91,8 +91,8 @@ describe('highLevelNewsScanner', () => {
           companies: ['Company A'],
           persons: [],
           organizations: [],
-          events: []
-        }
+          events: [],
+        },
       ];
 
       neo4jNewsService.getHighLevelNews.mockResolvedValue(newsItems);
@@ -103,7 +103,9 @@ describe('highLevelNewsScanner', () => {
       expect(result.success).toBe(true);
       expect(result.found).toBe(1);
       expect(result.sent).toBe(1);
-      expect(notificationService.sendBatchHighLevelNewsNotification).toHaveBeenCalledWith(newsItems);
+      expect(notificationService.sendBatchHighLevelNewsNotification).toHaveBeenCalledWith(
+        newsItems
+      );
     } finally {
       restoreTime();
     }
@@ -124,8 +126,8 @@ describe('highLevelNewsScanner', () => {
           timestamp: '2024-01-01T00:00:00.000Z',
           companies: [],
           persons: [],
-          events: []
-        }
+          events: [],
+        },
       ];
 
       neo4jNewsService.getHighLevelNews.mockResolvedValue(newsItems);
@@ -182,8 +184,8 @@ describe('highLevelNewsScanner', () => {
           companies: ['Company A'],
           persons: [],
           organizations: [],
-          events: []
-        }
+          events: [],
+        },
       ];
 
       neo4jNewsService.getHighLevelNews.mockResolvedValue(newsItems);
@@ -225,7 +227,10 @@ describe('highLevelNewsScanner', () => {
       jest.resetModules();
       const { highLevelNewsScanner } = await import('../../src/lib/services/high-level-scanner');
 
-      const result = await highLevelNewsScanner.scanHighLevelNews('bad-time', '2024-01-01T00:00:00.000Z');
+      const result = await highLevelNewsScanner.scanHighLevelNews(
+        'bad-time',
+        '2024-01-01T00:00:00.000Z'
+      );
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('无效的时间格式');
@@ -250,15 +255,15 @@ describe('highLevelNewsScanner', () => {
           companies: [],
           persons: [],
           organizations: [],
-          events: []
-        }
+          events: [],
+        },
       ];
 
       neo4jNewsService.getHighLevelNews.mockResolvedValue(newsItems);
 
       const result = await highLevelNewsScanner.scanHighLevelNews(undefined, undefined, {
         sendNotifications: false,
-        skipProcessed: false
+        skipProcessed: false,
       });
 
       expect(result.success).toBe(true);
@@ -285,8 +290,8 @@ describe('highLevelNewsScanner', () => {
           companies: [],
           persons: [],
           organizations: [],
-          events: []
-        }
+          events: [],
+        },
       ];
 
       neo4jNewsService.getHighLevelNews.mockResolvedValue(newsItems);
@@ -299,8 +304,11 @@ describe('highLevelNewsScanner', () => {
 
       const result = await highLevelNewsScanner.scanHighLevelNews();
 
+      expect(result.success).toBe(false);
       expect(result.sent).toBe(0);
-      expect(result.message).toContain('无需发送通知');
+      expect(result.message).toContain('保留待重试');
+      expect(result.error).toContain('通知发送失败');
+      expect(processed.has('news_2000')).toBe(false);
       expect(processed.size).toBeLessThan(1005);
     } finally {
       restoreTime();
@@ -323,8 +331,8 @@ describe('highLevelNewsScanner', () => {
           companies: [],
           persons: [],
           organizations: [],
-          events: []
-        }
+          events: [],
+        },
       ];
 
       neo4jNewsService.getHighLevelNews.mockResolvedValue(newsItems);
@@ -332,7 +340,9 @@ describe('highLevelNewsScanner', () => {
 
       const result = await highLevelNewsScanner.scanHighLevelNews();
 
+      expect(result.success).toBe(false);
       expect(result.sent).toBe(0);
+      expect(result.message).toContain('保留待重试');
     } finally {
       restoreTime();
     }
@@ -368,7 +378,7 @@ describe('highLevelNewsScanner', () => {
       const status = highLevelNewsScanner.getStatus();
       expect(status).toMatchObject({
         processedNewsCount: 0,
-        isRunning: false
+        isRunning: false,
       });
 
       highLevelNewsScanner.reset();

@@ -1,7 +1,7 @@
 {
   "name": "drudge-monorepo",
   "version": "1.0.0",
-  "description": "新闻知识图谱系统 - pnpm Monorepo",
+  "description": "实时财经新闻采集、AI 结构化总结与钉钉推送系统",
   "private": true,
   "engines": {
     "node": ">=18.0.0",
@@ -11,26 +11,15 @@
     "dev": "pnpm --parallel -r run dev",
     "build": "pnpm -r run build",
     "start": "pnpm --parallel -r run start",
-    "test": "pnpm -r run test",
+    "test": "pnpm -r run test --runInBand --silent",
     "lint": "pnpm -r run lint",
     "lint:env": "bash scripts/check-env-usage.sh",
     "lint:fix": "pnpm -r run lint:fix",
     "format": "pnpm -r run format",
     "format:check": "pnpm -r run format:check",
-    "clean": "pnpm -r run clean && rm -rf node_modules",
-    "docker:build": "docker-compose build",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f",
-    "schema:apply": "cypher-shell -f shared/neo4j/schema.cypher || echo 'Neo4j schema applied'",
-    "clean:neo4j": "node shared/scripts/cleanNeo4j.js",
-    "pm2": "node pm2-manager.cjs",
-    "pm2:start": "node pm2-manager.cjs start",
-    "pm2:stop": "node pm2-manager.cjs stop",
-    "pm2:restart": "node pm2-manager.cjs restart",
-    "pm2:delete": "node pm2-manager.cjs delete",
-    "pm2:status": "node pm2-manager.cjs status",
-    "pm2:logs": "node pm2-manager.cjs logs"
+    "briefing:test-live": "tsx packages/web-app/src/scripts/send-briefing-test.ts",
+    "verify": "pnpm run lint:env && pnpm run format:check && pnpm run lint && pnpm run test && pnpm run build",
+    "clean": "pnpm -r run clean && rm -rf node_modules"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -39,8 +28,7 @@
     "eslint": "^8.55.0",
     "prettier": "^3.1.0",
     "typescript": "^5.3.0",
-    "tsx": "^4.6.0",
-    "concurrently": "^8.2.2"
+    "tsx": "^4.6.0"
   },
   "author": "",
   "license": "ISC",

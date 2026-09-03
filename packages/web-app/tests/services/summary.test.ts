@@ -4,15 +4,15 @@ import { EventLevel } from '../../constants/enums';
 const neo4jNewsService = {
   getNewsInTimeRange: jest.fn(),
   getNewsEntities: jest.fn(),
-  getHistoricalNewsByEntities: jest.fn()
+  getHistoricalNewsByEntities: jest.fn(),
 };
 
 const notificationService = {
-  sendNormalSummaryNotification: jest.fn()
+  sendNormalSummaryNotification: jest.fn(),
 };
 
 const aiService = {
-  callLLM: jest.fn()
+  callLLM: jest.fn(),
 };
 
 const createMessages = jest.fn();
@@ -20,26 +20,26 @@ const callSimpleAIText = jest.fn();
 
 jest.mock('../../src/lib/neo4j', () => ({
   __esModule: true,
-  neo4jNewsService
+  neo4jNewsService,
 }));
 
 jest.mock('../../src/lib/services/notification', () => ({
   __esModule: true,
-  notificationService
+  notificationService,
 }));
 
 jest.mock('../../src/lib/utils/llm', () => ({
   __esModule: true,
   aiService,
   createMessages,
-  callSimpleAIText
+  callSimpleAIText,
 }));
 
 import {
   buildPrompt,
   generateSummary,
   groupByLevel,
-  summaryHandlers
+  summaryHandlers,
 } from '../../src/lib/services/summary';
 
 describe('summaryService', () => {
@@ -48,6 +48,7 @@ describe('summaryService', () => {
     neo4jNewsService.getNewsEntities.mockReset();
     neo4jNewsService.getHistoricalNewsByEntities.mockReset();
     notificationService.sendNormalSummaryNotification.mockReset();
+    notificationService.sendNormalSummaryNotification.mockResolvedValue(true);
     aiService.callLLM.mockReset();
     createMessages.mockReset();
     callSimpleAIText.mockReset();
@@ -69,22 +70,22 @@ describe('summaryService', () => {
         title: 'A',
         timestamp: '2024-01-01T00:00:00.000Z',
         content: 'A',
-        newsId: '1'
+        newsId: '1',
       },
       {
         level: EventLevel.LEVEL_2,
         title: 'B',
         timestamp: '2024-01-01T00:00:00.000Z',
         content: 'B',
-        newsId: '2'
+        newsId: '2',
       },
       {
         level: EventLevel.LEVEL_1,
         title: 'C',
         timestamp: '2024-01-01T00:00:00.000Z',
         content: 'C',
-        newsId: '3'
-      }
+        newsId: '3',
+      },
     ]);
 
     expect(grouped[EventLevel.LEVEL_1]).toHaveLength(2);
@@ -98,31 +99,31 @@ describe('summaryService', () => {
         title: 'A',
         timestamp: 1700000000,
         content: 'A',
-        newsId: '1'
+        newsId: '1',
       },
       {
         level: EventLevel.LEVEL_1,
         title: 'B',
         time: 1700000100,
         content: 'B',
-        newsId: '2'
+        newsId: '2',
       },
       {
         title: 'C',
         time: '2024-01-01T00:00:00.000Z',
-        newsId: '3'
+        newsId: '3',
       },
       {
         level: EventLevel.LEVEL_2,
         title: 'D',
         timestamp: 'invalid-time',
-        newsId: '4'
+        newsId: '4',
       },
       {
         level: EventLevel.LEVEL_2,
         title: 'E',
-        newsId: '5'
-      }
+        newsId: '5',
+      },
     ]);
 
     expect(grouped.Unknown[0].time).toBe(1700000000);
@@ -151,13 +152,13 @@ describe('summaryService', () => {
     neo4jNewsService.getNewsEntities
       .mockResolvedValueOnce([
         { name: 'Entity A', type: 'Company' },
-        { name: 'Entity B', type: 'Location' }
+        { name: 'Entity B', type: 'Location' },
       ])
       .mockResolvedValueOnce([{ name: 'Entity A', type: 'Company' }]);
 
     const result = await summaryHandlers.extractEntitiesFromNews([
       { newsId: 'news_1' },
-      { newsId: 'news_2' }
+      { newsId: 'news_2' },
     ]);
 
     expect(result).toEqual([{ name: 'Entity A', type: 'Company' }]);
@@ -178,7 +179,10 @@ describe('summaryService', () => {
   });
 
   it('skips historical news when no entities', async () => {
-    const result = await summaryHandlers.getHistoricalNewsForEntities([], new Date('2024-01-01T00:00:00.000Z'));
+    const result = await summaryHandlers.getHistoricalNewsForEntities(
+      [],
+      new Date('2024-01-01T00:00:00.000Z')
+    );
 
     expect(result).toEqual([]);
     expect(neo4jNewsService.getHistoricalNewsByEntities).not.toHaveBeenCalled();
@@ -202,7 +206,7 @@ describe('summaryService', () => {
       [{ name: 'Entity A', type: 'Company' }],
       [
         { relatedEntity: 'Entity A', timestamp: '2024-01-01T00:00:00.000Z', title: 'Old' },
-        { relatedEntity: 'Entity A', timestamp: '2024-01-02T00:00:00.000Z', title: 'New' }
+        { relatedEntity: 'Entity A', timestamp: '2024-01-02T00:00:00.000Z', title: 'New' },
       ]
     );
 
@@ -298,8 +302,8 @@ describe('summaryService', () => {
           title: 'Title',
           content: 'Content',
           time: 1700000000,
-          level: EventLevel.LEVEL_1
-        }
+          level: EventLevel.LEVEL_1,
+        },
       ],
       { 'Entity A': 'history' }
     );
@@ -315,7 +319,7 @@ describe('summaryService', () => {
       {
         get() {
           throw new Error('boom');
-        }
+        },
       }
     );
 
@@ -326,8 +330,8 @@ describe('summaryService', () => {
           title: 'Title',
           content: 'Content',
           time: 1700000000,
-          level: EventLevel.LEVEL_1
-        }
+          level: EventLevel.LEVEL_1,
+        },
       ],
       badSummaries as any
     );
@@ -345,8 +349,8 @@ describe('summaryService', () => {
           title: 'Title',
           content: 'Content',
           time: 1700000000,
-          level: EventLevel.LEVEL_1
-        }
+          level: EventLevel.LEVEL_1,
+        },
       ],
       {}
     );
@@ -374,7 +378,7 @@ describe('summaryService', () => {
 
     const result = await summaryHandlers.generateLevelSummaries({
       [EventLevel.LEVEL_1]: 'content 1',
-      [EventLevel.LEVEL_2]: 'content 2'
+      [EventLevel.LEVEL_2]: 'content 2',
     });
 
     expect(result).toContain('Level 1 summary');
@@ -385,7 +389,7 @@ describe('summaryService', () => {
     aiService.callLLM.mockResolvedValue({ success: false });
 
     const result = await summaryHandlers.generateLevelSummaries({
-      [EventLevel.LEVEL_1]: 'content'
+      [EventLevel.LEVEL_1]: 'content',
     });
 
     expect(result).toContain('AI生成的内容为空');
@@ -396,7 +400,7 @@ describe('summaryService', () => {
 
     const result = await summaryHandlers.generateLevelSummaries({
       Unknown: 'content',
-      [EventLevel.LEVEL_1]: 'content'
+      [EventLevel.LEVEL_1]: 'content',
     });
 
     expect(result).toContain('Unknown级新闻总结');
@@ -411,10 +415,7 @@ describe('summaryService', () => {
 
     const stats = await summaryHandlers.calculateStats(
       {
-        news_items: [
-          { newsId: 'news_1' },
-          { newsId: 'news_2' }
-        ]
+        news_items: [{ newsId: 'news_1' }, { newsId: 'news_2' }],
       },
       [{ name: 'Entity A', type: 'Company' }],
       [{ id: 'history' }],
@@ -446,7 +447,7 @@ describe('summaryService', () => {
     const end = new Date('2024-01-01T01:00:00.000Z');
 
     await summaryHandlers.notify(true, 'summary', start, end, {
-      news_items: [{ level: EventLevel.LEVEL_1 }]
+      news_items: [{ level: EventLevel.LEVEL_1 }],
     });
 
     expect(notificationService.sendNormalSummaryNotification).toHaveBeenCalled();
@@ -461,14 +462,26 @@ describe('summaryService', () => {
     expect(notificationService.sendNormalSummaryNotification).not.toHaveBeenCalled();
   });
 
-  it('handles notification errors', async () => {
+  it('surfaces notification exceptions', async () => {
     const start = new Date('2024-01-01T00:00:00.000Z');
     const end = new Date('2024-01-01T01:00:00.000Z');
     notificationService.sendNormalSummaryNotification.mockRejectedValue(new Error('boom'));
 
-    await summaryHandlers.notify(true, 'summary', start, end, { news_items: [] });
+    await expect(
+      summaryHandlers.notify(true, 'summary', start, end, { news_items: [] })
+    ).rejects.toThrow('boom');
 
     expect(notificationService.sendNormalSummaryNotification).toHaveBeenCalled();
+  });
+
+  it('surfaces a false notification result', async () => {
+    const start = new Date('2024-01-01T00:00:00.000Z');
+    const end = new Date('2024-01-01T01:00:00.000Z');
+    notificationService.sendNormalSummaryNotification.mockResolvedValue(false);
+
+    await expect(
+      summaryHandlers.notify(true, 'summary', start, end, { news_items: [] })
+    ).rejects.toThrow('总结通知未发送');
   });
 
   it('handles notifications when news items are missing', async () => {
@@ -490,10 +503,7 @@ describe('summaryService', () => {
     neo4jNewsService.getNewsInTimeRange.mockResolvedValue({ news_count: 0, news_items: [] });
 
     try {
-      const result = await generateSummary(
-        '2024-01-01T00:00:00.000Z',
-        '2024-01-01T01:00:00.000Z'
-      );
+      const result = await generateSummary('2024-01-01T00:00:00.000Z', '2024-01-01T01:00:00.000Z');
 
       expect(result.success).toBe(true);
       expect(result.data?.empty).toBe(true);
@@ -524,17 +534,30 @@ describe('summaryService', () => {
     const restoreTime = freezeTime('2024-01-01T00:00:00.000Z');
 
     try {
-      const fetchSpy = jest
-        .spyOn(summaryHandlers, 'fetchNews')
-        .mockResolvedValue({ news_count: 1, news_items: [{ newsId: 'news_1', level: EventLevel.LEVEL_1 }] });
-      const extractSpy = jest.spyOn(summaryHandlers, 'extractEntitiesFromNews').mockResolvedValue([]);
-      const historySpy = jest.spyOn(summaryHandlers, 'getHistoricalNewsForEntities').mockResolvedValue([]);
-      const summariesSpy = jest.spyOn(summaryHandlers, 'generateEntitySummaries').mockResolvedValue({});
-      const enrichSpy = jest.spyOn(summaryHandlers, 'enrichNewsWithHistoricalContext').mockResolvedValue({
-        [EventLevel.LEVEL_1]: 'content'
+      const fetchSpy = jest.spyOn(summaryHandlers, 'fetchNews').mockResolvedValue({
+        news_count: 1,
+        news_items: [{ newsId: 'news_1', level: EventLevel.LEVEL_1 }],
       });
-      const levelSpy = jest.spyOn(summaryHandlers, 'generateLevelSummaries').mockResolvedValue('summary');
-      const statsSpy = jest.spyOn(summaryHandlers, 'calculateStats').mockResolvedValue({ total: 1 });
+      const extractSpy = jest
+        .spyOn(summaryHandlers, 'extractEntitiesFromNews')
+        .mockResolvedValue([]);
+      const historySpy = jest
+        .spyOn(summaryHandlers, 'getHistoricalNewsForEntities')
+        .mockResolvedValue([]);
+      const summariesSpy = jest
+        .spyOn(summaryHandlers, 'generateEntitySummaries')
+        .mockResolvedValue({});
+      const enrichSpy = jest
+        .spyOn(summaryHandlers, 'enrichNewsWithHistoricalContext')
+        .mockResolvedValue({
+          [EventLevel.LEVEL_1]: 'content',
+        });
+      const levelSpy = jest
+        .spyOn(summaryHandlers, 'generateLevelSummaries')
+        .mockResolvedValue('summary');
+      const statsSpy = jest
+        .spyOn(summaryHandlers, 'calculateStats')
+        .mockResolvedValue({ total: 1 });
       const notifySpy = jest.spyOn(summaryHandlers, 'notify').mockResolvedValue(undefined);
 
       const result = await generateSummary(
@@ -564,13 +587,27 @@ describe('summaryService', () => {
     const restoreTime = freezeTime('2024-01-01T00:00:00.000Z');
 
     try {
-      const fetchSpy = jest.spyOn(summaryHandlers, 'fetchNews').mockResolvedValue({ news_count: 1 } as any);
-      const extractSpy = jest.spyOn(summaryHandlers, 'extractEntitiesFromNews').mockResolvedValue([]);
-      const historySpy = jest.spyOn(summaryHandlers, 'getHistoricalNewsForEntities').mockResolvedValue([]);
-      const summariesSpy = jest.spyOn(summaryHandlers, 'generateEntitySummaries').mockResolvedValue({});
-      const enrichSpy = jest.spyOn(summaryHandlers, 'enrichNewsWithHistoricalContext').mockResolvedValue({});
-      const levelSpy = jest.spyOn(summaryHandlers, 'generateLevelSummaries').mockResolvedValue('summary');
-      const statsSpy = jest.spyOn(summaryHandlers, 'calculateStats').mockResolvedValue({ total: 0 });
+      const fetchSpy = jest
+        .spyOn(summaryHandlers, 'fetchNews')
+        .mockResolvedValue({ news_count: 1 } as any);
+      const extractSpy = jest
+        .spyOn(summaryHandlers, 'extractEntitiesFromNews')
+        .mockResolvedValue([]);
+      const historySpy = jest
+        .spyOn(summaryHandlers, 'getHistoricalNewsForEntities')
+        .mockResolvedValue([]);
+      const summariesSpy = jest
+        .spyOn(summaryHandlers, 'generateEntitySummaries')
+        .mockResolvedValue({});
+      const enrichSpy = jest
+        .spyOn(summaryHandlers, 'enrichNewsWithHistoricalContext')
+        .mockResolvedValue({});
+      const levelSpy = jest
+        .spyOn(summaryHandlers, 'generateLevelSummaries')
+        .mockResolvedValue('summary');
+      const statsSpy = jest
+        .spyOn(summaryHandlers, 'calculateStats')
+        .mockResolvedValue({ total: 0 });
       const notifySpy = jest.spyOn(summaryHandlers, 'notify').mockResolvedValue(undefined);
 
       const result = await generateSummary(

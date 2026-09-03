@@ -3,28 +3,28 @@ import { freezeTime } from '../helpers/fake-time';
 import { SchedulerTrigger } from '../../src/types/scheduler';
 
 const highLevelNewsScanner = {
-  scanHighLevelNews: jest.fn()
+  scanHighLevelNews: jest.fn(),
 };
 
 const summaryService = {
-  generateSummary: jest.fn()
+  generateSummary: jest.fn(),
 };
 
 const initializeServices = jest.fn();
 
 jest.mock('../../src/lib/services/summary', () => ({
   __esModule: true,
-  summaryService
+  summaryService,
 }));
 
 jest.mock('../../src/lib/services/high-level-scanner', () => ({
   __esModule: true,
-  highLevelNewsScanner
+  highLevelNewsScanner,
 }));
 
 jest.mock('../../src/lib/services/init', () => ({
   __esModule: true,
-  initializeServices
+  initializeServices,
 }));
 
 describe('api/scheduler', () => {
@@ -42,8 +42,8 @@ describe('api/scheduler', () => {
       body: {
         trigger,
         timestamp: baseTimestamp,
-        metadata
-      }
+        metadata,
+      },
     });
 
   it('handles simple trigger', async () => {
@@ -73,7 +73,7 @@ describe('api/scheduler', () => {
     summaryService.generateSummary.mockResolvedValue({
       success: true,
       period: 'period',
-      message: 'ok'
+      message: 'ok',
     });
 
     const request = createSchedulerRequest(SchedulerTrigger.DAYTIME_05);
@@ -100,11 +100,11 @@ describe('api/scheduler', () => {
       found: 2,
       sent: 1,
       period: 'period',
-      message: 'ok'
+      message: 'ok',
     });
 
     const request = createSchedulerRequest(SchedulerTrigger.EVERY_5_MINUTES, {
-      source: 'test'
+      source: 'test',
     });
 
     try {
@@ -115,7 +115,7 @@ describe('api/scheduler', () => {
       expect(body.trigger).toBe(SchedulerTrigger.EVERY_5_MINUTES);
       expect(highLevelNewsScanner.scanHighLevelNews).toHaveBeenCalledWith(undefined, undefined, {
         sendNotifications: true,
-        skipProcessed: true
+        skipProcessed: true,
       });
       expect(body.data.found).toBe(2);
       expect(body.data.metadata).toEqual({ source: 'test' });
@@ -131,7 +131,7 @@ describe('api/scheduler', () => {
 
     highLevelNewsScanner.scanHighLevelNews.mockResolvedValue({
       success: false,
-      error: 'scan failed'
+      error: 'scan failed',
     });
 
     const request = createSchedulerRequest(SchedulerTrigger.EVERY_5_MINUTES);
@@ -154,7 +154,7 @@ describe('api/scheduler', () => {
     const { POST } = await import('../../src/app/api/scheduler/route');
 
     highLevelNewsScanner.scanHighLevelNews.mockResolvedValue({
-      success: false
+      success: false,
     });
 
     const request = createSchedulerRequest(SchedulerTrigger.EVERY_5_MINUTES);
@@ -197,8 +197,8 @@ describe('api/scheduler', () => {
     SchedulerTrigger.EVERY_HOUR,
     SchedulerTrigger.EVERY_HOUR_05,
     SchedulerTrigger.DAYTIME,
-    SchedulerTrigger.OVERNIGHT
-  ])('handles trigger %s', async (trigger) => {
+    SchedulerTrigger.OVERNIGHT,
+  ])('handles trigger %s', async trigger => {
     const restoreTime = freezeTime(baseTimestamp);
     jest.resetModules();
     const { POST } = await import('../../src/app/api/scheduler/route');
@@ -218,8 +218,8 @@ describe('api/scheduler', () => {
   it.each([
     SchedulerTrigger.DAYTIME_05,
     SchedulerTrigger.OVERNIGHT_05,
-    SchedulerTrigger.WEEKLY_FRIDAY_1605
-  ])('handles summary trigger %s', async (trigger) => {
+    SchedulerTrigger.WEEKLY_FRIDAY_1605,
+  ])('handles summary trigger %s', async trigger => {
     const restoreTime = freezeTime('2024-01-05T08:05:00.000Z');
     jest.resetModules();
     const { POST } = await import('../../src/app/api/scheduler/route');
@@ -227,7 +227,7 @@ describe('api/scheduler', () => {
     summaryService.generateSummary.mockResolvedValue({
       success: true,
       period: 'period',
-      message: 'ok'
+      message: 'ok',
     });
 
     try {
@@ -260,6 +260,35 @@ describe('api/scheduler', () => {
       expect(response.status).toBe(500);
       expect(body.success).toBe(false);
       expect(body.error).toContain('小时总结生成失败');
+    } finally {
+      restoreTime();
+    }
+  });
+
+  it.each([
+    [SchedulerTrigger.DAYTIME_05, '小时总结生成失败'],
+    [SchedulerTrigger.OVERNIGHT_05, '每日总结生成失败'],
+    [SchedulerTrigger.WEEKLY_FRIDAY_1605, '周报生成失败'],
+  ])('returns error when summary trigger %s reports a failed result', async (trigger, label) => {
+    const restoreTime = freezeTime('2024-01-05T08:05:00.000Z');
+    jest.resetModules();
+    const { POST } = await import('../../src/app/api/scheduler/route');
+
+    summaryService.generateSummary.mockResolvedValue({
+      success: false,
+      period: 'period',
+      message: '通知未发送',
+      error: 'recipient not configured',
+    });
+
+    try {
+      const response = await POST(createSchedulerRequest(trigger));
+      const body = await response.json();
+
+      expect(response.status).toBe(500);
+      expect(body.success).toBe(false);
+      expect(body.error).toContain(label);
+      expect(body.error).toContain('recipient not configured');
     } finally {
       restoreTime();
     }
@@ -329,8 +358,8 @@ describe('api/scheduler', () => {
         method: 'POST',
         body: {
           trigger: 'bad_trigger',
-          timestamp: baseTimestamp
-        }
+          timestamp: baseTimestamp,
+        },
       });
       const response = await POST(request);
       const body = await response.json();
@@ -389,9 +418,9 @@ describe('api/scheduler', () => {
       z: {
         ...jest.requireActual('zod').z,
         object: () => ({
-          parse: () => ({ trigger: 'UNKNOWN', timestamp: baseTimestamp })
-        })
-      }
+          parse: () => ({ trigger: 'UNKNOWN', timestamp: baseTimestamp }),
+        }),
+      },
     }));
 
     const { POST } = await import('../../src/app/api/scheduler/route');

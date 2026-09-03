@@ -35,11 +35,9 @@
     "axios": "^1.6.7",
     "chrono-node": "^2.8.3",
     "dayjs": "^1.11.13",
-    "dotenv": "^16.4.5",
     "express": "^5.1.0",
     "neo4j-driver": "^5.28.1",
     "node-cron": "^3.0.3",
-    "ts-enum-util": "^4.1.0",
     "winston": "^3.11.0",
     "zod": "^3.25.72"
   },

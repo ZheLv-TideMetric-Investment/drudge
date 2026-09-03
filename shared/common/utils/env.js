@@ -4,7 +4,7 @@ const dotenv = require('dotenv');
 const loadedDotenvKeys = new Set();
 const DEFAULT_DOTENV_PATH = path.resolve(__dirname, '../../../.env');
 
-const isEmpty = (value) =>
+const isEmpty = value =>
   value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
 
 const loadDotenv = (options = {}) => {
@@ -106,7 +106,7 @@ const getNodeEnv = (env = process.env) => readString(env, 'NODE_ENV', 'developme
 
 const isProduction = (env = process.env) => getNodeEnv(env) === 'production';
 
-const redactSecret = (value) => {
+const redactSecret = value => {
   if (isEmpty(value)) return '';
   const stringValue = String(value);
   if (stringValue.length <= 4) return '****';
@@ -262,8 +262,6 @@ const buildWebConfig = (options = {}) => {
     loadDotenv({ env });
   }
 
-  const webWebhookUrls = readString(env, 'WEB_TINGZI_ROBOT_WEBHOOK_URLS', '');
-
   return {
     nodeEnv: getNodeEnv(env),
     port: readInt(env, 'WEB_APP_PORT', readInt(env, 'PORT', 39112)),
@@ -310,17 +308,20 @@ const buildWebConfig = (options = {}) => {
       },
     },
     notification: {
-      enableWebhookNotification: readBoolean(
+      enabled: readBoolean(
         env,
-        'WEB_ENABLE_WEBHOOK_NOTIFICATION',
-        readBoolean(env, 'ENABLE_WEBHOOK_NOTIFICATION', false)
+        'WEB_ENABLE_DINGTALK_NOTIFICATION',
+        readBoolean(env, 'ENABLE_DINGTALK_NOTIFICATION', false)
       ),
-      webhookUrls: webWebhookUrls
-        ? webWebhookUrls
-            .split(',')
-            .map(item => item.trim())
-            .filter(Boolean)
-        : readCsv(env, 'TINGZI_ROBOT_WEBHOOK_URLS'),
+      dingtalk: {
+        clientId: readString(env, 'DINGTALK_APP_CLIENT_ID', ''),
+        clientSecret: readString(env, 'DINGTALK_APP_CLIENT_SECRET', ''),
+        targetUserId: readString(env, 'DINGTALK_TARGET_USER_ID', ''),
+      },
+      briefing: {
+        publicBaseUrl: readString(env, 'BRIEFING_PUBLIC_BASE_URL', ''),
+        storagePath: readString(env, 'BRIEFING_STORAGE_PATH', ''),
+      },
     },
     cron: {
       highLevelScan: readString(env, 'CRON_HIGH_LEVEL_SCAN', '0 */5 * * * *'),

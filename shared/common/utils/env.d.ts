@@ -112,8 +112,16 @@ export type WebConfig = {
     jina: { apiKey: string };
   };
   notification: {
-    enableWebhookNotification: boolean;
-    webhookUrls: string[];
+    enabled: boolean;
+    dingtalk: {
+      clientId: string;
+      clientSecret: string;
+      targetUserId: string;
+    };
+    briefing: {
+      publicBaseUrl: string;
+      storagePath: string;
+    };
   };
   cron: {
     highLevelScan: string;
@@ -138,7 +146,4 @@ export function buildGraphConfig(options?: {
   loadEnv?: boolean;
 }): GraphConfig;
 
-export function buildWebConfig(options?: {
-  env?: EnvRecord;
-  loadEnv?: boolean;
-}): WebConfig;
+export function buildWebConfig(options?: { env?: EnvRecord; loadEnv?: boolean }): WebConfig;

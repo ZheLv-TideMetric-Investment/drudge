@@ -1,11 +1,23 @@
 import type { NextConfig } from 'next';
-import { getNodeEnv } from '@drudge/common';
+import { buildWebConfig, getNodeEnv } from '@drudge/common';
 
 const nodeEnv = getNodeEnv();
+const webConfig = buildWebConfig();
+const briefingPublicHost = (() => {
+  try {
+    return new URL(webConfig.notification.briefing.publicBaseUrl).hostname.toLowerCase();
+  } catch {
+    return '';
+  }
+})();
 
 const nextConfig: NextConfig = {
   /* config options here */
   output: 'standalone',
+  // The host is public information. Middleware uses it to keep non-briefing routes private.
+  env: {
+    DRUDGE_BRIEFING_PUBLIC_HOST: briefingPublicHost,
+  },
   images: {
     remotePatterns: [
       {

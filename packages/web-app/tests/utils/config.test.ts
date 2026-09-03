@@ -42,13 +42,17 @@ describe('config', () => {
       XAI_MODEL: undefined,
       XAI_API_KEY: undefined,
       XAI_PROXY_URL: undefined,
-      ENABLE_WEBHOOK_NOTIFICATION: undefined,
-      TINGZI_ROBOT_WEBHOOK_URLS: undefined,
+      ENABLE_DINGTALK_NOTIFICATION: undefined,
+      DINGTALK_APP_CLIENT_ID: undefined,
+      DINGTALK_APP_CLIENT_SECRET: undefined,
+      DINGTALK_TARGET_USER_ID: undefined,
+      BRIEFING_PUBLIC_BASE_URL: undefined,
+      BRIEFING_STORAGE_PATH: undefined,
       CRON_HIGH_LEVEL_SCAN: undefined,
       CRON_HOURLY_SUMMARY: undefined,
       CRON_DAILY_SUMMARY: undefined,
       LOG_LEVEL: undefined,
-      LOG_FILE: undefined
+      LOG_FILE: undefined,
     });
 
     const originalWindow = (global as any).window;
@@ -64,8 +68,16 @@ describe('config', () => {
       expect(config.ai.google.model).toBe('gemini-2.5-flash-lite');
       expect(config.ai.qwen.model).toBe('qwen3.7-flash');
       expect(config.ai.xai.model).toBe('grok-4.3');
-      expect(config.notification.enableWebhookNotification).toBe(false);
-      expect(config.notification.webhookUrls).toEqual([]);
+      expect(config.notification.enabled).toBe(false);
+      expect(config.notification.dingtalk).toEqual({
+        clientId: '',
+        clientSecret: '',
+        targetUserId: '',
+      });
+      expect(config.notification.briefing).toEqual({
+        publicBaseUrl: '',
+        storagePath: '',
+      });
       expect(config.cron.highLevelScan).toBe('0 */5 * * * *');
       expect(config.log.level).toBe('info');
     } finally {
@@ -98,13 +110,17 @@ describe('config', () => {
       XAI_MODEL: 'x-model',
       XAI_API_KEY: 'x-key',
       XAI_PROXY_URL: 'http://proxy',
-      ENABLE_WEBHOOK_NOTIFICATION: 'true',
-      TINGZI_ROBOT_WEBHOOK_URLS: 'http://a, , http://b',
+      ENABLE_DINGTALK_NOTIFICATION: 'true',
+      DINGTALK_APP_CLIENT_ID: 'client-id',
+      DINGTALK_APP_CLIENT_SECRET: 'client-secret',
+      DINGTALK_TARGET_USER_ID: 'designated-user-id',
+      BRIEFING_PUBLIC_BASE_URL: 'https://news.example.com',
+      BRIEFING_STORAGE_PATH: '/srv/drudge/data/briefings',
       CRON_HIGH_LEVEL_SCAN: '*/1 * * * *',
       CRON_HOURLY_SUMMARY: '0 1 * * *',
       CRON_DAILY_SUMMARY: '0 2 * * *',
       LOG_LEVEL: 'debug',
-      LOG_FILE: 'logs/test.log'
+      LOG_FILE: 'logs/test.log',
     });
 
     try {
@@ -120,8 +136,16 @@ describe('config', () => {
       expect(config.ai.qwen.model).toBe('q-model');
       expect(config.ai.xai.model).toBe('x-model');
       expect(config.ai.xai.proxyUrl).toBe('http://proxy');
-      expect(config.notification.enableWebhookNotification).toBe(true);
-      expect(config.notification.webhookUrls).toEqual(['http://a', 'http://b']);
+      expect(config.notification.enabled).toBe(true);
+      expect(config.notification.dingtalk).toEqual({
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+        targetUserId: 'designated-user-id',
+      });
+      expect(config.notification.briefing).toEqual({
+        publicBaseUrl: 'https://news.example.com',
+        storagePath: '/srv/drudge/data/briefings',
+      });
       expect(config.cron.hourlySummary).toBe('0 1 * * *');
       expect(config.log.file).toBe('logs/test.log');
     } finally {
@@ -149,13 +173,17 @@ describe('config', () => {
       XAI_MODEL: undefined,
       XAI_API_KEY: undefined,
       XAI_PROXY_URL: undefined,
-      ENABLE_WEBHOOK_NOTIFICATION: undefined,
-      TINGZI_ROBOT_WEBHOOK_URLS: undefined,
+      ENABLE_DINGTALK_NOTIFICATION: undefined,
+      DINGTALK_APP_CLIENT_ID: undefined,
+      DINGTALK_APP_CLIENT_SECRET: undefined,
+      DINGTALK_TARGET_USER_ID: undefined,
+      BRIEFING_PUBLIC_BASE_URL: undefined,
+      BRIEFING_STORAGE_PATH: undefined,
       CRON_HIGH_LEVEL_SCAN: undefined,
       CRON_HOURLY_SUMMARY: undefined,
       CRON_DAILY_SUMMARY: undefined,
       LOG_LEVEL: undefined,
-      LOG_FILE: undefined
+      LOG_FILE: undefined,
     });
 
     const originalWindow = (global as any).window;
@@ -167,7 +195,8 @@ describe('config', () => {
 
       expect(config.neo4j.uri).toBe('bolt://localhost:7687');
       expect(config.ai.provider).toBe('deepseek');
-      expect(config.notification.webhookUrls).toEqual([]);
+      expect(config.notification.enabled).toBe(false);
+      expect(config.notification.dingtalk.targetUserId).toBe('');
     } finally {
       if (originalWindow === undefined) {
         delete (global as any).window;

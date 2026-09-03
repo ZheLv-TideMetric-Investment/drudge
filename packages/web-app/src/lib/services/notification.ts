@@ -1,279 +1,105 @@
-import { webhookService } from './webhook';
-import { UrgencyLevel, EventLevel } from '../../../constants/enums';
-import { TimeZoneUtils, TIME_FORMATS } from '../utils/timezone';
+import { saveBriefing } from './briefing-store';
+import { dingtalkMessageService } from './dingtalk-message';
+import {
+  BriefingDraft,
+  buildBatchNewsBriefing,
+  buildSingleNewsBriefing,
+  buildSummaryBriefing,
+  buildSystemAlertBriefing,
+} from './notification-briefing';
 
 /**
- * 通知服务
- * 统一管理所有通知推送功能，根据调用来源决定是否发送通知
+ * 通知编排层：先保存完整简报，再向显式指定收件人发送图片摘要与 H5 入口。
  */
 class NotificationService {
-  private webhook: any;
-  private initialized: boolean = false;
-
-  constructor() {
-    this.webhook = webhookService;
+  private async deliver(briefing: BriefingDraft): Promise<boolean> {
+    const document = await saveBriefing(briefing);
+    return dingtalkMessageService.sendBriefing(document);
   }
 
-  /**
-   * 初始化服务
-   */
   async initialize(): Promise<void> {
-    try {
-      this.initialized = true;
-      console.log('通知服务初始化完成');
-    } catch (error) {
-      console.error('通知服务初始化失败:', error);
-      throw error;
-    }
+    console.log('通知服务初始化完成（钉钉显式单收件人图片摘要 + H5 详情）');
   }
 
-  /**
-   * 发送批量高级别新闻通知
-   * @param newsItems 新闻数据数组
-   * @param source 调用来源
-   */
   async sendBatchHighLevelNewsNotification(newsItems: any[]): Promise<boolean> {
-    if (newsItems.length === 0) {
-      return false;
-    }
+    if (newsItems.length === 0) return false;
 
     try {
-      const currentTime = TimeZoneUtils.now(TIME_FORMATS.TIME);
-
-      let message = `🚨 **${EventLevel.LEVEL_1} 新闻批量提醒** (${newsItems.length}条) - ${currentTime}
-
-`;
-
-      // 聚合所有相关实体
-      const allCompanies = new Set<string>();
-      const allPersons = new Set<string>();
-      const allEvents = new Set<string>();
-
-      newsItems.forEach((news, index) => {
-        const timestamp = TimeZoneUtils.format(news.timestamp, TIME_FORMATS.TIME_SHORT);
-        message += `📰 **${index + 1}. ${news.title}** *(${timestamp})*\n`;
-
-        // 收集实体信息
-        news.companies?.forEach((company: string) => allCompanies.add(company));
-        news.persons?.forEach((person: string) => allPersons.add(person));
-        news.events?.forEach((event: string) => allEvents.add(event));
-      });
-
-      // 添加聚合的实体信息
-      if (allCompanies.size > 0) {
-        const companies = Array.from(allCompanies).slice(0, 5);
-        message += `\n🏢 **涉及公司**: ${companies.join(', ')}${allCompanies.size > 5 ? ` 等${allCompanies.size}家` : ''}`;
+      const sent = await this.deliver(buildBatchNewsBriefing(newsItems));
+      if (sent) {
+        console.log(`批量高级别新闻通知已发送: ${newsItems.length} 条新闻`);
       }
-
-      if (allPersons.size > 0) {
-        const persons = Array.from(allPersons).slice(0, 5);
-        message += `\n👤 **涉及人物**: ${persons.join(', ')}${allPersons.size > 5 ? ` 等${allPersons.size}人` : ''}`;
-      }
-
-      if (allEvents.size > 0) {
-        const events = Array.from(allEvents).slice(0, 3);
-        message += `\n📋 **相关事件**: ${events.join(', ')}${allEvents.size > 3 ? ` 等${allEvents.size}个` : ''}`;
-      }
-
-      // 添加时间范围信息
-      const resolveTimestamp = (value: unknown): number | null => {
-        if (!value) return null;
-        if (typeof value === 'number') return value;
-        const date = new Date(value as any);
-        const timestamp = date.getTime();
-        return Number.isNaN(timestamp) ? null : timestamp;
-      };
-
-      let earliestTimestamp: number | null = null;
-      let latestTimestamp: number | null = null;
-
-      newsItems.forEach(news => {
-        const timestamp = resolveTimestamp(news.timestamp);
-        if (timestamp === null) return;
-        if (earliestTimestamp === null || timestamp < earliestTimestamp) {
-          earliestTimestamp = timestamp;
-        }
-        if (latestTimestamp === null || timestamp > latestTimestamp) {
-          latestTimestamp = timestamp;
-        }
-      });
-
-      if (earliestTimestamp !== null && latestTimestamp !== null) {
-        const earliestTime = TimeZoneUtils.format(
-          new Date(earliestTimestamp),
-          TIME_FORMATS.TIME_SHORT
-        );
-        const latestTime = TimeZoneUtils.format(
-          new Date(latestTimestamp),
-          TIME_FORMATS.TIME_SHORT
-        );
-
-        if (earliestTime !== latestTime) {
-          message += `\n⏰ **时间范围**: ${earliestTime} - ${latestTime}`;
-        }
-      }
-
-      await this.webhook.sendMessage(message);
-      console.log(`批量高级别新闻通知已发送: ${newsItems.length} 条新闻`);
-      return true;
-    } catch (error: any) {
-      console.error(`发送批量高级别新闻通知失败:`, error);
+      return sent;
+    } catch (error) {
+      console.error('发送批量高级别新闻通知失败:', error);
       return false;
     }
   }
 
-  /**
-   * 发送高级别新闻通知 (保留兼容性，但建议使用批量方法)
-   * @param news 新闻数据
-   * @param source 调用来源
-   */
   async sendHighLevelNewsNotification(news: any): Promise<boolean> {
     try {
-      const urgencyEmoji: { [key: string]: string } = {
-        [UrgencyLevel.CRITICAL]: '🚨',
-        [UrgencyLevel.HIGH]: '🔴',
-        [UrgencyLevel.MEDIUM]: '🟡',
-      };
-
-      const emoji = urgencyEmoji[news.urgency] || '⚠️';
-      const timestamp = TimeZoneUtils.format(news.timestamp, TIME_FORMATS.TIME);
-
-      let message = `${emoji} **高级别新闻提醒** [${news.level}]
-
-📰 **标题**: ${news.title}
-🕒 **时间**: ${timestamp}
-📊 **级别**: ${news.level}
-⚡ **紧急度**: ${news.urgency.toUpperCase()}`;
-
-      if (news.companies.length > 0) {
-        message += `\n🏢 **涉及公司**: ${news.companies.slice(0, 3).join(', ')}${news.companies.length > 3 ? '等' : ''}`;
+      const sent = await this.deliver(buildSingleNewsBriefing(news));
+      if (sent) {
+        console.log(`高级别新闻通知已发送: ${news.newsId} - ${news.title}`);
       }
-
-      if (news.persons.length > 0) {
-        message += `\n👤 **涉及人物**: ${news.persons.slice(0, 3).join(', ')}${news.persons.length > 3 ? '等' : ''}`;
-      }
-
-      if (news.events.length > 0) {
-        message += `\n📋 **相关事件**: ${news.events.slice(0, 2).join(', ')}${news.events.length > 2 ? '等' : ''}`;
-      }
-
-      if (news.source) {
-        message += `\n📡 **来源**: ${news.source}`;
-      }
-
-      // 添加内容摘要（如果有）
-      if (news.content && news.content.length > 50) {
-        const summary = news.content.substring(0, 200);
-        message += `\n\n📖 **内容摘要**: ${summary}...`;
-      }
-
-      if (news.url) {
-        message += `\n🔗 **原文链接**: ${news.url}`;
-      }
-
-      await this.webhook.sendMessage(message);
-      console.log(`高级别新闻通知已发送: ${news.newsId} - ${news.title}`);
-      return true;
-    } catch (error: any) {
+      return sent;
+    } catch (error) {
       console.error(`发送高级别新闻通知失败: ${news.newsId}`, error);
       return false;
     }
   }
 
-  /**
-   * 发送小时总结通知
-   * @param summary 总结数据（现在是markdown字符串）
-   * @param hourStart 开始时间
-   * @param hourEnd 结束时间
-   * @param highLevelNews Level 1 新闻
-   */
   async sendNormalSummaryNotification(
     summary: any,
     hourStart: string,
     hourEnd: string,
-    highLevelNews: any[]
+    newsItems: any[]
   ): Promise<boolean> {
     try {
-      // 提取markdown总结内容
       const summaryContent = typeof summary === 'string' ? summary : summary.summary;
-
-      const level1Message =
-        highLevelNews.length > 0
-          ? `🚨 **Level 1 新闻** (${highLevelNews.length}条)  
-${highLevelNews
-  .slice(0, 3)
-  .map((item: any, index: number) => `${index + 1}. [${item.level}] ${item.title}`)
-  .join('\n')}`.trim()
-          : '';
-
-      const message = `${level1Message}
-
-📊 **总结** (${TimeZoneUtils.format(hourStart, TIME_FORMATS.NEWS_TIME)}-${TimeZoneUtils.format(
-        hourEnd,
-        TIME_FORMATS.NEWS_TIME
-      )})  
-${summaryContent}
-`.trim();
-
-      await this.webhook.sendMessage(message);
-      console.log(
-        `小时总结通知已发送: ${TimeZoneUtils.format(hourStart, TIME_FORMATS.HOUR_FORMAT)}-${TimeZoneUtils.format(
-          hourEnd,
-          TIME_FORMATS.HOUR_FORMAT
-        )}`
+      const sent = await this.deliver(
+        buildSummaryBriefing(String(summaryContent || ''), hourStart, hourEnd, newsItems)
       );
-      return true;
-    } catch (error: any) {
-      console.error('发送小时总结通知失败:', error);
+      if (sent) {
+        console.log(`财经总结通知已发送: ${hourStart} - ${hourEnd}`);
+      }
+      return sent;
+    } catch (error) {
+      console.error('发送财经总结通知失败:', error);
       return false;
     }
   }
 
-  /**
-   * 发送系统警报
-   * @param title 标题
-   * @param message 消息
-   * @param source 调用来源
-   */
   async sendSystemAlert(title: string, message: string): Promise<boolean> {
     try {
-      const alertMessage = `🚨 **系统警报** - ${title}
-
-📅 **时间**: ${TimeZoneUtils.now(TIME_FORMATS.FULL)}
-📋 **详情**: ${message}
-  `;
-
-      await this.webhook.sendMessage(alertMessage);
-      console.log(`系统警报已发送: ${title}`);
-      return true;
-    } catch (error: any) {
+      const sent = await this.deliver(buildSystemAlertBriefing(title, message));
+      if (sent) {
+        console.log(`系统警报已发送: ${title}`);
+      }
+      return sent;
+    } catch (error) {
       console.error('发送系统警报失败:', error);
       return false;
     }
   }
 
-  /**
-   * 健康检查
-   */
   async healthCheck(): Promise<any> {
-    try {
-      // 测试webhook连接
-      await this.webhook.testConnection();
-
+    const connected = await dingtalkMessageService.healthCheck();
+    if (connected) {
       return {
         status: 'healthy',
         service: 'NotificationService',
         timestamp: new Date().toISOString(),
-        webhook_connection: 'connected',
-      };
-    } catch (error: any) {
-      return {
-        status: 'unhealthy',
-        service: 'NotificationService',
-        timestamp: new Date().toISOString(),
-        error: error.message,
+        dingtalk_message_connection: 'connected',
       };
     }
+
+    return {
+      status: 'unhealthy',
+      service: 'NotificationService',
+      timestamp: new Date().toISOString(),
+      error: '钉钉图片摘要通知未启用、配置不完整或鉴权失败',
+    };
   }
 }
 

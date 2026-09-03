@@ -4,6 +4,8 @@
 
 v1 不引入 GitHub Actions、自建 Runner、Webhook、新容器或复杂制品系统。GitHub 继续作为代码基线和审计记录，当前 Mac/Codex 作为发布控制端。
 
+产品与架构边界见 [`architecture.md`](architecture.md)，本地实现和 review 见 [`development.md`](development.md)。本文是 GitHub 到 PVE 发布命令的唯一事实源。
+
 ## 1. 当前已验证的运行基线
 
 - 本地仓库：`/Users/microTT/toto/ih/drudge`
@@ -37,7 +39,7 @@ AI 在 codex/<task> 修改
   -> SHA、进程和 HTTP 健康检查
 ```
 
-默认只保留一个人工门：目标 SHA 固定且 AI 完成检查后，用户批准包含 GitHub push 和 PVE 部署完整命令的单次 `CHANGE_ID`。批准后其余步骤由 AI 连续执行；异常立即停止，不自动重试或换方案。
+在当前任务已经明确授权本地 commit 的前提下，发布阶段默认只保留一个人工门：目标 SHA 固定且 AI 完成检查后，用户批准包含 GitHub push 和 PVE 部署完整命令的单次 `CHANGE_ID`。批准后其余步骤由 AI 连续执行；异常立即停止，不自动重试或换方案。
 
 ## 3. AI 开发与本地检查
 
@@ -55,11 +57,7 @@ AI 完成修改和测试后，必须依次通过：
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm run lint:env
-pnpm run format:check
-pnpm run lint
-pnpm run test
-pnpm run build
+pnpm run verify
 git diff --check
 git status --short
 ```
@@ -73,7 +71,7 @@ AI Review 至少确认：
 - 没有数据库清理、Schema 破坏或 Neo4j 重建步骤；
 - 明确区分“本地检查通过”和“PVE 已部署生效”。
 
-只暂存明确文件，不使用宽泛的 `git add .`：
+只有用户已明确授权本次 commit 时，才执行下一段；否则在本地 review 和工作树状态处停止。只暂存明确文件，不使用宽泛的 `git add .`：
 
 ```bash
 git add -- <file-1> <file-2>
@@ -172,7 +170,7 @@ ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge run build"'
 
 ### 6.5 重启应用
 
-不要执行 `start.sh`、`docker-compose down/up` 或重建 Neo4j。只重启三个应用配置；web 配置会同时重启 `web-app` 和 `web-scheduler`：
+仓库不再提供旧的根级启动脚本或 Docker Compose 部署入口；不要自行恢复这些路径，也不要重建 Neo4j。只重启三个包级应用配置；web 配置会同时重启 `web-app` 和 `web-scheduler`：
 
 ```bash
 ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge --filter @drudge/ingest-worker run pm2:restart"'
@@ -246,11 +244,7 @@ ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge --filter web ru
 在 /Users/microTT/toto/ih/drudge 完成下面需求：<需求>。
 
 从最新 main 创建 codex/<task>，只做必要改动并补测试。完成后运行：
-pnpm run lint:env
-pnpm run format:check
-pnpm run lint
-pnpm run test
-pnpm run build
+pnpm run verify
 git diff --check
 
 先给我变更摘要、diff review、测试结果、commit SHA/tree SHA 和发布风险。

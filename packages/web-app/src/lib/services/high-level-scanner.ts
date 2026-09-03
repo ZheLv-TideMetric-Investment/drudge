@@ -115,18 +115,25 @@ class HighLevelNewsScanner {
       if (sendNotifications) {
         sentCount = await this.sendNotifications(newsToProcess);
 
-        // 标记为已处理（仅在skipProcessed为true时）
-        if (skipProcessed) {
+        // 只有整批通知真实发送成功后才推进消费状态。
+        if (skipProcessed && sentCount > 0) {
           newsToProcess.forEach(news => {
             this.processedNewsIds.add(news.newsId);
           });
         }
       }
 
+      const notificationFailed = sendNotifications && newsToProcess.length > 0 && sentCount === 0;
+
       // 清理过期的已处理新闻ID
       this.cleanupProcessedNewsIds();
 
-      this.updateLastScanTime(end);
+      if (notificationFailed) {
+        // 保留本轮起点，避免下一次扫描越过尚未送达的新闻。
+        this.updateLastScanTime(start);
+      } else {
+        this.updateLastScanTime(end);
+      }
 
       const scanType = startTime || endTime ? '自定义' : '定时';
       const processType = skipProcessed ? '新发现' : '全部';
@@ -135,14 +142,15 @@ class HighLevelNewsScanner {
         sendNotifications && sentCount > 0
           ? `，聚合发送 1 条批量通知 (包含 ${sentCount} 条新闻)`
           : sendNotifications
-            ? '，无需发送通知'
+            ? '，通知未发送，保留待重试'
             : '';
 
       return {
-        success: true,
+        success: !notificationFailed,
         found: newsToProcess.length,
         sent: sentCount,
         message: `${scanType}扫描完成：发现 ${newsToProcess.length} 条${processType} Level 1 新闻${notificationText}`,
+        error: notificationFailed ? '通知发送失败或配置未启用' : undefined,
         period: this.formatPeriod(start, end),
         high_level_news: newsToProcess.map(news => this.formatNewsItem(news)),
         timestamp: TimeZoneUtils.now(TIME_FORMATS.FULL),

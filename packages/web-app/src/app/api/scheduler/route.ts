@@ -169,7 +169,6 @@ async function handleEvery5Minutes(timestamp: string, metadata?: Record<string, 
     const errorMessage = error instanceof Error ? error.message : '高级别新闻扫描失败';
     throw new Error(`高级别新闻扫描失败: ${errorMessage}`);
   }
-
 }
 
 /**
@@ -266,6 +265,9 @@ async function handleDaytime05(timestamp: string, metadata?: Record<string, unkn
       hourEnd.toISOString(),
       true // 发送通知
     );
+    if (!summaryResult.success) {
+      throw new Error(summaryResult.error || summaryResult.message || '小时总结生成失败');
+    }
 
     return {
       message: `小时总结生成完成: ${summaryResult.period}`,
@@ -317,6 +319,9 @@ async function handleOvernight05(timestamp: string, metadata?: Record<string, un
       summaryEnd.toISOString(),
       true // 发送通知
     );
+    if (!summaryResult.success) {
+      throw new Error(summaryResult.error || summaryResult.message || '每日总结生成失败');
+    }
 
     return {
       message: `每日总结生成完成: ${summaryResult.period}`,
@@ -353,6 +358,9 @@ async function handleWeeklyFriday1605(timestamp: string, metadata?: Record<strin
       weekEnd.toISOString(),
       true // 发送通知
     );
+    if (!summaryResult.success) {
+      throw new Error(summaryResult.error || summaryResult.message || '周报生成失败');
+    }
 
     return {
       message: `周报生成完成: ${summaryResult.period}`,
