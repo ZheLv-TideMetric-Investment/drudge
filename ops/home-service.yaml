@@ -10,7 +10,7 @@ spec:
     guest: tide
 
   components:
-    - name: briefing
+    - name: web
       protocol: http
       port: 39112
       health:
@@ -18,5 +18,5 @@ spec:
         method: GET
       publication:
         mode: public
-        host: news.microzj.com
+        host: drudge.microzj.com
         auth: none

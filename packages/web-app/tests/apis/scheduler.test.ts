@@ -486,6 +486,13 @@ describe('api/scheduler', () => {
 
       expect(body.status).toBe('active');
       expect(body.available_triggers).toContain(SchedulerTrigger.EVERY_MINUTE);
+      expect(body.implemented_triggers).toEqual([
+        SchedulerTrigger.EVERY_5_MINUTES,
+        SchedulerTrigger.DAYTIME_05,
+        SchedulerTrigger.OVERNIGHT_05,
+        SchedulerTrigger.WEEKLY_FRIDAY_1605,
+      ]);
+      expect(body.implemented_triggers).not.toContain(SchedulerTrigger.EVERY_MINUTE);
     } finally {
       restoreTime();
     }

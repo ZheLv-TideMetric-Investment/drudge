@@ -178,6 +178,7 @@ export function Layout({ children }: LayoutProps) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Button
             type="text"
+            aria-label="打开导航菜单"
             icon={<MenuOutlined />}
             onClick={() => setDrawerOpen(true)}
             style={{

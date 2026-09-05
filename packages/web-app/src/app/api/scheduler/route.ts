@@ -386,6 +386,12 @@ export async function GET() {
 
     const status = {
       available_triggers: Object.values(SchedulerTrigger),
+      implemented_triggers: [
+        SchedulerTrigger.EVERY_5_MINUTES,
+        SchedulerTrigger.DAYTIME_05,
+        SchedulerTrigger.OVERNIGHT_05,
+        SchedulerTrigger.WEEKLY_FRIDAY_1605,
+      ],
       server_time: TimeZoneUtils.nowUTC(),
       status: 'active',
     };

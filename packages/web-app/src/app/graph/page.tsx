@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Card, Input, Space, Button, message, Typography } from 'antd';
+import { Alert, Card, Input, Button, message, Typography } from 'antd';
 import { SearchOutlined, ClearOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Layout } from '../../components/Layout';
 import NetworkGraph from '../../components/graph/NetworkGraph';
 import { searchEntities, loadMultiEntityGraph, Entity } from '../../lib/graph-utils';
+import styles from '../workbench.module.css';
 
 const { Title, Text } = Typography;
 
 interface GraphData {
+  incomplete?: boolean;
   nodes: Array<{
     id: string;
     name: string;
@@ -23,6 +25,8 @@ interface GraphData {
 }
 
 const GraphPage = () => {
+  const [messageApi, contextHolder] = message.useMessage();
+  const [error, setError] = useState('');
   // 状态管理
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -38,7 +42,7 @@ const GraphPage = () => {
     }
 
     setLoading(true);
-    const hide = message.loading('搜索中...', 0);
+    setError('');
     
     try {
       // 1. 搜索实体
@@ -46,7 +50,7 @@ const GraphPage = () => {
       setEntities(searchResults);
       
       if (searchResults.length === 0) {
-        message.warning('未找到相关实体');
+        messageApi.warning('未找到相关实体');
         setGraphData({ nodes: [], edges: [] });
         return;
       }
@@ -55,56 +59,68 @@ const GraphPage = () => {
       const graphResult = await loadMultiEntityGraph(searchResults, 50);
       setGraphData(graphResult);
       
-      message.success(`找到 ${searchResults.length} 个实体，${graphResult.nodes.length} 个节点`);
+      messageApi.success(`找到 ${searchResults.length} 个实体，${graphResult.nodes.length} 个节点`);
       
     } catch (error) {
       console.error('搜索失败:', error);
-      message.error('搜索失败，请重试');
+      setError('搜索失败，请重试');
     } finally {
-      hide();
       setLoading(false);
     }
-  }, []);
+  }, [messageApi]);
 
   // 清空搜索
   const handleClear = useCallback(() => {
     setQuery('');
     setEntities([]);
     setGraphData({ nodes: [], edges: [] });
-    message.info('已清空');
-  }, []);
+    setError('');
+    messageApi.info('已清空');
+  }, [messageApi]);
 
   // 刷新图数据
   const handleRefresh = useCallback(async () => {
     if (entities.length === 0) return;
     
     setLoading(true);
-    const hide = message.loading('刷新中...', 0);
+    setError('');
     
     try {
       const graphResult = await loadMultiEntityGraph(entities, 50);
       setGraphData(graphResult);
-      message.success('刷新成功');
+      messageApi.success('刷新成功');
     } catch (error) {
-      message.error('刷新失败');
+      setError('刷新失败，请重试');
     } finally {
-      hide();
       setLoading(false);
     }
-  }, [entities]);
+  }, [entities, messageApi]);
 
   // 节点点击处理
   const handleNodeClick = useCallback((node: any) => {
-    message.info(`选中节点: ${node.name}`);
-  }, []);
+    messageApi.info(`选中节点: ${node.name}`);
+  }, [messageApi]);
 
   // 节点双击处理
-  const handleNodeDoubleClick = useCallback((node: any) => {
-    message.info(`双击节点: ${node.name}，可以在这里添加更多操作`);
+  const handleNodeDoubleClick = useCallback(async (node: GraphData['nodes'][number]) => {
+    setLoading(true);
+    setError('');
+    try {
+      const entity: Entity = { ...node, properties: {} };
+      const graphResult = await loadMultiEntityGraph([entity], 50);
+      setQuery(node.name);
+      setEntities([entity]);
+      setGraphData(graphResult);
+    } catch {
+      setError('加载节点关系失败，请重试');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   return (
     <Layout>
+      {contextHolder}
       <div style={{ padding: '20px' }}>
         {/* 页面标题 */}
         <div style={{ marginBottom: '20px' }}>
@@ -112,13 +128,13 @@ const GraphPage = () => {
             🌐 知识图谱
           </Title>
           <Text type="secondary">
-            探索实体间的关联关系，发现隐藏的知识连接
+            搜索实体查看关联关系，双击节点继续探索它的关联。
           </Text>
         </div>
 
         {/* 搜索区域 */}
         <Card style={{ marginBottom: '20px' }}>
-          <Space.Compact style={{ width: '100%' }}>
+          <div className={styles.toolbar}>
             <Input
               placeholder="搜索实体（如：特斯拉、马斯克、比亚迪）"
               value={query}
@@ -127,6 +143,7 @@ const GraphPage = () => {
               size="large"
               id="graph-search"
               name="graph-search"
+              style={{ flex: '1 1 260px', width: 'auto' }}
             />
             <Button 
               type="primary" 
@@ -152,7 +169,7 @@ const GraphPage = () => {
             >
               刷新
             </Button>
-          </Space.Compact>
+          </div>
           
           {/* 快速搜索建议 */}
           <div style={{ marginTop: '10px' }}>
@@ -174,6 +191,12 @@ const GraphPage = () => {
         </Card>
 
         {/* 图谱显示区域 */}
+        {error && (
+          <Alert type="error" showIcon message={error} description={graphData.nodes.length ? '下方保留上一次成功加载的图谱。' : undefined} style={{ marginBottom: 16 }} />
+        )}
+        {graphData.incomplete && (
+          <Alert type="warning" showIcon message="部分实体的关联未能加载，请刷新重试。" style={{ marginBottom: 16 }} />
+        )}
         <Card 
           title="关系图谱" 
           extra={

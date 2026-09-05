@@ -3,25 +3,22 @@ import {
   BUILT_BRIEFING_PUBLIC_HOST,
   hostnameFromHostHeader,
   isBriefingPublicHost,
-  isBriefingPublicPath,
+  isCrossOriginApiAction,
 } from './lib/public-surface';
 
 export function middleware(request: NextRequest) {
-  const requestHost = hostnameFromHostHeader(request.headers.get('host'));
-  if (!isBriefingPublicHost(requestHost, BUILT_BRIEFING_PUBLIC_HOST)) return NextResponse.next();
-
-  if (!isBriefingPublicPath(request.nextUrl.pathname)) {
-    return new NextResponse('Not found', {
-      status: 404,
-      headers: {
-        'Cache-Control': 'no-store',
-        'X-Robots-Tag': 'noindex, nofollow',
-      },
-    });
+  if (isCrossOriginApiAction(request.nextUrl.pathname, request.method, request.headers)) {
+    return NextResponse.json(
+      { success: false, error: '请在工作台内发起此操作' },
+      { status: 403, headers: { 'Cache-Control': 'no-store' } }
+    );
   }
 
   const response = NextResponse.next();
-  response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  const requestHost = hostnameFromHostHeader(request.headers.get('host'));
+  if (isBriefingPublicHost(requestHost, BUILT_BRIEFING_PUBLIC_HOST)) {
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  }
   return response;
 }
 

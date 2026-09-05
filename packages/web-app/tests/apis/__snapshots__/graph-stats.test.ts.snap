@@ -20,6 +20,7 @@ exports[`api/graph/stats returns graph stats payload 1`] = `
       },
       "total": 1,
     },
+    "relationshipDistribution": {},
     "timeStats": {
       "metadata": {
         "beijing_now": "2024-01-01 08:00:00",

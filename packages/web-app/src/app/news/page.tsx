@@ -21,6 +21,7 @@ import {
   ClearOutlined
 } from '@ant-design/icons';
 import { Layout } from '../../components/Layout';
+import { NewsText } from '../../components/NewsText';
 import { toAntdValue, fromAntdValue, formatNewsTime, formatTime } from '../../lib/utils/timezone';
 import { BEIJING_TIMEZONE } from '@drudge/common';
 
@@ -88,6 +89,7 @@ const getProcessedDisplayTime = (news: NewsItem) => {
 // 新闻卡片组件
 interface NewsCardProps {
   news: NewsItem;
+  keyword: string;
   expandedRows: Set<string>;
   onToggleExpand: (newsId: string) => void;
   onShowDetail: (news: NewsItem) => void;
@@ -97,6 +99,7 @@ interface NewsCardProps {
 
 function NewsCard({ 
   news, 
+  keyword,
   expandedRows, 
   onToggleExpand, 
   onShowDetail, 
@@ -109,11 +112,6 @@ function NewsCard({
   
   const getDisplayContent = () => {
     if (!hasContent) return '暂无内容';
-    
-    // 如果有高亮内容（搜索结果）
-    if (news.highlightedContent) {
-      return news.highlightedContent;
-    }
     
     // 普通显示逻辑
     if (!needsExpansion || isExpanded) {
@@ -163,10 +161,7 @@ function NewsCard({
             fontWeight: 'bold',
             color: 'var(--newspaper-red)'
           }}
-          dangerouslySetInnerHTML={{ 
-            __html: news.highlightedTitle || news.title 
-          }}
-        />
+        ><NewsText text={news.title} keyword={keyword} /></div>
       </div>
 
       {/* 内容 */}
@@ -180,10 +175,7 @@ function NewsCard({
             wordBreak: 'break-word',
             textIndent: '2em'
           }}
-          dangerouslySetInnerHTML={{ 
-            __html: getDisplayContent()
-          }}
-        />
+        ><NewsText text={getDisplayContent()} keyword={keyword} /></div>
       </div>
 
       {/* 底部操作区 */}
@@ -248,6 +240,7 @@ function NewsCard({
 }
 
 export default function NewsPage() {
+  const [messageApi, contextHolder] = message.useMessage();
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -349,20 +342,18 @@ export default function NewsPage() {
         }
         setPagination(result.data.pagination);
       } else {
-        message.error(result.error || '获取新闻失败');
+        messageApi.error(result.error || '获取新闻失败');
       }
     } catch (error) {
       console.error('获取新闻失败:', error);
-      message.error('网络请求失败');
+      messageApi.error('网络请求失败');
     } finally {
       setLoading(false);
       setLoadingMore(false);
     }
   }, [
-    filters.dateRange,
-    filters.level,
-    filters.sortBy,
-    filters.sortOrder,
+    filters,
+    messageApi,
     pagination.limit
   ]);
 
@@ -374,6 +365,8 @@ export default function NewsPage() {
 
   // 搜索新闻
   const handleSearch = (keyword: string) => {
+    searchKeywordRef.current = keyword;
+    searchModeRef.current = !!keyword;
     setSearchKeyword(keyword);
     setIsSearchMode(!!keyword);
     fetchNews(1);
@@ -381,6 +374,8 @@ export default function NewsPage() {
 
   // 清除搜索
   const clearSearch = () => {
+    searchKeywordRef.current = '';
+    searchModeRef.current = false;
     setSearchKeyword('');
     setIsSearchMode(false);
     fetchNews(1);
@@ -388,6 +383,8 @@ export default function NewsPage() {
 
   // 清除所有筛选
   const clearAllFilters = () => {
+    searchKeywordRef.current = '';
+    searchModeRef.current = false;
     setFilters({
       level: undefined,
       dateRange: undefined,
@@ -479,6 +476,7 @@ export default function NewsPage() {
 
   return (
     <Layout>
+      {contextHolder}
       <div className="newspaper-page" style={{ padding: 'var(--space-2xl) var(--space-lg)', maxWidth: '100%', overflow: 'hidden' }}>
         {/* 传统报纸头部 */}
         <div className="newspaper-header-frame" style={{ marginBottom: 'var(--space-2xl)' }}>
@@ -682,6 +680,7 @@ export default function NewsPage() {
                   className="masonry-item"
                 >
                   <NewsCard 
+                    keyword={isSearchMode ? searchKeyword : ''}
                     news={item}
                     expandedRows={expandedRows}
                     onToggleExpand={toggleExpanded}
@@ -839,10 +838,7 @@ export default function NewsPage() {
                     textAlign: 'center',
                     lineHeight: '1.4'
                   }}
-                  dangerouslySetInnerHTML={{ 
-                    __html: selectedNews.highlightedTitle || selectedNews.title 
-                  }}
-                />
+                ><NewsText text={selectedNews.title} keyword={isSearchMode ? searchKeyword : ''} /></div>
               </div>
 
               <div>
@@ -863,10 +859,7 @@ export default function NewsPage() {
                     textIndent: '2em',
                     color: 'var(--newspaper-text-primary)'
                   }}
-                  dangerouslySetInnerHTML={{ 
-                    __html: selectedNews.content || '暂无内容' 
-                  }}
-                />
+                ><NewsText text={selectedNews.content || '暂无内容'} keyword={isSearchMode ? searchKeyword : ''} /></div>
               </div>
             </div>
           )}

@@ -3,7 +3,8 @@ import { TimeZoneUtils } from '../../src/lib/utils/timezone';
 
 const neo4jAnalyticsService = {
   getDatabaseStats: jest.fn(),
-  getTimeStats: jest.fn()
+  getTimeStats: jest.fn(),
+  getRelationshipDistribution: jest.fn()
 };
 
 const neo4jGraphService = {
@@ -20,6 +21,7 @@ describe('api/graph/stats', () => {
   beforeEach(() => {
     neo4jAnalyticsService.getDatabaseStats.mockReset();
     neo4jAnalyticsService.getTimeStats.mockReset();
+    neo4jAnalyticsService.getRelationshipDistribution.mockReset().mockResolvedValue({});
     neo4jGraphService.getGraphData.mockReset();
   });
 
@@ -79,6 +81,33 @@ describe('api/graph/stats', () => {
 
     expect(body.success).toBe(false);
     expect(body.error).toContain('boom');
+  });
+
+  it('includes the stored relationship distribution', async () => {
+    const { GET } = await import('../../src/app/api/graph/stats/route');
+    neo4jAnalyticsService.getDatabaseStats.mockResolvedValue({ totalNodes: 3 });
+    neo4jAnalyticsService.getTimeStats.mockResolvedValue({});
+    neo4jGraphService.getGraphData.mockResolvedValue({ nodes: [] });
+    neo4jAnalyticsService.getRelationshipDistribution.mockResolvedValue({ MENTIONS: 7, LOCATED_IN: 2 });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(body.data.relationshipDistribution).toEqual({ MENTIONS: 7, LOCATED_IN: 2 });
+  });
+
+  it('rejects a database error result instead of returning an incomplete overview', async () => {
+    const { GET } = await import('../../src/app/api/graph/stats/route');
+    neo4jAnalyticsService.getDatabaseStats.mockResolvedValue({ error: 'connection failed', connected: false });
+    neo4jAnalyticsService.getTimeStats.mockResolvedValue({});
+    neo4jGraphService.getGraphData.mockResolvedValue({ nodes: [] });
+
+    const response = await GET();
+    const body = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(body.success).toBe(false);
+    expect(body.error).toBe('数据库统计暂不可用');
   });
 
   it('returns error response for non-error failures', async () => {

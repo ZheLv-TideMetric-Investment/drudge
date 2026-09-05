@@ -14,7 +14,7 @@ const briefingPublicHost = (() => {
 const nextConfig: NextConfig = {
   /* config options here */
   output: 'standalone',
-  // The host is public information. Middleware uses it to keep non-briefing routes private.
+  // Public information only, used for message URL validation and noindex response headers.
   env: {
     DRUDGE_BRIEFING_PUBLIC_HOST: briefingPublicHost,
   },

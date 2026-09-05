@@ -8,6 +8,7 @@ export interface Entity {
 }
 
 export interface SimpleGraphData {
+  incomplete?: boolean;
   nodes: Array<{
     id: string;
     name: string;
@@ -60,6 +61,9 @@ export async function loadMultiEntityGraph(entities: Entity[], maxNodes = 50): P
   });
 
   const results = await Promise.all(promises);
+  if (results.length > 0 && results.every(result => !result)) {
+    throw new Error('实体关联查询失败');
+  }
   
   // 高效合并数据
   results.forEach(result => {
@@ -100,7 +104,7 @@ export async function loadMultiEntityGraph(entities: Entity[], maxNodes = 50): P
   const endTime = performance.now();
   console.log(`🚀 Fast Graph Loading: ${nodes.length} nodes, ${edges.length} edges in ${Math.round(endTime - startTime)}ms`);
 
-  return { nodes, edges };
+  return { nodes, edges, incomplete: results.some(result => !result) };
 }
 
 // 简单的实体搜索
@@ -116,10 +120,10 @@ export async function searchEntities(query: string, limit = 10): Promise<Entity[
       return result.data.map((item: any) => item.entity || item);
     }
     
-    return [];
+    throw new Error(result.error || '实体搜索失败');
   } catch (error) {
     console.error('Search failed:', error);
-    return [];
+    throw error;
   }
 }
 
@@ -138,4 +142,4 @@ export function convertToSimpleGraph(complexData: any): SimpleGraphData {
   }));
   
   return { nodes, edges };
-} 
+}

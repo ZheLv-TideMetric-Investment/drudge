@@ -33,7 +33,7 @@ import { TimeZoneUtils, TIME_FORMATS } from '../lib/utils/timezone';
 
 interface SystemStatus {
   scheduler: {
-    available_triggers: string[];
+    implemented_triggers: string[];
     server_time: string;
     status: string;
   };
@@ -62,6 +62,9 @@ export default function Home() {
       ]);
 
       const [schedulerData, scanData] = await Promise.all([schedulerRes.json(), scanRes.json()]);
+      if (!schedulerRes.ok || !scanRes.ok || !scanData.scanner_status || !schedulerData.status) {
+        throw new Error('获取系统状态失败');
+      }
 
       setSystemStatus({
         scheduler: schedulerData,
@@ -69,6 +72,7 @@ export default function Home() {
       });
       setError(null);
     } catch (err) {
+      setSystemStatus(null);
       setError('获取系统状态失败');
       messageApi.error('获取系统状态失败');
     } finally {
@@ -190,7 +194,7 @@ export default function Home() {
         const typeName = type === 'auto' ? '自动' : '手动';
         notificationApi.success({
           message: '扫描完成',
-          description: `${typeName}扫描已完成 - ${data.period}，发现 ${data.found} 条 Level 1 新闻，${data.found > 0 ? '已聚合发送通知' : '无需发送通知'}`,
+          description: `${typeName}扫描已完成 - ${data.period}，发现 ${data.found} 条 Level 1 新闻，${data.sent > 0 ? '已聚合发送通知' : '未发送通知'}`,
           icon: <CheckCircleOutlined style={{ color: 'var(--newspaper-green)' }} />,
         });
         fetchSystemStatus(); // 刷新状态
@@ -340,7 +344,7 @@ export default function Home() {
             border: '1px solid var(--newspaper-fine-border)',
             marginBottom: '0'
           }}>
-            集成定时任务调度、新闻扫描和AI总结功能，采用传统中文报纸版面设计。为用户提供专业的新闻知识图谱分析服务。系统运行状态良好，各项功能正常运转。
+            浏览实时财经新闻、探索实体关系，按时间范围生成总结。扫描进度和应用连通性可在实时监控中查看。
           </div>
         </div>
 
@@ -466,7 +470,7 @@ export default function Home() {
                 title={
                   <Space>
                     <ScheduleOutlined className="newspaper-icon" />
-                    <span className="newspaper-title newspaper-title-small">调度器状态</span>
+                    <span className="newspaper-title newspaper-title-small">调度接口</span>
                   </Space>
                 }
                 className="newspaper-card"
@@ -475,17 +479,17 @@ export default function Home() {
                 <div className="newspaper-stats">
                   <div className="newspaper-paragraph">
                     <div className="newspaper-body newspaper-body-no-indent" style={{ marginBottom: '8px' }}>
-                      <strong>运行状态：</strong>
+                      <strong>接口状态：</strong>
                       <Badge
                         status={systemStatus?.scheduler?.status === 'active' ? 'processing' : 'error'}
-                        text={systemStatus?.scheduler?.status === 'active' ? '运行中' : '已停止'}
+                        text={systemStatus?.scheduler?.status === 'active' ? '可访问' : '未确认'}
                         style={{ marginLeft: '8px' }}
                       />
                     </div>
                     <div className="newspaper-body newspaper-body-no-indent" style={{ marginBottom: '8px' }}>
-                      <strong>可用触发器：</strong>
+                      <strong>已实现任务：</strong>
                       <span className="newspaper-title" style={{ fontSize: '16px', marginLeft: '8px' }}>
-                        {systemStatus?.scheduler?.available_triggers?.length || 0} 个
+                        {systemStatus?.scheduler?.implemented_triggers?.length || 0} 个
                       </span>
                     </div>
                     <div className="newspaper-body newspaper-body-no-indent">
@@ -521,20 +525,22 @@ export default function Home() {
                       <strong>运行状态：</strong>
                       <Badge
                         status={systemStatus?.scanner?.isRunning ? 'processing' : 'default'}
-                        text={systemStatus?.scanner?.isRunning ? '扫描中' : '空闲'}
+                        text={!systemStatus?.scanner ? '未确认' : systemStatus.scanner.isRunning ? '扫描中' : '空闲'}
                         style={{ marginLeft: '8px' }}
                       />
                     </div>
                     <div className="newspaper-body newspaper-body-no-indent" style={{ marginBottom: '8px' }}>
                       <strong>已处理新闻：</strong>
                       <span className="newspaper-title" style={{ fontSize: '16px', marginLeft: '8px' }}>
-                        {systemStatus?.scanner?.processedNewsCount || 0} 条
+                        {systemStatus?.scanner?.processedNewsCount ?? '—'} 条
                       </span>
                     </div>
                     <div className="newspaper-body newspaper-body-no-indent">
                       <strong>上次扫描：</strong>
                       <span className="newspaper-time" style={{ marginLeft: '8px' }}>
-                        {systemStatus?.scanner?.lastScanTime || '从未扫描'}
+                        {systemStatus?.scanner?.lastScanTime
+                          ? TimeZoneUtils.format(systemStatus.scanner.lastScanTime)
+                          : systemStatus?.scanner ? '暂无记录' : '未确认'}
                       </span>
                     </div>
                   </div>
@@ -553,7 +559,7 @@ export default function Home() {
           </div>
           
           <Row gutter={[20, 20]}>
-            {systemStatus?.scheduler?.available_triggers?.map(trigger => (
+            {systemStatus?.scheduler?.implemented_triggers?.map(trigger => (
               <Col xs={24} sm={12} lg={8} key={trigger}>
                 <Card
                   className="newspaper-card"
@@ -695,7 +701,7 @@ export default function Home() {
                     onClick={() => triggerSummary('hourly')}
                     block
                   >
-                    {triggerLoading['summary-hourly'] ? '生成中...' : '生成小时总结'}
+                    {triggerLoading['summary-hourly'] ? '生成中...' : '生成并推送小时总结'}
                   </Button>,
                 ]}
               >
@@ -727,7 +733,7 @@ export default function Home() {
                     onClick={() => triggerSummary('daily')}
                     block
                   >
-                    {triggerLoading['summary-daily'] ? '生成中...' : '生成每日总结'}
+                    {triggerLoading['summary-daily'] ? '生成中...' : '生成并推送每日总结'}
                   </Button>,
                 ]}
               >
@@ -759,7 +765,7 @@ export default function Home() {
                     onClick={() => triggerSummary('custom')}
                     block
                   >
-                    {triggerLoading['summary-custom'] ? '生成中...' : '生成自定义总结'}
+                    {triggerLoading['summary-custom'] ? '生成中...' : '生成并推送自定义总结'}
                   </Button>,
                 ]}
               >

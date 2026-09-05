@@ -2,10 +2,19 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { setEnv } from '../helpers/env';
+import { buildWebConfig } from '@drudge/common';
 
 const emptyEnvPath = path.join(os.tmpdir(), `drudge-web-empty-env-${process.pid}`);
 
 describe('config', () => {
+  it('uses worker ports independently from the web process PORT', () => {
+    expect(buildWebConfig({ loadEnv: false, env: { PORT: '39112' } }).workers).toEqual({
+      ingestPort: 39110, graphPort: 39111,
+    });
+    expect(buildWebConfig({ loadEnv: false, env: { PORT: '39112', INGEST_WORKER_PORT: '40110', GRAPH_WORKER_PORT: '40111' } }).workers).toEqual({
+      ingestPort: 40110, graphPort: 40111,
+    });
+  });
   beforeAll(() => {
     fs.writeFileSync(emptyEnvPath, '');
   });

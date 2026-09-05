@@ -49,7 +49,7 @@
 
 钉钉拉图和打开 H5 时不能附带家庭入口的 Basic Auth，因此简报路由需要公网可读。当前采用不可遍历 URL，而不是用户登录；链接被人工转发后仍可访问。简报中不得包含密钥、私人新闻正文或高敏感系统告警。
 
-Web App 的其他业务路由没有登录层。构建时会从 `BRIEFING_PUBLIC_BASE_URL` 提取公网 Host；该 Host 下的中间件只放行 `/briefings/*`、`/_next/*` 和 favicon，其他页面与 `/api/*` 返回 404。内网 Host 不受这条展示边界影响。
+简报与工作台统一使用 `drudge.microzj.com`，按用户要求均可直接访问，不加账号密码层。构建时从 `BRIEFING_PUBLIC_BASE_URL` 提取公网 Host，用于校验运行时的消息域名一致性及添加 `noindex` 响应头，不再据此阻止工作台页面与 API。工作台保留浏览器跨站操作检查。入口契约和迁移见[发布手册](deployment.md#12-工作台入口)。
 
 ## 4. 运行配置
 
@@ -60,7 +60,7 @@ ENABLE_DINGTALK_NOTIFICATION=false
 DINGTALK_APP_CLIENT_ID=<企业应用 Client ID>
 DINGTALK_APP_CLIENT_SECRET=<企业应用 Client Secret>
 DINGTALK_TARGET_USER_ID=<明确收件人的 userId>
-BRIEFING_PUBLIC_BASE_URL=https://<简报公网域名>
+BRIEFING_PUBLIC_BASE_URL=https://drudge.microzj.com
 BRIEFING_STORAGE_PATH=/absolute/path/to/drudge/data/briefings
 ```
 

@@ -12,11 +12,16 @@ import { BEIJING_TIMEZONE } from '@drudge/common';
  */
 export async function GET() {
   try {
-    const [databaseStats, timeStats, graphStats] = await Promise.all([
+    const [databaseStats, timeStats, graphStats, relationshipDistribution] = await Promise.all([
       neo4jAnalyticsService.getDatabaseStats(),
       neo4jAnalyticsService.getTimeStats(),
       neo4jGraphService.getGraphData(),
+      neo4jAnalyticsService.getRelationshipDistribution(),
     ]);
+
+    if (databaseStats.error) {
+      throw new Error('数据库统计暂不可用');
+    }
 
     const todayRange = TimeZoneUtils.getTodayRange();
     const overview = {
@@ -55,7 +60,7 @@ export async function GET() {
       overview,
       timeStats: formattedTimeStats,
       graphStats: graphStatsWithMeta,
-      // relationshipDistribution, // 暂时注释掉，因为tzAnalytics中没有这个方法
+      relationshipDistribution,
       metadata: {
         generated_at: formattedTimeStats.metadata.beijing_now || '',
         timezone: BEIJING_TIMEZONE

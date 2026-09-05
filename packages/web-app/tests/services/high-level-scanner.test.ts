@@ -24,6 +24,27 @@ describe('highLevelNewsScanner', () => {
     notificationService.sendBatchHighLevelNewsNotification.mockReset();
   });
 
+  it('reports running until every active scan finishes, including failures', async () => {
+    jest.resetModules();
+    const { highLevelNewsScanner } = await import('../../src/lib/services/high-level-scanner');
+    let finishFirst!: (news: any[]) => void;
+    let failSecond!: (error: Error) => void;
+    neo4jNewsService.getHighLevelNews
+      .mockImplementationOnce(() => new Promise(resolve => { finishFirst = resolve; }))
+      .mockImplementationOnce(() => new Promise((_, reject) => { failSecond = reject; }));
+
+    expect(highLevelNewsScanner.getStatus().isRunning).toBe(false);
+    const first = highLevelNewsScanner.scanHighLevelNews();
+    const second = highLevelNewsScanner.scanHighLevelNews();
+    expect(highLevelNewsScanner.getStatus().isRunning).toBe(true);
+    finishFirst([]);
+    await first;
+    expect(highLevelNewsScanner.getStatus().isRunning).toBe(true);
+    failSecond(new Error('database unavailable'));
+    expect((await second).success).toBe(false);
+    expect(highLevelNewsScanner.getStatus().isRunning).toBe(false);
+  });
+
   it('returns empty result when no news found', async () => {
     const restoreTime = freezeTime('2024-01-01T00:00:00.000Z');
     try {

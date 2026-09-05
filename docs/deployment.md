@@ -24,6 +24,44 @@ v1 不引入 GitHub Actions、自建 Runner、Webhook、新容器或复杂制品
 
 PVE 的非登录命令环境找不到 NVM 中的 `node` 和 `pnpm`，所以所有 Node/pnpm 远程命令都必须通过 `bash -lc` 执行。
 
+### 1.1 Web 运行配置更新
+
+根 `.env` 是唯一运行配置入口。Next standalone 构建目录可能带有旧的 `.env` 副本；只修改根文件并重启，不足以证明 Web 已读取新配置。Web 与调度器应通过现有 `DOTENV_CONFIG_PATH` 明确使用根文件。
+
+已获本次配置修改和重启授权、核对运行目标并保留原配置后，在应用容器中执行：
+
+```bash
+cd /root/pre/drudge/packages/web-app
+DOTENV_CONFIG_PATH=/root/pre/drudge/.env pnpm exec pm2 restart web-app web-scheduler --update-env
+```
+
+这里按进程名称重启。现场验证 PM2 5.4.3 使用 `restart ecosystem.config.js --update-env` 时，并未导入命令前设置的 `DOTENV_CONFIG_PATH`。
+
+重启后核对两个进程的配置路径和有效通知开关，只输出是否匹配，不输出完整环境；确认进程在线、简报健康端点正常后，执行 `pnpm exec pm2 save` 保存运行状态。停用通知同样修改根配置并重启两个进程。通知投递的验收要求见[钉钉简报手册](dingtalk-briefing.md#5-启用与验收)。
+
+### 1.2 工作台入口
+
+`ops/home-service.yaml` 只声明 `drudge.microzj.com`，简报和工作台均转发到 Tide 的现有 Web App：
+
+| 路径 | 用途 | 访问方式 |
+| --- | --- | --- |
+| `/briefings/*`、`/_next/static/*`、favicon | 钉钉图片、简报详情与静态资源 | 直接访问 |
+| `/`、`/news`、`/graph`、`/summary`、`/monitor`、`/stats`、`/tingzi`、`/api/*` | 工作台页面和接口 | 直接访问，无账号密码认证 |
+
+使用 IH 的 `home-ingress/bin/home-ingressctl check/render` 生成 Drudge 自己的路由，再按[入口接入手册](../../home-ingress/SERVICE-ONBOARDING.md)安装到 101。路由变更和应用发布需在本次生产授权范围内；不增加业务进程或公网端口。
+
+用户已明确要求先去掉工作台认证，manifest 使用 `public/none`，无需在 101 配置 owner 账号。工作台页面及扫描、总结、推送 API 均可直接访问；不再依赖代理认证标记。
+
+在获授权的同次发布中，将根 `.env` 的 `BRIEFING_PUBLIC_BASE_URL` 更新为 `https://drudge.microzj.com`，再构建 Web 并重启 `web-app` 和 `web-scheduler`。构建时域名与运行时链接配置必须一致。替换 Drudge 自己的路由文件后不再保留旧 `news.microzj.com` 入口或跳转；历史消息里的旧域名链接会失效，持久化简报仍可在新域名用原 ID 访问。
+
+若需要回滚，恢复对应的应用版本、根配置中的域名和 Drudge 路由文件；构建时与运行时的域名必须一致。
+
+验收包括：无凭据访问工作台页面和只读 API 正常，不出现账号密码提示或原来的域名访问限制；简报和图片仍为 200；旧域名不再提供 Drudge 服务。浏览器的扫描、总结与消息操作先用本地模拟响应验收；生产点击发送需要明确授权。
+
+监控页每 30 秒刷新，worker 端口复用根配置的 `INGEST_WORKER_PORT`、`GRAPH_WORKER_PORT`。图谱数据库未能完成检测时显示“未确认”；连通性结果不能代替新闻采集质量或 AI 处理结果的验收。
+
+工作台的浏览器操作请求检查 `Origin` 和 Fetch Metadata，拒绝其他站点发起的扫描、总结等操作；不带浏览器来源头的内部调度调用保持兼容。新闻标题、正文和关键词按文本渲染，保留内容与高亮，不执行新闻源提供的 HTML。
+
 ## 2. 发布链路
 
 ```text
@@ -199,7 +237,7 @@ ssh home-pve 'pct exec 103 -- curl -sS -o /dev/null -w "%{http_code}" http://127
 - 四个 PM2 进程均为 `online`；
 - 三个 HTTP 检查均为 `200`；
 - Neo4j 容器未被重建或重启；
-- `.env`、`old_data/`、`*.bak-*` 和业务数据未被触碰。
+- `.env` 仅包含本次明确批准的配置变更；既有 `old_data/`、`*.bak-*` 和业务数据未被触碰。
 
 ## 7. 失败与回滚
 

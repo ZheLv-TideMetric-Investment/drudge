@@ -34,6 +34,7 @@ const formatBeijing = (input: Date, format: string): string => {
 class HighLevelNewsScanner {
   private lastScanTime: string | null = null;
   private processedNewsIds: Set<string> = new Set();
+  private runningScans = 0;
 
   constructor() {
     this.lastScanTime = null;
@@ -50,6 +51,7 @@ class HighLevelNewsScanner {
     endTime?: TimeInput,
     options: ScanOptions = {}
   ): Promise<HighLevelScanResult> {
+    this.runningScans++;
     try {
       // 设置默认选项
       const { sendNotifications = true, skipProcessed = true } = options;
@@ -166,6 +168,8 @@ class HighLevelNewsScanner {
         period: '',
         timestamp: TimeZoneUtils.now(TIME_FORMATS.FULL),
       };
+    } finally {
+      this.runningScans--;
     }
   }
 
@@ -242,7 +246,7 @@ class HighLevelNewsScanner {
     return {
       lastScanTime: this.lastScanTime,
       processedNewsCount: this.processedNewsIds.size,
-      isRunning: false,
+      isRunning: this.runningScans > 0,
       timestamp: TimeZoneUtils.now(TIME_FORMATS.FULL),
     };
   }

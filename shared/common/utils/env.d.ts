@@ -96,6 +96,10 @@ export type GraphConfig = {
 export type WebConfig = {
   nodeEnv: string;
   port: number;
+  workers: {
+    ingestPort: number;
+    graphPort: number;
+  };
   neo4j: {
     uri: string;
     user: string;

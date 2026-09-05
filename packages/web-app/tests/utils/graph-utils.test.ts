@@ -49,6 +49,7 @@ describe('graph-utils', () => {
     expect((global as any).fetch).toHaveBeenCalledTimes(3);
     expect(result.nodes.length).toBe(4);
     expect(result.edges).toHaveLength(1);
+    expect(result.incomplete).toBe(true);
   });
 
   it('uses default maxNodes and edge type fallback', async () => {
@@ -80,10 +81,7 @@ describe('graph-utils', () => {
       json: async () => ({ success: false, data: null })
     });
 
-    const result = await loadMultiEntityGraph(entities, 10);
-
-    expect(result.nodes).toEqual([{ id: '1', name: 'A', type: 'Company' }]);
-    expect(result.edges).toEqual([]);
+    await expect(loadMultiEntityGraph(entities, 10)).rejects.toThrow('实体关联查询失败');
 
     (global as any).fetch.mockResolvedValue({
       json: async () => ({
@@ -122,22 +120,23 @@ describe('graph-utils', () => {
     expect(result).toEqual([{ id: '1', name: 'A' }, { id: '2', name: 'B' }]);
   });
 
-  it('returns empty results when search response is unsuccessful', async () => {
+  it('reports unsuccessful search instead of treating it as no matches', async () => {
     (global as any).fetch.mockResolvedValue({
       json: async () => ({ success: false })
     });
 
-    const result = await searchEntities('abc');
-
-    expect(result).toEqual([]);
+    await expect(searchEntities('abc')).rejects.toThrow('实体搜索失败');
   });
 
   it('handles search errors', async () => {
     (global as any).fetch.mockRejectedValue(new Error('boom'));
 
-    const result = await searchEntities('abc');
+    await expect(searchEntities('abc')).rejects.toThrow('boom');
+  });
 
-    expect(result).toEqual([]);
+  it('preserves a successful search with no matches', async () => {
+    (global as any).fetch.mockResolvedValue({ json: async () => ({ success: true, data: [] }) });
+    await expect(searchEntities('no-match')).resolves.toEqual([]);
   });
 
   it('converts complex graph structures', () => {

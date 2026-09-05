@@ -265,6 +265,10 @@ const buildWebConfig = (options = {}) => {
   return {
     nodeEnv: getNodeEnv(env),
     port: readInt(env, 'WEB_APP_PORT', readInt(env, 'PORT', 39112)),
+    workers: {
+      ingestPort: readInt(env, 'INGEST_WORKER_PORT', 39110),
+      graphPort: readInt(env, 'GRAPH_WORKER_PORT', 39111),
+    },
     neo4j: {
       uri: readString(env, 'WEB_NEO4J_URI', readString(env, 'NEO4J_URI', 'bolt://localhost:7687')),
       user: readString(env, 'WEB_NEO4J_USER', readString(env, 'NEO4J_USER', 'neo4j')),

@@ -31,7 +31,7 @@ interface GraphEdge {
   properties?: Record<string, any>;
 }
 
-const getNodeColor = (type: string, isHighlighted: boolean, isSelected: boolean) => {
+const getNodeColor = (type: string, isHighlighted: boolean) => {
   const colorMap: Record<string, any> = {
     PERSON: {
       background: '#e3f2fd',
@@ -66,14 +66,6 @@ const getNodeColor = (type: string, isHighlighted: boolean, isSelected: boolean)
   };
 
   const colors = colorMap[type] || colorMap.default;
-
-  if (isSelected) {
-    return {
-      background: '#fff9c4',
-      border: '#fbc02d',
-      highlight: { background: '#fff59d', border: '#f57f17' },
-    };
-  }
 
   if (isHighlighted) {
     return {
@@ -128,8 +120,8 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
   const convertData = useCallback((): Data => {
     const nodes: Node[] = data.nodes.map(node => {
       const isHighlighted = highlightedNodeIds.includes(node.id);
-      const isSelected = selectedNode === node.id;
-      const colors = getNodeColor(node.type, isHighlighted, isSelected);
+      // Let vis-network manage selection so clicks preserve the current layout.
+      const colors = getNodeColor(node.type, isHighlighted);
       
       // 构建节点标签，包含类型和名称
       const typeLabel = getTypeLabel(node.type);
@@ -194,7 +186,7 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
     }));
 
     return { nodes, edges };
-  }, [data.edges, data.nodes, highlightedNodeIds, selectedNode]);
+  }, [data.edges, data.nodes, highlightedNodeIds]);
 
   // 网络图配置选项
   const getOptions = (): Options => ({
@@ -364,40 +356,6 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
     };
   }, [convertData, data, onNodeClick, onNodeDoubleClick]);
 
-  // 更新节点颜色（当高亮状态改变时）
-  useEffect(() => {
-    if (!networkInstance.current) return;
-
-    const nodes = data.nodes.map(node => {
-      const isHighlighted = highlightedNodeIds.includes(node.id);
-      const isSelected = selectedNode === node.id;
-      const colors = getNodeColor(node.type, isHighlighted, isSelected);
-      const typeLabel = getTypeLabel(node.type);
-      const nodeLabel = `${typeLabel}\n${node.name}`;
-      
-      return {
-        id: node.id,
-        label: nodeLabel,
-        color: colors,
-        size: isHighlighted ? 60 : 55,
-        borderWidth: isHighlighted ? 4 : 3,
-        font: {
-          size: isHighlighted ? 18 : 16
-        }
-      };
-    });
-
-    networkInstance.current.setData({ 
-      nodes, 
-      edges: data.edges.map((edge, index) => ({
-        id: `edge-${index}`,
-        from: edge.source,
-        to: edge.target,
-        label: edge.type
-      }))
-    });
-  }, [highlightedNodeIds, selectedNode, data.nodes, data.edges]);
-
   // 控制方法
   const handleFit = () => {
     networkInstance.current?.fit({
@@ -422,7 +380,8 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
       <div
         ref={networkContainer}
         style={{
-          width: `${width}px`,
+          width: '100%',
+          maxWidth: `${width}px`,
           height: `${height}px`,
           border: '1px solid #ddd',
           borderRadius: '4px',
