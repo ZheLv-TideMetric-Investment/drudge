@@ -43,7 +43,7 @@ const visibleText = (svg: string): string =>
     .join('');
 
 describe('briefing image renderer', () => {
-  it('shows every event with optional context and source, keeping detailed facts and entities in the snapshot', () => {
+  it('shows only every event and optional context, keeping metadata and details in the snapshot', () => {
     const before = JSON.stringify(briefing);
     const svg = renderBriefingSvg(briefing);
     const text = visibleText(svg);
@@ -51,10 +51,14 @@ describe('briefing image renderer', () => {
     for (const entry of briefing.items) {
       expect(text).toContain(entry.headline);
       expect(text).not.toContain(`${entry.id} 完整事实`);
-      expect(text).toContain(entry.source);
+      expect(text).not.toContain(entry.source);
+      expect(text).not.toContain(entry.level);
+      expect(text).not.toContain(entry.time);
       expect(text).not.toContain(entry.url);
     }
     expect(text).toContain('背景：仍需进一步确认');
+    expect(text).not.toContain(briefing.title);
+    expect(text).not.toContain(briefing.meta);
     expect(text).not.toContain('公司：示例公司');
     expect(text.indexOf('core-second 标题')).toBeLessThan(text.indexOf('support-third 标题'));
     expect(text.indexOf('muted-first 标题')).toBeLessThan(text.indexOf('muted-fourth 标题'));
@@ -71,16 +75,16 @@ describe('briefing image renderer', () => {
     const single = renderBriefingSvg({ ...briefing, items: [briefing.items[0]] });
     expect(heightOf(svg)).toBeGreaterThan(heightOf(single));
     expect(visibleText(svg)).toContain('entry-9 标题');
-    expect(svg).toContain('font-size="30"');
+    expect(svg).toContain('font-size="18"');
     const yPositions = [...svg.matchAll(/<(?:text|line)[^>]* (?:y|y1)="(\d+)"/g)].map(match =>
       Number(match[1])
     );
     expect(Math.max(...yPositions)).toBeLessThan(heightOf(svg));
     const pages = renderBriefingImages(ten);
-    expect(pages.length).toBeGreaterThan(1);
+    expect(pages).toHaveLength(1);
     for (const page of pages) {
       expect(page.height).toBeLessThanOrEqual(BRIEFING_IMAGE_MAX_HEIGHT);
-      expect(page.svg).toContain('font-size="30"');
+      expect(page.svg).toContain('font-size="18"');
     }
   });
 
@@ -95,18 +99,14 @@ describe('briefing image renderer', () => {
   });
 
   it('keeps a long existing event intact and uses only the first complete context sentence', () => {
-    const headline = '很长的标题包括关键数字25.75亿元与事件时间。'.repeat(40);
+    const headline = '很长的标题包括关键数字25.75亿元与事件时间。'.repeat(100);
     const detail =
       '事实：完整信息留在详情。\n历史：上次利率维持不变，但通胀仍高于目标。更早的脉络留在详情。';
     const svg = renderBriefingSvg({
       ...briefing,
       items: [{ ...briefing.items[0], headline, detail }],
     });
-    const text = visibleText(svg)
-      .replaceAll(briefing.title, '')
-      .replaceAll(briefing.meta, '')
-      .replaceAll('长婷报社', '')
-      .replaceAll('L3 · 接上图', '');
+    const text = visibleText(svg).replaceAll('接上图', '');
     expect(text).toContain(headline);
     expect(text).toContain('历史：上次利率维持不变，但通胀仍高于目标。');
     expect(text).not.toContain('更早的脉络');
@@ -121,10 +121,10 @@ describe('briefing image renderer', () => {
     expect(pages[1].svg).toContain('接上图');
   });
 
-  it('moves a repeated trailing timestamp to metadata without losing the date', () => {
+  it('omits a matching metadata timestamp but retains other dates in the event', () => {
     const headline = '示例标题（2026-09-05 14:30）';
     const svg = renderBriefingSvg({ ...briefing, items: [{ ...briefing.items[0], headline }] });
-    expect(visibleText(svg)).toContain('2026-09-05 14:30');
+    expect(visibleText(svg)).not.toContain('2026-09-05 14:30');
     expect(visibleText(svg)).toContain('示例标题');
     expect(svg).not.toContain('示例标题（');
     const different = renderBriefingSvg({
@@ -138,7 +138,14 @@ describe('briefing image renderer', () => {
     const svg = renderBriefingSvg({
       ...briefing,
       title: '<script>alert("x")</script>',
-      items: [{ ...briefing.items[0], headline: 'A & B < C', detail: '历史：安全\u0000内容' }],
+      items: [
+        {
+          ...briefing.items[0],
+          headline: 'A & B < C',
+          emphasis: ['A & B < C'],
+          detail: '历史：安全\u0000内容',
+        },
+      ],
     });
     expect(svg).toContain('&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;');
     expect(svg).toContain('A &amp; B &lt; C');
@@ -158,7 +165,7 @@ describe('briefing image renderer', () => {
     const before = JSON.stringify(entry);
     const text = visibleText(renderBriefingSvg({ ...briefing, items: [entry] }));
     expect(text).toContain('示例企业拟建 8 万台产能，仍需审批');
-    expect(text).toContain('示例交易所');
+    expect(text).not.toContain('示例交易所');
     expect(text).toContain('上期产能为 5 万台');
     expect(text).toContain('口径相同。');
     expect(text).not.toContain('公司：');
@@ -166,36 +173,55 @@ describe('briefing image renderer', () => {
     expect(JSON.stringify(entry)).toBe(before);
   });
 
-  it('emphasizes existing event quantities while retaining uncertainty and leaving context quiet', () => {
+  it('does not infer emphasis from numbers when a snapshot has no explicit marks', () => {
     const headline = '示例企业拟投资 12 亿元，规划 8 万台产能，贷款 3 亿元尚未落实';
     const detail = '背景：上期投资 5 亿元。\n公司：示例公司';
     const svg = renderBriefingSvg({
       ...briefing,
       items: [{ ...briefing.items[0], headline, detail }],
     });
-    const emphasized = [...svg.matchAll(/<tspan font-weight="700"[^>]*>([^<]+)<\/tspan>/g)].map(
-      match => match[1]
-    );
-    expect(emphasized).toEqual(['12 亿元', '8 万台']);
+    expect(svg).not.toContain('font-weight="600"');
     const text = visibleText(svg);
     expect(text).toContain(headline);
     expect(text).toContain('背景：上期投资 5 亿元。');
   });
 
-  it('separates the actual summary format into event, brief history and timestamp without changing H5 content', () => {
+  it('keeps marked action and qualifiers highlighted across lines without highlighting history', () => {
+    const focus = '拟投资12亿元建设新产线';
+    const headline = `${'示例机构'.repeat(8)}${focus}，仍需审批。`;
+    const entry = {
+      ...briefing.items[0],
+      headline,
+      emphasis: [focus],
+      detail: `历史：上期曾${focus}。`,
+    };
+    const before = JSON.stringify(entry);
+    const svg = renderBriefingSvg({ ...briefing, items: [entry] });
+    const marked = [
+      ...svg.matchAll(/<tspan fill="#537568" font-weight="600">([^<]*)<\/tspan>/g),
+    ].map(match => match[1]);
+    expect(marked.length).toBeGreaterThan(1);
+    expect(marked.join('')).toBe(focus);
+    expect(visibleText(svg)).toContain(headline);
+    expect(visibleText(svg)).toContain(`历史：上期曾${focus}。`);
+    expect(JSON.stringify(entry)).toBe(before);
+  });
+
+  it('reduces the actual summary format to event and brief history without changing H5 content', () => {
     const items = parseSummaryItems(`## Level 1级新闻总结
-- **示例央行**下调利率 **25bp** *(截至 14:30)* [历史：上次会议维持不变。] [原文](https://example.com/rate)
+- 示例央行**下调利率25bp** *(截至 14:30)* [历史：上次会议维持不变。] [原文](https://example.com/rate)
 ## Level 2级新闻总结
-- **示例企业**否认裁员传闻 *(14:35)*`);
+- 示例企业**否认裁员传闻** *(14:35)*`);
     const before = JSON.stringify(items);
-    const text = visibleText(renderBriefingSvg({ ...briefing, meta: '2 条', items }));
-    expect(text).toContain('示例央行下调利率 25bp');
+    const svg = renderBriefingSvg({ ...briefing, meta: '2 条', items });
+    const text = visibleText(svg);
+    expect(text).toContain('示例央行下调利率25bp');
+    expect(svg).toContain('<tspan fill="#537568" font-weight="600">否认裁员传闻</tspan>');
     expect(text).toContain('历史：上次会议维持不变。');
-    expect(text).toContain('截至 14:30');
+    expect(text).not.toContain('截至 14:30');
     expect(text).toContain('示例企业否认裁员传闻');
     expect(text).not.toMatch(/\[历史|\(截至|原文|https/);
     expect(text.indexOf('25bp')).toBeLessThan(text.indexOf('历史：'));
-    expect(text.indexOf('历史：')).toBeLessThan(text.indexOf('截至 14:30'));
     expect(JSON.stringify(items)).toBe(before);
   });
 

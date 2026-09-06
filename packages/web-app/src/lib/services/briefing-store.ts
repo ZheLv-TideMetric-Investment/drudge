@@ -14,12 +14,17 @@ const briefingItemSchema = z
     tone: z.enum(['core', 'support', 'muted']),
     label: z.string().min(1),
     headline: z.string().min(1),
+    emphasis: z.array(z.string().min(1)).max(2).optional(),
     time: z.string(),
     detail: z.string(),
     source: z.string(),
     url: z.union([z.literal(''), z.string().url()]),
   })
-  .strict();
+  .strict()
+  .refine(item => item.emphasis?.every(phrase => item.headline.includes(phrase)) ?? true, {
+    message: 'Emphasis must be part of the existing headline',
+    path: ['emphasis'],
+  });
 
 const briefingDraftSchema = z
   .object({

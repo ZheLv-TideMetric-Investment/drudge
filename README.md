@@ -8,34 +8,35 @@
 
 - 线上入口：[drudge.microzj.com](https://drudge.microzj.com)。工作台、简报图片和详情共用该域名，当前无需账号密码；旧 `news.microzj.com` 入口已关闭。
 - 已上线：新闻浏览与搜索、图谱关联查询、总结报告、实时监控、数据统计、概览及现有机器人入口。
-- 2026-09-06 已发布：**“牛长婷”紧凑快讯图片（`quick-2`）**。每条事件句与可选短背景聚成一个浅色信息块，视觉强调集中在事件句；全部事件进入图片，多条内容按需分页。完整正文、实体列表和原文链接留在详情。下一步观察实际聊天呈现并继续细化图片，再优化详情；图谱深度探索暂不扩展。具体基线和验收见[消息手册](docs/dingtalk-briefing.md#下一阶段)。
+- 2026-09-06 已发布：**“牛长婷”紧凑快讯图片（`quick-2`）**。每条事件句与可选短背景聚成一个浅色信息块；全部事件进入图片，多条内容按需分页。完整正文、实体列表和原文链接留在详情。
+- 最新决定：用户要求停止设计发散，回到“一句事件 + 可选已有历史”的普通文字列表，并尽量缩小字号。当前本地实现为 `plain-2`：白底、事件 `18px`、历史 `16px`，仅对核心动作/变化使用灰绿色加粗，无标题、等级或色块；尚未发布。详情见[消息手册](docs/dingtalk-briefing.md#下一阶段)。
 - 最近部署版本、真实验收与回退点见[发布快照](docs/deployment.md#最近发布快照)。历史验收不能替代下一次操作前的现场检查。
 
 ## AI 从这里接手
 
 先读 [AGENTS.md](AGENTS.md)，再按任务选择文档。仓库现有文档就是项目知识入口，每类事实只维护一处。
 
-| 要回答的问题 | 主要文档 |
-| --- | --- |
-| 现在完成了什么、下一步优先做什么 | 本 README |
-| AI 怎样工作、哪些边界必须保留 | [AGENTS.md](AGENTS.md) |
-| 三个应用怎样协作、数据怎样流转 | [架构](docs/architecture.md) |
-| 怎样定位实现、测试和交付 | [开发](docs/development.md) |
-| 机器人消息怎样生成、展示和验收 | [消息](docs/dingtalk-briefing.md) |
-| 哪个版本在线、怎样发布和回退 | [部署](docs/deployment.md) |
-| Neo4j 精确字段、关系和迁移约束 | [数据库结构](packages/graph-worker/DATABASE_SCHEMA.md) |
-| 为什么采用当前收件人、展示和域名方案 | [决定记录](docs/decisions/) |
-| 配置键和安全示例 | [env.example](env.example) |
+| 要回答的问题                         | 主要文档                                               |
+| ------------------------------------ | ------------------------------------------------------ |
+| 现在完成了什么、下一步优先做什么     | 本 README                                              |
+| AI 怎样工作、哪些边界必须保留        | [AGENTS.md](AGENTS.md)                                 |
+| 三个应用怎样协作、数据怎样流转       | [架构](docs/architecture.md)                           |
+| 怎样定位实现、测试和交付             | [开发](docs/development.md)                            |
+| 机器人消息怎样生成、展示和验收       | [消息](docs/dingtalk-briefing.md)                      |
+| 哪个版本在线、怎样发布和回退         | [部署](docs/deployment.md)                             |
+| Neo4j 精确字段、关系和迁移约束       | [数据库结构](packages/graph-worker/DATABASE_SCHEMA.md) |
+| 为什么采用当前收件人、展示和域名方案 | [决定记录](docs/decisions/)                            |
+| 配置键和安全示例                     | [env.example](env.example)                             |
 
 `CLAUDE.md` 只引导读取同一套规则，不维护第二份架构或状态。`artifacts/` 是不入库的临时工作记录，不是后续 AI 接手所必需的知识源。
 
 ## 应用与运行
 
-| 应用包 | 职责 | 默认 HTTP 端口 |
-| --- | --- | --- |
-| `packages/ingest-worker` | 富途与 AWTMT 采集、源内去重、文件落盘 | `39110` |
-| `packages/graph-worker` | 消费新闻文件、AI 抽取、Neo4j 写入与查询 | `39111` |
-| `packages/web-app` | 工作台、简报、总结、扫描和消息投递 | `39112` |
+| 应用包                   | 职责                                    | 默认 HTTP 端口 |
+| ------------------------ | --------------------------------------- | -------------- |
+| `packages/ingest-worker` | 富途与 AWTMT 采集、源内去重、文件落盘   | `39110`        |
+| `packages/graph-worker`  | 消费新闻文件、AI 抽取、Neo4j 写入与查询 | `39111`        |
+| `packages/web-app`       | 工作台、简报、总结、扫描和消息投递      | `39112`        |
 
 三个应用包在生产运行四个 PM2 进程：`ingest-worker`、`graph-worker`、`web-app`、`web-scheduler`。`shared/common` 是共享库，不是第四个应用；`web-scheduler` 属于 Web 包，是独立的调度进程。
 

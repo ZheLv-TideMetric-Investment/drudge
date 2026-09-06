@@ -50,7 +50,7 @@ describe('dingtalkMessageService', () => {
     const message = buildBriefingMessage(briefing, 'https://news.example.com/');
 
     expect(message.imageUrls).toEqual([
-      'https://news.example.com/briefings/0123456789abcdef0123456789abcdef/image.svg?v=quick-2&page=1',
+      'https://news.example.com/briefings/0123456789abcdef0123456789abcdef/image.svg?v=plain-2&page=1',
     ]);
     expect(message.detailUrl).toBe(
       'https://news.example.com/briefings/0123456789abcdef0123456789abcdef'
@@ -64,7 +64,7 @@ describe('dingtalkMessageService', () => {
     const { buildBriefingMessage } = await import('../../src/lib/services/dingtalk-message');
     const document = {
       ...briefing,
-      items: Array.from({ length: 20 }, (_, index) => ({
+      items: Array.from({ length: 40 }, (_, index) => ({
         ...briefing.items[0],
         id: `news-${index}`,
         detail: '事实：全部信息保留。'.repeat(30),

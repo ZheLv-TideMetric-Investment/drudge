@@ -8,11 +8,11 @@ const document: BriefingDocument = {
   id,
   createdAt: '2026-09-05T13:00:00.000Z',
   title: '模拟简报',
-  meta: '20:00–21:00 · 20 条',
+  meta: '20:00–21:00 · 40 条',
   l1Count: 0,
   l2Count: 0,
-  l3PlusCount: 20,
-  items: Array.from({ length: 20 }, (_, index) => ({
+  l3PlusCount: 40,
+  items: Array.from({ length: 40 }, (_, index) => ({
     id: `item-${index}`,
     level: 'L3',
     tone: 'muted',
@@ -49,7 +49,7 @@ describe('briefing image route', () => {
       params: Promise.resolve({ id }),
     });
     expect(response.status).toBe(200);
-    expect(await response.text()).toContain('内容19');
+    expect(await response.text()).toContain('内容39');
   });
 
   it.each(['0', '-1', '1.5', 'invalid', '999999'])(

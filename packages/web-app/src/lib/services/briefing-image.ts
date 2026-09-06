@@ -1,21 +1,19 @@
 import type { BriefingDocument, BriefingItem } from './notification-briefing';
 
 export const BRIEFING_IMAGE_WIDTH = 720;
-export const BRIEFING_IMAGE_VERSION = 'quick-2';
-const PADDING = 36;
+export const BRIEFING_IMAGE_VERSION = 'plain-2';
+const PADDING = 20;
 const CONTENT_WIDTH = BRIEFING_IMAGE_WIDTH - PADDING * 2;
-const BLOCK_PADDING = 12;
-const BLOCK_GAP = 16;
+const BLOCK_GAP = 10;
 
 const COLORS = {
-  ink: '#35453D',
-  accent: '#587466',
-  secondary: '#6D7870',
-  block: '#F0F3EE',
-  paper: '#FAFBF8',
+  ink: '#343434',
+  accent: '#537568',
+  secondary: '#777777',
+  paper: '#FFFFFF',
 };
 
-// 图片不承担点击或复制操作；只移除网址，正文与来源名称继续保留。
+// 图片不承担点击或复制操作；移除网址及对应操作标签，保留事件与背景正文。
 const imageText = (value: string): string =>
   value
     .split(/\r\n?|\n/)
@@ -81,19 +79,22 @@ export const wrapText = (value: string, maxUnits: number): string[] => {
 
 const toneRank: Record<BriefingItem['tone'], number> = { core: 0, support: 1, muted: 2 };
 
-interface Emphasis {
+interface EmphasisRange {
   start: number;
   end: number;
 }
 
-const inlineText = (value: string, emphasis: Emphasis[] = []): string => {
-  let position = 0;
-  const spans = emphasis.map(({ start, end }) => {
-    const span = `${escapeXml(value.slice(position, start))}<tspan font-weight="700" fill="${COLORS.accent}">${escapeXml(value.slice(start, end))}</tspan>`;
-    position = end;
-    return span;
-  });
-  return spans.join('') + escapeXml(value.slice(position));
+const inlineText = (value: string, ranges: EmphasisRange[] = []): string => {
+  let cursor = 0;
+  let svg = '';
+  for (const range of ranges) {
+    const start = Math.max(cursor, range.start);
+    if (range.end <= start) continue;
+    svg += escapeXml(value.slice(cursor, start));
+    svg += `<tspan fill="${COLORS.accent}" font-weight="600">${escapeXml(value.slice(start, range.end))}</tspan>`;
+    cursor = range.end;
+  }
+  return svg + escapeXml(value.slice(cursor));
 };
 
 const textElement = (
@@ -105,7 +106,7 @@ const textElement = (
     color?: string;
     lineHeight: number;
     x?: number;
-    emphasis?: Emphasis[];
+    emphasis?: EmphasisRange[];
   }
 ): string => {
   const { size, weight = 400, color = COLORS.ink, lineHeight, x = PADDING } = options;
@@ -118,7 +119,7 @@ const textElement = (
     .join('')}</text>`;
 };
 
-const imageHeading = (item: BriefingItem): { headline: string; time: string; context: string } => {
+const imageHeading = (item: BriefingItem): { headline: string; context: string } => {
   let context = '';
   const selectContext = (label: string, value: string) => {
     if (context) return;
@@ -134,6 +135,7 @@ const imageHeading = (item: BriefingItem): { headline: string; time: string; con
       selectContext(label, value);
       return '';
     })
+    .replace(/\s+/g, ' ')
     .trim();
   for (const paragraph of item.detail.split(/\r\n?|\n/)) {
     const marked = paragraph.match(/^(历史|背景)\s*[:：]\s*(.+)$/);
@@ -146,9 +148,9 @@ const imageHeading = (item: BriefingItem): { headline: string; time: string; con
   );
   if (timestamp && item.time && timestamp[1].includes(item.time)) {
     const event = headline.slice(0, timestamp.index).trim();
-    if (event) return { headline: event, time: timestamp[1], context };
+    if (event) return { headline: event, context };
   }
-  return { headline, time: item.time, context };
+  return { headline, context };
 };
 
 export const BRIEFING_IMAGE_MAX_HEIGHT = 1280;
@@ -165,7 +167,7 @@ interface ImageLine {
   weight?: number;
   color?: string;
   height: number;
-  emphasis?: Emphasis[];
+  emphasis?: EmphasisRange[];
 }
 
 interface ImageBlock {
@@ -185,19 +187,28 @@ const linesFor = (
     ...options,
   }));
 
-const eventLines = (headline: string): ImageLine[] => {
-  const lines = linesFor(headline, 30, 42, { weight: 600 });
-  let emphasisLeft = 2;
-  for (const line of lines) {
-    // 强调放在事件句内，不再把详细正文里的数值做成另一个阅读层级。
-    line.emphasis = [];
-    for (const match of line.text!.matchAll(new RegExp(QUANTITY_PATTERN, 'gi'))) {
-      if (emphasisLeft === 0) break;
-      line.emphasis.push({ start: match.index!, end: match.index! + match[0].length });
-      emphasisLeft -= 1;
-    }
-  }
-  return lines;
+const eventLines = (headline: string, emphasis: string[] = []): ImageLine[] => {
+  // 只使用既有标记且仍在事件句中的文字；旧快照和无标记新闻不猜测重点。
+  const ranges = emphasis
+    .slice(0, 2)
+    .map(phrase => ({
+      start: headline.indexOf(phrase),
+      end: headline.indexOf(phrase) + phrase.length,
+    }))
+    .filter(range => range.start >= 0 && range.end > range.start)
+    .sort((a, b) => a.start - b.start);
+  let offset = 0;
+  return linesFor(headline, 18, 26).map(line => {
+    const length = line.text!.length;
+    line.emphasis = ranges
+      .filter(range => range.start < offset + length && range.end > offset)
+      .map(range => ({
+        start: Math.max(0, range.start - offset),
+        end: Math.min(length, range.end - offset),
+      }));
+    offset += length;
+    return line;
+  });
 };
 
 const heightOf = (lines: ImageLine[]): number =>
@@ -226,14 +237,8 @@ const drawLines = (lines: ImageLine[], startY: number): string => {
 
 /** 快速播报：保留每条事件句，可附已有短背景；完整详情仍在同一份快照中。 */
 export const renderBriefingImages = (briefing: BriefingDocument): BriefingImage[] => {
-  const header = [
-    ...linesFor(briefing.title, 20, 28, { weight: 600, color: COLORS.accent }),
-    ...linesFor(briefing.meta, 18, 24, { color: COLORS.secondary }),
-  ];
-  const headerY = 20;
-  const bodyY = headerY + heightOf(header) + 14;
-  const footerHeight = 48;
-  const capacity = Math.max(160, BRIEFING_IMAGE_MAX_HEIGHT - bodyY - footerHeight);
+  const bodyY = PADDING;
+  const capacity = BRIEFING_IMAGE_MAX_HEIGHT - PADDING * 2 - 30;
   const pages: ImageBlock[][] = [[]];
   let page = pages[0];
   let used = 0;
@@ -244,7 +249,7 @@ export const renderBriefingImages = (briefing: BriefingDocument): BriefingImage[
   };
   const startBlock = (): ImageBlock => {
     const block: ImageBlock = { lines: [] };
-    used += (page.length ? BLOCK_GAP : 0) + BLOCK_PADDING * 2;
+    used += page.length ? BLOCK_GAP : 0;
     page.push(block);
     return block;
   };
@@ -261,28 +266,12 @@ export const renderBriefingImages = (briefing: BriefingDocument): BriefingImage[
     );
 
   items.forEach(({ item }) => {
-    const { headline, time, context } = imageHeading(item);
-    const source =
-      ({ futu_live: '富途快讯', awtmt_live: '华尔街见闻' } as Record<string, string>)[
-        item.source
-      ] ?? item.source;
-    const metadata = [item.level, time, imageText(source)].filter(Boolean).join(' · ');
-    const heading = eventLines(headline);
-    const body = [
-      ...(context
-        ? [{ height: 2 }, ...linesFor(context, 22, 30, { color: COLORS.secondary })]
-        : []),
-      ...(metadata
-        ? [{ height: 4 }, ...linesFor(metadata, 18, 24, { color: COLORS.secondary })]
-        : []),
-    ];
+    const { headline, context } = imageHeading(item);
+    const heading = eventLines(headline, item.emphasis);
+    const body = context ? linesFor(context, 16, 23, { color: COLORS.secondary }) : [];
     const section = [...heading, ...body];
-    const sectionHeight = heightOf(section) + BLOCK_PADDING * 2;
-    const minimumStart = Math.min(
-      sectionHeight,
-      heightOf(heading) + 44 + BLOCK_PADDING * 2,
-      capacity
-    );
+    const sectionHeight = heightOf(section);
+    const minimumStart = Math.min(sectionHeight, heightOf(heading) + 23, capacity);
     if (
       used > 0 &&
       used + BLOCK_GAP + (sectionHeight <= capacity ? sectionHeight : minimumStart) > capacity
@@ -295,11 +284,10 @@ export const renderBriefingImages = (briefing: BriefingDocument): BriefingImage[
         nextPage();
         block = startBlock();
         append(block, {
-          text: `${item.level} · 接上图`,
-          size: 18,
-          height: 28,
+          text: '接上图',
+          size: 14,
+          height: 20,
           color: COLORS.secondary,
-          weight: 500,
         });
       }
       append(block, line);
@@ -311,25 +299,21 @@ export const renderBriefingImages = (briefing: BriefingDocument): BriefingImage[
     const content = blocks
       .map((block, blockIndex) => {
         if (blockIndex > 0) blockY += BLOCK_GAP;
-        const blockHeight = heightOf(block.lines) + BLOCK_PADDING * 2;
+        const blockHeight = heightOf(block.lines);
         const svg = `<g class="briefing-item">
-        <rect x="20" y="${blockY}" width="680" height="${blockHeight}" rx="4" fill="${COLORS.block}"/>
-        ${drawLines(block.lines, blockY + BLOCK_PADDING)}
+        ${drawLines(block.lines, blockY)}
       </g>`;
         blockY += blockHeight;
         return svg;
       })
       .join('\n');
-    const footerY = blockY + 12;
-    const height = Math.max(180, footerY + 36);
+    const height = Math.max(64, blockY + PADDING + (pages.length > 1 ? 30 : 0));
     const svg = `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${BRIEFING_IMAGE_WIDTH}" height="${height}" viewBox="0 0 ${BRIEFING_IMAGE_WIDTH} ${height}" role="img" aria-label="${escapeXml(briefing.title)} · ${index + 1}/${pages.length}">
   <rect width="${BRIEFING_IMAGE_WIDTH}" height="${height}" fill="${COLORS.paper}"/>
   <g font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif">
-    ${drawLines(header, headerY)}
     ${content}
-    ${textElement(['长婷报社'], footerY + 16, { size: 16, lineHeight: 22, color: COLORS.secondary })}
-    <text x="684" y="${footerY + 16}" text-anchor="end" fill="${COLORS.secondary}" font-size="16">${index + 1} / ${pages.length}</text>
+    ${pages.length > 1 ? `<text x="700" y="${blockY + 26}" text-anchor="end" fill="${COLORS.secondary}" font-size="14">${index + 1} / ${pages.length}</text>` : ''}
   </g>
 </svg>`;
     return { svg, width: BRIEFING_IMAGE_WIDTH, height };
