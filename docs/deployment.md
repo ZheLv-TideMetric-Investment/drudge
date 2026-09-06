@@ -1,291 +1,211 @@
-# Drudge 最小发布手册（v1）
+# 发布与运行状态
 
-这份手册只解决一件事：让 AI 完成代码修改和检查后，把同一个 Git 提交安全地推到 GitHub，并在家庭 PVE 的 `tide` 容器中构建、重启和验证。
+本文是 Drudge 生产状态、应用发布和回退的主要手册。应用源码留在本仓库，入口契约只在 [ops/home-service.yaml](../ops/home-service.yaml)；共享入口操作沿用 [Home Ingress 手册](../../home-ingress/SERVICE-ONBOARDING.md)。
 
-v1 不引入 GitHub Actions、自建 Runner、Webhook、新容器或复杂制品系统。GitHub 继续作为代码基线和审计记录，当前 Mac/Codex 作为发布控制端。
+## 最近发布快照
 
-产品与架构边界见 [`architecture.md`](architecture.md)，本地实现和 review 见 [`development.md`](development.md)。本文是 GitHub 到 PVE 发布命令的唯一事实源。
+以下是 **2026-09-06 紧凑快讯图片发布完成时**的已验证结果，不是持续监控。下一次操作前必须重新确认动态状态。
 
-## 1. 当前已验证的运行基线
+| 项目 | 验收结果 |
+| --- | --- |
+| 应用提交 | `557db957a80b84504db9000b1fe3a88af575d78b` |
+| 应用 tree | `fc985ba808a4aa32d8fed839f449a781b33dfed6` |
+| 发布记录 | `DRUDGE-DEPLOY-557db95-20260906` |
+| 展示版本 | `quick-2`，事件句与短背景、紧凑信息分组、全条目分页 |
+| 代码位置 | 应用提交已同步 GitHub 和 Tide；后续纯文档提交与运行应用版本分开记录 |
+| 进程 | 四个既有 PM2 进程 online，仅重启 `web-app` 和 `web-scheduler`，状态已保存；两个 worker 的 PID/启动时间未变 |
+| 公网 | 七个工作台页面、简报健康端点、既有模拟简报 H5/SVG 均为 200，无认证挑战；模拟 SVG 与本地渲染器逐字节一致 |
+| 分页 | 用户提供的既有简报分为两页，分别为 `720×1124`、`720×892`，均返回 200；无页码路径正常，非法页码返回 404 |
+| 只读 API | 公网监控返回 200，Web、ingest、graph、Neo4j 四项连通性均为 true；三个应用健康端点为 200 |
+| 浏览器 | 本地桌面/390px 手机预览通过；发布后的浏览器复验工具超时，未计为通过 |
+| 通知 | 按既有用户授权保持开启，唯一显式收件人不变；本次发布未再手动发消息或调用 AI |
+| 配置与入口 | Web 两进程显式读取根配置，构建与运行 Host 匹配 `drudge.microzj.com`；本次未修改配置或 Home Ingress 路由 |
+| 运行边界 | Neo4j 容器 ID 与启动时间未变；未迁移或清理数据库、业务数据和消费位点 |
 
-- 本地仓库：`/Users/microTT/toto/ih/drudge`
-- GitHub：`ZheLv-TideMetric-Investment/drudge`
-- PVE 入口：`ssh home-pve`
-- PVE 应用容器：`tide`，当前 CTID 为 `103`；CTID 每次发布前必须动态确认
-- PVE 仓库：`/root/pre/drudge`
-- Node.js：NVM 中的 `v24.3.0`
-- pnpm：`10.12.4`
-- 应用进程：PM2 管理 `ingest-worker`、`graph-worker`、`web-app`、`web-scheduler`
-- Neo4j：独立 Docker 容器 `drudge-neo4j`
-- 健康检查：
-  - ingest：`http://127.0.0.1:39110/health`
-  - graph：`http://127.0.0.1:39111/health`
-  - web：`http://127.0.0.1:39112/`
+发布前完整验证通过：72 个套件、860 项测试，lint、格式/环境检查和三个应用构建通过；本服务 Home Ingress manifest 校验通过。生产执行 `pnpm install --frozen-lockfile` 和 `pnpm --filter web run build`。本次仅 Web 包变化，共享库、依赖和两个 worker 未变化，因此不重启 worker。
 
-PVE 的非登录命令环境找不到 NVM 中的 `node` 和 `pnpm`，所以所有 Node/pnpm 远程命令都必须通过 `bash -lc` 执行。
+本次代码回退分支为 Tide 的 `pve-pre-deploy-557db95`，指向发布前提交 `3dd0b1a43c1ad44f6fa30206f5edafac521874b8`。无配置或路由变更，不为本次发布新增这些对象的副本。
 
-### 1.1 Web 运行配置更新
+2026-09-05 统一入口里程碑的回退材料仍保留，属于那次发布：
 
-根 `.env` 是唯一运行配置入口。Next standalone 构建目录可能带有旧的 `.env` 副本；只修改根文件并重启，不足以证明 Web 已读取新配置。Web 与调度器应通过现有 `DOTENV_CONFIG_PATH` 明确使用根文件。
+- Tide 代码分支：`pve-pre-deploy-3dd0b1a`，对应发布前提交 `c4f08934f1692693a8dea370c4ac47cf6b5eeb24`。
+- Tide 根配置副本：`/root/pre/drudge/.env.bak-DRUDGE-DEPLOY-3dd0b1a-20260905`。
+- 101 路由副本：`/etc/home-ingress/backups/drudge-3dd0b1a.caddy`。
 
-已获本次配置修改和重启授权、核对运行目标并保留原配置后，在应用容器中执行：
+本次原始记录位于本地忽略目录 `artifacts/DRUDGE-DEPLOY-557db95-20260906.md`；上述正式结论不依赖该目录可用。后续观察机器人实际呈现，详见 README 和消息手册。
 
-```bash
-cd /root/pre/drudge/packages/web-app
-DOTENV_CONFIG_PATH=/root/pre/drudge/.env pnpm exec pm2 restart web-app web-scheduler --update-env
-```
+## 运行位置与配置
 
-这里按进程名称重启。现场验证 PM2 5.4.3 使用 `restart ecosystem.config.js --update-env` 时，并未导入命令前设置的 `DOTENV_CONFIG_PATH`。
+| 对象 | 位置 / 职责 |
+| --- | --- |
+| 本地工作区 | `/Users/microTT/toto/ih/drudge`，修改与验证 |
+| GitHub | `ZheLv-TideMetric-Investment/drudge`，main 作为共享代码基线 |
+| 业务容器 | `tide`，最近现场 CTID 为 `103`，仓库 `/root/pre/drudge` |
+| 入口容器 | CT101 `home-ingress`，只运行 Caddy 与共享隧道 |
+| 应用进程 | `ingest-worker`、`graph-worker`、`web-app`、`web-scheduler` |
+| 数据库 | 独立 Docker 容器 `drudge-neo4j`，普通应用发布不重启或重建 |
+| 运行配置 | `/root/pre/drudge/.env`；实际值不写入仓库和文档 |
+| 最近工具版本 | Node.js `v24.3.0`（NVM）、pnpm `10.12.4`、PM2 `5.4.3`；操作前核实 |
 
-重启后核对两个进程的配置路径和有效通知开关，只输出是否匹配，不输出完整环境；确认进程在线、简报健康端点正常后，执行 `pnpm exec pm2 save` 保存运行状态。停用通知同样修改根配置并重启两个进程。通知投递的验收要求见[钉钉简报手册](dingtalk-briefing.md#5-启用与验收)。
+固定管理入口是 `ssh home-pve`。开始远程工作先读取现行 home-pve 运维规则并运行其固定预检，保持已固定的 SSH Host Key 和严格校验；不换公网端口、身份或连接路线。
 
-### 1.2 工作台入口
+PVE 的普通非登录 shell 找不到 NVM 工具。下方多行命令通过 `bash -ls` 从标准输入执行，以加载登录环境并避免多层引号。
 
-`ops/home-service.yaml` 只声明 `drudge.microzj.com`，简报和工作台均转发到 Tide 的现有 Web App：
+### Web 根配置
 
-| 路径 | 用途 | 访问方式 |
-| --- | --- | --- |
-| `/briefings/*`、`/_next/static/*`、favicon | 钉钉图片、简报详情与静态资源 | 直接访问 |
-| `/`、`/news`、`/graph`、`/summary`、`/monitor`、`/stats`、`/tingzi`、`/api/*` | 工作台页面和接口 | 直接访问，无账号密码认证 |
+Web standalone 目录可能含旧 `.env` 副本。仅修改根文件或按 ecosystem 文件重启，不能证明新配置已载入；`web-app` 和 `web-scheduler` 必须显式使用根 `DOTENV_CONFIG_PATH`。
 
-使用 IH 的 `home-ingress/bin/home-ingressctl check/render` 生成 Drudge 自己的路由，再按[入口接入手册](../../home-ingress/SERVICE-ONBOARDING.md)安装到 101。路由变更和应用发布需在本次生产授权范围内；不增加业务进程或公网端口。
+在用户授权的配置变更中，先保留权限不变的根配置副本，只更新约定键。`BRIEFING_PUBLIC_BASE_URL` 影响 Web 构建域名，修改后必须重新构建，并按下方命名进程方式重启。
 
-用户已明确要求先去掉工作台认证，manifest 使用 `public/none`，无需在 101 配置 owner 账号。工作台页面及扫描、总结、推送 API 均可直接访问；不再依赖代理认证标记。
+验收只输出“配置路径匹配、有效通知开关、单收件人合法、构建/运行 Host 匹配”等结果，不输出完整环境、用户 ID 或凭据。
 
-在获授权的同次发布中，将根 `.env` 的 `BRIEFING_PUBLIC_BASE_URL` 更新为 `https://drudge.microzj.com`，再构建 Web 并重启 `web-app` 和 `web-scheduler`。构建时域名与运行时链接配置必须一致。替换 Drudge 自己的路由文件后不再保留旧 `news.microzj.com` 入口或跳转；历史消息里的旧域名链接会失效，持久化简报仍可在新域名用原 ID 访问。
-
-若需要回滚，恢复对应的应用版本、根配置中的域名和 Drudge 路由文件；构建时与运行时的域名必须一致。
-
-验收包括：无凭据访问工作台页面和只读 API 正常，不出现账号密码提示或原来的域名访问限制；简报和图片仍为 200；旧域名不再提供 Drudge 服务。浏览器的扫描、总结与消息操作先用本地模拟响应验收；生产点击发送需要明确授权。
-
-监控页每 30 秒刷新，worker 端口复用根配置的 `INGEST_WORKER_PORT`、`GRAPH_WORKER_PORT`。图谱数据库未能完成检测时显示“未确认”；连通性结果不能代替新闻采集质量或 AI 处理结果的验收。
-
-工作台的浏览器操作请求检查 `Origin` 和 Fetch Metadata，拒绝其他站点发起的扫描、总结等操作；不带浏览器来源头的内部调度调用保持兼容。新闻标题、正文和关键词按文本渲染，保留内容与高亮，不执行新闻源提供的 HTML。
-
-## 2. 发布链路
+## 公网入口
 
 ```text
-AI 在 codex/<task> 修改
-  -> 本地 lint/test/build
-  -> AI 检查 diff、测试结果和敏感文件
-  -> 生成固定 commit SHA
-  -> 用户批准一次发布 CHANGE_ID
-  -> fast-forward 到本地 main 并推送 GitHub
-  -> 通过现有固定 SSH 链路把同一 SHA 送入 PVE
-  -> PVE install/build
-  -> PM2 重启四个应用进程
-  -> SHA、进程和 HTTP 健康检查
+HTTPS drudge.microzj.com
+  → ECS :443 / Nginx
+  → 共享回环隧道
+  → CT101 Caddy
+  → Tide Web App :39112
 ```
 
-在当前任务已经明确授权本地 commit 的前提下，发布阶段默认只保留一个人工门：目标 SHA 固定且 AI 完成检查后，用户批准包含 GitHub push 和 PVE 部署完整命令的单次 `CHANGE_ID`。批准后其余步骤由 AI 连续执行；异常立即停止，不自动重试或换方案。
+manifest 只声明一个 `web` component，`public/none`；工作台、API、`/briefings/*` 和静态资源都直接访问，不需要 owner 账号或代理认证标记。用户明确选择免登录，不在后续任务中自行恢复 Basic Auth。
 
-## 3. AI 开发与本地检查
+原 `news.microzj.com` 入口已退出。旧消息里的旧域名 URL 会失效，持久化简报仍可在新域名用原 ID 访问。构建与运行消息配置都必须使用 `https://drudge.microzj.com`。
 
-从干净的 `main` 开始：
+修改本服务入口时运行：
 
 ```bash
-cd /Users/microTT/toto/ih/drudge
-git status --short --branch
-git switch main
-git pull --ff-only origin main
-git switch -c codex/<task-name>
+/Users/microTT/toto/ih/home-ingress/bin/home-ingressctl check --repo .
+/Users/microTT/toto/ih/home-ingress/bin/home-ingressctl render --repo . --output /tmp/drudge.caddy
 ```
 
-AI 完成修改和测试后，必须依次通过：
+取得本次入口变更授权后，按共享手册安装生成的 Drudge 路由、校验并 reload。只替换自己的 `/etc/home-ingress/routes/drudge.caddy`，保留回退副本；不修改其他服务，也不新增 DNS、证书、iKuai 映射、隧道或公网端口。
 
-```bash
-pnpm install --frozen-lockfile
-pnpm run verify
-git diff --check
-git status --short
-```
+## 发布约定
 
-AI Review 至少确认：
+本地修改和验收 → 固定提交 → GitHub main → 固定 SSH 传输同一提交 → Tide 构建受影响应用 → 命名重启受影响进程 → 公网与现场验收。
 
-- 改动只覆盖当前需求，没有无关重构；
-- 测试覆盖新增或变化的关键行为；
-- `.env`、`data/`、`old_data/`、日志和 `*.bak-*` 没有被提交；
-- 不包含 Token、Webhook、API Key、数据库密码或私人新闻正文；
-- 没有数据库清理、Schema 破坏或 Neo4j 重建步骤；
-- 明确区分“本地检查通过”和“PVE 已部署生效”。
+执行 commit、push、配置修改、部署或重启前，确认它们在用户已授权的范围内。同一任务的授权持续有效；先把 SHA、目标、影响、命令和回退点整理成一份可 review 的 `DRUDGE-DEPLOY-<SHORT_SHA>-<YYYYMMDD>` 记录，不建立逐命令确认流程。尚缺授权时，把准备工作完成后一次性提出。
 
-只有用户已明确授权本次 commit 时，才执行下一段；否则在本地 review 和工作树状态处停止。只暂存明确文件，不使用宽泛的 `git add .`：
+遇到目标不符、tracked 生产改动、非 fast-forward、安装/构建/健康失败立即停止；先定位原因，不 force push、自动解决生产冲突、切换传输路线或扩大发布范围。新目标、破坏性操作或更大影响要重新说明。
 
-```bash
-git add -- <file-1> <file-2>
-git diff --cached --check
-git diff --cached --name-only
-git diff --cached --stat
-git commit -m "<message>"
-git rev-parse HEAD
-git rev-parse HEAD^{tree}
-```
+**仅文档变更不需要应用构建或生产重启。** 文档提交与实际运行应用版本分别记录，不为了让文档 SHA 与进程版本相同而重复部署。
 
-此时 commit SHA 已固定，但尚未推送或部署。
+## 应用发布步骤
 
-## 4. 发布审批包
+以下是全应用发布模板。只有 Web 包变化且共享库、依赖未变时，构建使用 `pnpm --filter web run build`，重启只执行 Web 两进程的命名命令；核对两个 worker 持续运行。示例中的 `103` 只能在现场确认仍是 Tide 后使用；分支、SHA 和记录必须换成本次真实值。
 
-AI 在外部写入前展示：
+### 1. 本地验证与固定提交
 
-- 唯一 `CHANGE_ID: DRUDGE-DEPLOY-<SHORT_SHA>-<YYYYMMDD>`；
-- 目标 commit SHA 和 tree SHA；
-- diff 摘要及实际通过的检查；
-- GitHub 当前 `main`；
-- PVE 动态确认的容器名称、CTID、当前 SHA 和 tracked 工作树状态；
-- 本次完整 push、构建、重启、验证命令；
-- 影响范围、停止条件和回滚分支名。
+遵循[开发手册](development.md)完成检查和 review。只暂存明确文件，检查暂存 diff 后按已有授权提交；不使用 `git add .`，不包含 `.env`、数据、日志或构建产物。
 
-用户批准这个 `CHANGE_ID` 后，才能执行以下写操作。任何 SHA、CTID、命令或范围变化都需要新的批准。
+固定提交后记录 `git rev-parse HEAD` 与 `git rev-parse 'HEAD^{tree}'`。发布前核对 GitHub main、本地 main、当前任务分支与生产旧提交，不覆盖无关工作。
 
-## 5. 推送 GitHub
-
-把开发分支 fast-forward 到 `main`：
-
-```bash
-cd /Users/microTT/toto/ih/drudge
-git switch main
-git merge --ff-only codex/<task-name>
-git push origin main
-git ls-remote --heads origin main
-```
-
-远端返回值必须与目标 SHA 完全一致。禁止 force push。
-
-## 6. 部署到 PVE
-
-### 6.1 发布前只读检查
+### 2. 生产只读预检
 
 ```bash
 bash /Users/microTT/pve-remote-ops/skills/home-pve-ops/scripts/check-home-pve.sh
-
 ssh home-pve 'pct config 103'
 ssh home-pve 'pct exec 103 -- git -C /root/pre/drudge symbolic-ref --short HEAD'
 ssh home-pve 'pct exec 103 -- git -C /root/pre/drudge rev-parse HEAD'
 ssh home-pve 'pct exec 103 -- git -C /root/pre/drudge status --short --untracked-files=no'
 ```
 
-必须确认：
+确认容器与进程、分支 main、旧 SHA、tracked 工作树干净。生产 `old_data/`、备份和运行数据不是 Git 冲突，不清理或提交。记录必要进程和 Neo4j 元数据，便于直接验收，避免全系统审计。
 
-- 动态库存中的 `103` 仍是 `tide` 且正在运行；
-- PVE 当前分支是 `main`；
-- 没有 tracked 修改；
-- 当前 SHA 是审批包记录的旧 SHA。
+### 3. GitHub 与同一提交传输
 
-PVE 中保留的 `old_data/` 和 `*.bak-*` 不属于 Git 基线，不删除、不提交、不读取正文。
-
-### 6.2 建立代码回滚点
-
-先将旧 HEAD 保存为唯一分支。执行前把占位符替换为本次实际短 SHA：
+本地示例变量不包含秘密；填写并核对真实值后执行：
 
 ```bash
-ssh home-pve 'pct exec 103 -- git -C /root/pre/drudge branch pve-pre-deploy-<TARGET_SHORT_SHA> HEAD'
+DRUDGE_TASK_BRANCH='codex/replace-with-task'
+DRUDGE_TARGET_SHA='replace-with-approved-40-character-sha'
+[[ "$DRUDGE_TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || exit 1
+DRUDGE_SHORT_SHA="${DRUDGE_TARGET_SHA:0:7}"
+
+git switch main
+git merge --ff-only "$DRUDGE_TASK_BRANCH"
+test "$(git rev-parse HEAD)" = "$DRUDGE_TARGET_SHA" || exit 1
+git push origin main
+git ls-remote --heads origin main
 ```
 
-如果同名分支已存在，立即停止，不覆盖。
-
-### 6.3 传输并切换同一提交
-
-由于 PVE 到 GitHub 的 HTTPS 曾出现 TLS 中断，v1 使用已经验证过的固定 SSH 链路，从本地直接传输 Git 对象：
+GitHub 返回的 SHA 必须与目标完全一致。通过后，先在 Tide 保存旧提交；同名回退分支已存在时停止，不覆盖：
 
 ```bash
-git -C /Users/microTT/toto/ih/drudge -c protocol.ext.allow=always push 'ext::ssh home-pve pct exec 103 -- git-receive-pack /root/pre/drudge' <TARGET_SHA>:refs/remotes/origin/main
-
+ssh home-pve "pct exec 103 -- git -C /root/pre/drudge branch pve-pre-deploy-${DRUDGE_SHORT_SHA} HEAD"
+git -c protocol.ext.allow=always push 'ext::ssh home-pve pct exec 103 -- git-receive-pack /root/pre/drudge' "${DRUDGE_TARGET_SHA}:refs/remotes/origin/main"
 ssh home-pve 'pct exec 103 -- git -C /root/pre/drudge rev-parse refs/remotes/origin/main'
-ssh home-pve 'pct exec 103 -- git -C /root/pre/drudge switch main'
 ssh home-pve 'pct exec 103 -- git -C /root/pre/drudge merge --ff-only origin/main'
-```
-
-`origin/main` 和合并后的 `HEAD` 都必须等于 `<TARGET_SHA>`。不处理冲突，不创建 merge commit。
-
-### 6.4 PVE 安装和构建
-
-```bash
-ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge install --frozen-lockfile"'
-ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge run build"'
-```
-
-安装或构建失败时停止，不重启 PM2。当前运行进程通常仍保留原来已加载的代码，但 web 构建目录是原位写入，仍需报告并评估。
-
-### 6.5 重启应用
-
-仓库不再提供旧的根级启动脚本或 Docker Compose 部署入口；不要自行恢复这些路径，也不要重建 Neo4j。只重启三个包级应用配置；web 配置会同时重启 `web-app` 和 `web-scheduler`：
-
-```bash
-ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge --filter @drudge/ingest-worker run pm2:restart"'
-ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge --filter @drudge/graph-worker run pm2:restart"'
-ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge --filter web run pm2:restart"'
-```
-
-### 6.6 验收
-
-```bash
 ssh home-pve 'pct exec 103 -- git -C /root/pre/drudge rev-parse HEAD'
-ssh home-pve 'pct exec 103 -- git -C /root/pre/drudge rev-parse HEAD^{tree}'
-ssh home-pve 'pct exec 103 -- git -C /root/pre/drudge status --short --untracked-files=no'
-
-ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge --filter @drudge/ingest-worker exec pm2 ls --no-color"'
-
-ssh home-pve 'pct exec 103 -- curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:39110/health'
-ssh home-pve 'pct exec 103 -- curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:39111/health'
-ssh home-pve 'pct exec 103 -- curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:39112/'
 ```
 
-成功条件：
+核对目标引用与 HEAD 都是该 SHA 后才继续。配置变化先精确保留副本，只修改获授权键。
 
-- PVE HEAD 和 tree 与本地/GitHub 完全一致；
-- tracked 工作树干净；
-- 四个 PM2 进程均为 `online`；
-- 三个 HTTP 检查均为 `200`；
-- Neo4j 容器未被重建或重启；
-- `.env` 仅包含本次明确批准的配置变更；既有 `old_data/`、`*.bak-*` 和业务数据未被触碰。
-
-## 7. 失败与回滚
-
-以下任一情况立即停止：
-
-- SSH 预检、Host Key 或动态 CTID 不一致；
-- GitHub/PVE SHA 与审批包不一致；
-- PVE 存在 tracked 修改；
-- push 不是 fast-forward；
-- install、build、PM2 restart 或健康检查失败；
-- 出现未批准的文件、服务、数据或命令范围。
-
-如果失败发生在 PM2 重启前，不继续重启，先报告当前 Git、构建和进程状态。
-
-如果新进程已启动但验收失败，使用新的受控变更批准回滚。回滚到本次部署前建立的分支：
+### 4. 安装与构建
 
 ```bash
-ssh home-pve 'pct exec 103 -- git -C /root/pre/drudge switch pve-pre-deploy-<TARGET_SHORT_SHA>'
-ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge install --frozen-lockfile"'
-ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge run build"'
-ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge --filter @drudge/ingest-worker run pm2:restart"'
-ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge --filter @drudge/graph-worker run pm2:restart"'
-ssh home-pve 'pct exec 103 -- bash -lc "pnpm -C /root/pre/drudge --filter web run pm2:restart"'
+ssh home-pve 'pct exec 103 -- bash -ls' <<'DRUDGE_BUILD'
+set -e
+cd /root/pre/drudge
+pnpm install --frozen-lockfile
+pnpm run build
+DRUDGE_BUILD
 ```
 
-随后重新执行 PM2 和三个 HTTP 验收。不要使用 `git reset --hard`，不要删除数据、备份分支或构建目录。
+失败不继续重启。构建在原目录发生，Web 构建目录可能已变化，不能假定旧进程继续运行就等于没有影响。
 
-代码回滚分支只是应用级回退点，不改变家庭 PVE 当前 `NO-RECOVERABLE-BACKUP` 的保护等级。数据库迁移、数据清理、Neo4j 重建和系统升级不进入这条自动链路。
+### 5. 重启四个进程
 
-## 8. v1 已知限制
+两个 worker 使用既有包级脚本；Web 使用按名字重启并明确根配置的已验证方式：
 
-- PVE 当前没有可见的 `pm2-*` systemd unit；容器重启后的 PM2 自动恢复尚未验证。
-- 构建发生在当前工作目录，不是不可变制品或双目录原子切换。
-- 发布依赖当前 Mac/Codex 能连接 `ssh home-pve`。
-- v1 不自动处理失败重试、冲突、数据库迁移或依赖大版本升级。
-
-这些限制不阻止日常小改动发布。先按本手册完成一次真实演练，再决定是否增加一键脚本、PM2 开机恢复或双目录发布。
-
-## 9. 给 AI 的固定任务模板
-
-```text
-在 /Users/microTT/toto/ih/drudge 完成下面需求：<需求>。
-
-从最新 main 创建 codex/<task>，只做必要改动并补测试。完成后运行：
-pnpm run verify
-git diff --check
-
-先给我变更摘要、diff review、测试结果、commit SHA/tree SHA 和发布风险。
-未经批准不要 push 或部署。需要发布时，严格按 docs/deployment.md 生成一个包含
-GitHub push 与 PVE 部署完整命令的 DRUDGE-DEPLOY CHANGE_ID。
+```bash
+ssh home-pve 'pct exec 103 -- bash -ls' <<'DRUDGE_RESTART'
+set -e
+cd /root/pre/drudge
+pnpm --filter @drudge/ingest-worker run pm2:restart
+pnpm --filter @drudge/graph-worker run pm2:restart
+cd packages/web-app
+DOTENV_CONFIG_PATH=/root/pre/drudge/.env pnpm exec pm2 restart web-app web-scheduler --update-env
+pnpm exec pm2 ls --no-color
+DRUDGE_RESTART
 ```
+
+不要用 `restart ecosystem.config.js --update-env` 代替 Web 命名重启：现场曾验证该方式没有导入命令前设置的 `DOTENV_CONFIG_PATH`。域名或入口变更按前述入口流程同步。
+
+### 6. 验收与保存
+
+- 核对生产 HEAD/tree、tracked 工作树、四个进程 online，Web 两进程根配置路径与有效通知配置符合本次目标。
+- 检查 ingest `:39110/health`、graph `:39111/health`、web `:39112/briefings/health`。
+- 公网检查工作台、只读查询、简报 H5 与 SVG；浏览器检查实际页面和 Console。只有动到路由时才验证 Caddy/reload 与域名退出结果。
+- Neo4j、业务数据、位点和非授权配置没有变化。监控可达、API 成功和消息投递分别报告；没有消息授权时不点击扫描、生成或推送。
+
+上述通过后保存 PM2 状态：
+
+```bash
+ssh home-pve 'pct exec 103 -- bash -ls' <<'DRUDGE_SAVE'
+set -e
+cd /root/pre/drudge/packages/web-app
+pnpm exec pm2 save
+DRUDGE_SAVE
+```
+
+随后更新本文的最近发布快照。仅列实际验证内容，测试结果不能替代真实运行验收。
+
+## 失败与回退
+
+先报告失败发生在提交、配置、构建、进程或入口的哪一层。回退在既有授权覆盖的范围内执行，否则完成具体方案后取得授权。
+
+使用本次保留的代码分支切回原版本，必要时恢复对应根配置和 Drudge 路由副本；再按本手册安装/构建、命名重启、校验与保存。Web 构建 Host、运行配置和入口要一致。不要通过 `git reset --hard`、删除数据或恢复隐式群发来回退。
+
+代码与配置副本只是应用回退点，不能替代家庭环境的可恢复数据备份。数据库迁移、数据清理、卷变更、Neo4j 重建和系统升级不属于此流程。
+
+## 已知限制
+
+- 容器重启后 PM2 的自动恢复尚未验证；`pm2 save` 不证明已配置系统开机恢复。
+- 使用原目录构建，不是不可变制品或双目录原子切换；发布依赖当前控制端可用的固定 SSH 链路。
+- 不引入 GitHub Actions、Runner、Webhook、新容器或升级操作系统作为日常发布前提。
+- 2026-09-05 GitHub 推送报告既有 170 项依赖安全告警，含 5 项 critical。本次未核定可利用性或升级依赖，告警不等于已发生漏洞利用；处理时以届时仓库告警为准。
+
+这些限制保留为事实，不自动变成下一阶段消息优化的任务。

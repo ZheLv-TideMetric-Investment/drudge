@@ -1,151 +1,61 @@
 # Drudge
 
-Drudge 是一个持续采集实时财经快讯、使用 AI 结构化与总结，并将重要内容主动推送到钉钉的系统。
+持续采集实时财经快讯，用 AI 保留和组织关键事实，再主动推送到钉钉。最终价值是让用户及时收到忠实、可读、可追溯的信息。
 
-当前接入的数据源只有：
+## 当前里程碑与下一步
 
-- 富途快讯（`futu_live`）
-- AWTMT / 华尔街见闻（`awtmt_live`）
+2026-09-05，用户确认“简报链路跑通、工作台补齐、统一入口上线”里程碑完成。
 
-仓库目前没有独立的《华尔街日报》（WSJ）采集器。历史样例里出现 WSJ 文本，不代表已接入该数据源。
+- 线上入口：[drudge.microzj.com](https://drudge.microzj.com)。工作台、简报图片和详情共用该域名，当前无需账号密码；旧 `news.microzj.com` 入口已关闭。
+- 已上线：新闻浏览与搜索、图谱关联查询、总结报告、实时监控、数据统计、概览及现有机器人入口。
+- 2026-09-06 已发布：**“牛长婷”紧凑快讯图片（`quick-2`）**。每条事件句与可选短背景聚成一个浅色信息块，视觉强调集中在事件句；全部事件进入图片，多条内容按需分页。完整正文、实体列表和原文链接留在详情。下一步观察实际聊天呈现并继续细化图片，再优化详情；图谱深度探索暂不扩展。具体基线和验收见[消息手册](docs/dingtalk-briefing.md#下一阶段)。
+- 最近部署版本、真实验收与回退点见[发布快照](docs/deployment.md#最近发布快照)。历史验收不能替代下一次操作前的现场检查。
 
-## 系统链路
+## AI 从这里接手
 
-```text
-富途 + AWTMT
-  -> ingest-worker 拉取、按来源去重、写入新闻文件
-  -> graph-worker 扫描新文件、调用 LLM、写入 Neo4j
-  -> web-app 查询、分级、聚合和生成总结
-  -> 钉钉企业机器人向显式指定用户推送图片摘要 + H5 详情
-```
+先读 [AGENTS.md](AGENTS.md)，再按任务选择文档。仓库现有文档就是项目知识入口，每类事实只维护一处。
 
-三个运行服务都以北京时间执行调度：
+| 要回答的问题 | 主要文档 |
+| --- | --- |
+| 现在完成了什么、下一步优先做什么 | 本 README |
+| AI 怎样工作、哪些边界必须保留 | [AGENTS.md](AGENTS.md) |
+| 三个应用怎样协作、数据怎样流转 | [架构](docs/architecture.md) |
+| 怎样定位实现、测试和交付 | [开发](docs/development.md) |
+| 机器人消息怎样生成、展示和验收 | [消息](docs/dingtalk-briefing.md) |
+| 哪个版本在线、怎样发布和回退 | [部署](docs/deployment.md) |
+| Neo4j 精确字段、关系和迁移约束 | [数据库结构](packages/graph-worker/DATABASE_SCHEMA.md) |
+| 为什么采用当前收件人、展示和域名方案 | [决定记录](docs/decisions/) |
+| 配置键和安全示例 | [env.example](env.example) |
 
-| 模块                     | 责任                                     | 默认端口   |
-| ------------------------ | ---------------------------------------- | ---------- |
-| `packages/ingest-worker` | 数据源接入、文件落盘、采集状态与告警     | `39110`    |
-| `packages/graph-worker`  | AI 实体/事件/关系抽取、Neo4j 写入与查询  | `39111`    |
-| `packages/web-app`       | 页面、查询 API、Level 1 扫描、总结与通知 | `39112`    |
-| `shared/common`          | 环境变量、枚举、时区、LLM 与通知公共能力 | 不单独运行 |
+`CLAUDE.md` 只引导读取同一套规则，不维护第二份架构或状态。`artifacts/` 是不入库的临时工作记录，不是后续 AI 接手所必需的知识源。
 
-产品目的、数据契约和可变边界见 [架构手册](docs/architecture.md)。
+## 应用与运行
 
-## 仓库结构
+| 应用包 | 职责 | 默认 HTTP 端口 |
+| --- | --- | --- |
+| `packages/ingest-worker` | 富途与 AWTMT 采集、源内去重、文件落盘 | `39110` |
+| `packages/graph-worker` | 消费新闻文件、AI 抽取、Neo4j 写入与查询 | `39111` |
+| `packages/web-app` | 工作台、简报、总结、扫描和消息投递 | `39112` |
 
-```text
-.
-├── AGENTS.md                       # AI 必须遵守的仓库工作约定
-├── README.md                       # 项目入口
-├── docs/
-│   ├── architecture.md             # 产品核心、架构与已知债务
-│   ├── dingtalk-briefing.md         # 图片摘要、H5、收件人与机器人配置
-│   ├── development.md              # 本地开发、AI 迭代与 review
-│   ├── deployment.md               # GitHub -> PVE 唯一发布手册
-│   └── decisions/                   # 经用户批准的重大工程决定
-├── env.example                     # 唯一环境变量模板
-├── packages/
-│   ├── ingest-worker/
-│   ├── graph-worker/
-│   └── web-app/
-├── shared/common/                  # Workspace 公共包
-└── scripts/check-env-usage.sh      # 环境变量入口检查
-```
+三个应用包在生产运行四个 PM2 进程：`ingest-worker`、`graph-worker`、`web-app`、`web-scheduler`。`shared/common` 是共享库，不是第四个应用；`web-scheduler` 属于 Web 包，是独立的调度进程。
 
-运行数据、处理位点、日志、密钥和数据库卷不属于源码，均不会提交到 Git：
+业务运行在 Tide；101 只负责 Home Ingress 转发。源码位置、配置入口与进程操作见部署手册。
 
-- `.env`
-- `data/`，包括 `data/news/.processed/` 和 `data/news/failed/`
-- `neo4j/`
-- `logs/`、`*.log`
-- 各包的 `dist/`、`.next/`、根 `node_modules/`
+## 本地开始
 
-不要将这些目录当作“缓存”清理；它们可能是生产数据或恢复依据。
-
-## 快速开始
-
-要求：Node.js `>=18`、pnpm `>=8`，以及一个可连接的 Neo4j 5 实例。
+Node.js 和 pnpm 的最低要求见 [package.json](package.json)，依赖以锁文件为准。
 
 ```bash
 pnpm install --frozen-lockfile
-cp env.example .env
+cp env.example .env  # 仅首次使用；不要覆盖已有配置
 ```
 
-然后只在根 `.env` 中填写当前环境需要的配置。不要在包目录创建第二份 `.env`。
-
-常用配置包括：
-
-- Neo4j：`NEO4J_URI`、`NEO4J_USER`、`NEO4J_PASSWORD`
-- AI：`AI_PROVIDER`、对应提供商 API Key 与模型名
-- 数据目录：`STORAGE_PATH`、`NEWS_DIRECTORY`、`FAILED_NEWS_DIRECTORY`
-- 通知：异常告警使用 `ALERT_WEBHOOK_URL`；主动推送使用企业机器人、一个显式的 `DINGTALK_TARGET_USER_ID` 与简报公网地址
-
-完整字段和安全占位值都在 [env.example](env.example) 中。
-
-主动推送默认关闭且没有默认收件人。机器人消息不依赖钉钉卡片模板，只承载一张紧凑摘要图和一个 H5 详情入口；配置与启用顺序见[钉钉简报手册](docs/dingtalk-briefing.md)。
-
-## 验证
-
-仓库级完整检查只有一个入口：
+根 `.env` 是唯一运行配置入口。填写隔离的开发配置后再运行服务；只编辑文档或代码时无需启动应用。
 
 ```bash
 pnpm run verify
 ```
 
-它依次执行环境变量规范、格式、lint、全部 Jest 测试和构建。测试默认禁止真实网络，并阻止写入仓库数据目录和常见生产路径。
+这是代码变更的完整验证入口。纯文档的检查范围、单包命令和浏览器验证见开发手册。
 
-快速验证单个包：
-
-```bash
-pnpm --filter @drudge/ingest-worker run test --runInBand
-pnpm --filter @drudge/graph-worker run test --runInBand
-pnpm --filter web run test --runInBand
-```
-
-覆盖率验收使用各包的 `test:ci`；普通 `test` 不采集覆盖率。
-
-## 本地运行
-
-仅查看 Web：
-
-```bash
-pnpm --filter web run dev
-```
-
-页面地址为 <http://127.0.0.1:39112>。页面会读取配置的 Neo4j；不要在未隔离的环境中点击扫描、总结、调度或机器人测试按钮。
-
-单独启动 worker：
-
-```bash
-pnpm --filter @drudge/ingest-worker run dev
-pnpm --filter @drudge/graph-worker run dev
-```
-
-`ingest-worker` 会访问真实新闻源并写文件；`graph-worker` 会读取文件、调用 AI 并写 Neo4j。只有在数据、数据库和通知均已隔离时才运行。
-
-`pnpm run dev` 会并行启动全部包，副作用最大，不应作为普通 UI 检查命令。
-
-健康检查：
-
-```text
-GET http://127.0.0.1:39110/health
-GET http://127.0.0.1:39111/health
-GET http://127.0.0.1:39112/
-```
-
-## 开发与发布
-
-- AI 或开发者开始修改前，先读 [AGENTS.md](AGENTS.md) 和 [开发手册](docs/development.md)。
-- Neo4j 节点、关系、约束和迁移规则见 [数据库结构](packages/graph-worker/DATABASE_SCHEMA.md)。
-- GitHub 是共享代码基线，PVE 是生产运行环境。发布必须使用 [发布手册](docs/deployment.md)，不能直接在 PVE 修改源码。
-- 未经明确批准，不 commit、不 push、不部署、不重启生产服务，也不发送钉钉消息。
-
-## 当前工程基线
-
-- pnpm workspace monorepo
-- TypeScript workers，Express 5
-- Next.js 15.3.5，React 18
-- Neo4j Driver 5.28
-- Jest 29
-- PVE 上使用包级 PM2 配置运行四个进程：`ingest-worker`、`graph-worker`、`web-app`、`web-scheduler`
-
-版本、模型、容器 ID 和线上 SHA 都可能变化；动态状态必须在操作前重新检查，不能把文档快照当作当前事实。
+需要本地查看工作台时使用 `pnpm --filter web run dev`，地址为 `http://127.0.0.1:39112`；页面会访问配置中的数据库。启动全部应用、生成总结和点击推送都有真实副作用，应按当前任务授权与隔离配置执行。
