@@ -49,15 +49,39 @@ describe('dingtalkMessageService', () => {
     const { buildBriefingMessage } = await import('../../src/lib/services/dingtalk-message');
     const message = buildBriefingMessage(briefing, 'https://news.example.com/');
 
-    expect(message.imageUrl).toBe(
-      'https://news.example.com/briefings/0123456789abcdef0123456789abcdef/image.svg'
-    );
+    expect(message.imageUrls).toEqual([
+      'https://news.example.com/briefings/0123456789abcdef0123456789abcdef/image.svg?v=quick-2&page=1',
+    ]);
     expect(message.detailUrl).toBe(
       'https://news.example.com/briefings/0123456789abcdef0123456789abcdef'
     );
-    expect(message.text).toContain(`![${briefing.title}](${message.imageUrl})`);
+    expect(message.text).toContain(`![${briefing.title} 1/1](${message.imageUrls[0]})`);
     expect(message.text).toContain(`[查看完整详情 · 1 条 →](${message.detailUrl})`);
     expect(message.text).not.toContain(briefing.items[0].detail);
+  });
+
+  it('includes every image page in one message with one detail link', async () => {
+    const { buildBriefingMessage } = await import('../../src/lib/services/dingtalk-message');
+    const document = {
+      ...briefing,
+      items: Array.from({ length: 20 }, (_, index) => ({
+        ...briefing.items[0],
+        id: `news-${index}`,
+        detail: '事实：全部信息保留。'.repeat(30),
+      })),
+    };
+    const message = buildBriefingMessage(document, 'https://news.example.com');
+    expect(message.imageUrls.length).toBeGreaterThan(1);
+    message.imageUrls.forEach((url, index) => {
+      expect(url).toContain(`page=${index + 1}`);
+      expect(message.text).toContain(
+        `![${briefing.title} ${index + 1}/${message.imageUrls.length}](${url})`
+      );
+    });
+    expect(message.text.match(/查看完整详情/g)).toHaveLength(1);
+    expect(message.text.indexOf(message.imageUrls.at(-1)!)).toBeLessThan(
+      message.text.indexOf('查看完整详情')
+    );
   });
 
   it('does not call DingTalk when disabled or incompletely configured', async () => {

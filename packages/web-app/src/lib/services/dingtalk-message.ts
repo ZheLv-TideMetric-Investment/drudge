@@ -2,6 +2,7 @@ import axios from 'axios';
 import { config } from '../config';
 import { BUILT_BRIEFING_PUBLIC_HOST, isBriefingPublicHost } from '../public-surface';
 import type { BriefingDocument } from './notification-briefing';
+import { BRIEFING_IMAGE_VERSION, renderBriefingImages } from './briefing-image';
 
 const DINGTALK_API = 'https://api.dingtalk.com';
 const TOKEN_ENDPOINT = `${DINGTALK_API}/v1.0/oauth2/accessToken`;
@@ -48,12 +49,14 @@ export const buildBriefingMessage = (briefing: BriefingDocument, publicBaseUrl: 
     throw new Error('BRIEFING_PUBLIC_BASE_URL 必须是无凭证、路径、查询参数和锚点的 HTTPS Origin');
 
   const detailUrl = `${baseUrl}/briefings/${encodeURIComponent(briefing.id)}`;
-  const imageUrl = `${detailUrl}/image.svg`;
+  const imageUrls = renderBriefingImages(briefing).map(
+    (_image, index) => `${detailUrl}/image.svg?v=${BRIEFING_IMAGE_VERSION}&page=${index + 1}`
+  );
   return {
     title: briefing.title,
-    text: `![${briefing.title}](${imageUrl})\n\n[查看完整详情 · ${briefing.items.length} 条 →](${detailUrl})`,
+    text: `${imageUrls.map((url, index) => `![${briefing.title} ${index + 1}/${imageUrls.length}](${url})`).join('\n\n')}\n\n[查看完整详情 · ${briefing.items.length} 条 →](${detailUrl})`,
     detailUrl,
-    imageUrl,
+    imageUrls,
   };
 };
 
