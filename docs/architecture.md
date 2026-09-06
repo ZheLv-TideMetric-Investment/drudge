@@ -77,7 +77,7 @@ Neo4j 当前有 `News`、`Event`、`Company`、`Person`、`Organization`、`Loca
 | `/monitor`        | 工作台/worker/数据库连通性、扫描状态、去重数、通知开关、30 秒刷新    |
 | `/stats`          | 实际节点、关系和时间分布；查询失败明确报错                           |
 | `/tingzi`         | 现有机器人操作入口；调用可能生成内容或发送消息                       |
-| `/briefings/<id>` | 已持久化完整简报；同 ID 的 `image.svg` 提供图片，`page` 参数选择单页 |
+| `/briefings/<id>` | 已持久化完整简报；同 ID 的 `image.png` 提供 PNG 图片（默认第 1 页），`page` 参数选择单页；旧 `image.svg` 保持可读 |
 
 新闻和图查询实现位于 Web 的 `src/app/api/` 与 `src/lib/neo4j/`。Worker 另有健康、查询和操作 API，真实路由见各自 `src/http/index.ts`；不在文档重复所有请求字段。
 
