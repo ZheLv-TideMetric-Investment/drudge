@@ -4,47 +4,54 @@
 
 ## 最近发布快照
 
-以下是 **2026-09-06 紧凑快讯图片发布完成时**的已验证结果，不是持续监控。下一次操作前必须重新确认动态状态。
+以下是 **2026-09-06 小字重点简报发布完成时**的已验证结果，不是持续监控。下一次操作前必须重新确认动态状态。
 
-| 项目 | 验收结果 |
-| --- | --- |
-| 应用提交 | `557db957a80b84504db9000b1fe3a88af575d78b` |
-| 应用 tree | `fc985ba808a4aa32d8fed839f449a781b33dfed6` |
-| 发布记录 | `DRUDGE-DEPLOY-557db95-20260906` |
-| 展示版本 | `quick-2`，事件句与短背景、紧凑信息分组、全条目分页 |
-| 代码位置 | 应用提交已同步 GitHub 和 Tide；后续纯文档提交与运行应用版本分开记录 |
-| 进程 | 四个既有 PM2 进程 online，仅重启 `web-app` 和 `web-scheduler`，状态已保存；两个 worker 的 PID/启动时间未变 |
-| 公网 | 七个工作台页面、简报健康端点、既有模拟简报 H5/SVG 均为 200，无认证挑战；模拟 SVG 与本地渲染器逐字节一致 |
-| 分页 | 用户提供的既有简报分为两页，分别为 `720×1124`、`720×892`，均返回 200；无页码路径正常，非法页码返回 404 |
-| 只读 API | 公网监控返回 200，Web、ingest、graph、Neo4j 四项连通性均为 true；三个应用健康端点为 200 |
-| 浏览器 | 本地桌面/390px 手机预览通过；发布后的浏览器复验工具超时，未计为通过 |
-| 通知 | 按既有用户授权保持开启，唯一显式收件人不变；本次发布未再手动发消息或调用 AI |
-| 配置与入口 | Web 两进程显式读取根配置，构建与运行 Host 匹配 `drudge.microzj.com`；本次未修改配置或 Home Ingress 路由 |
-| 运行边界 | Neo4j 容器 ID 与启动时间未变；未迁移或清理数据库、业务数据和消费位点 |
+| 项目       | 验收结果                                                                                                                           |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 应用提交   | `41972d8516a04f9b631d772075497d4cbb9818ed`                                                                                         |
+| 应用 tree  | `6b265c369345a439bae670167e5bc5574a83307a`                                                                                         |
+| 发布记录   | `DRUDGE-DEPLOY-41972d8-20260906`                                                                                                   |
+| 展示版本   | `plain-2`：白底事件 18px、可选历史 16px，仅核心动作/变化灰绿色加粗；全部条目按需分页                                               |
+| 代码位置   | 应用提交已同步 GitHub main 和 Tide；后续纯文档提交与运行应用版本分开记录                                                           |
+| 进程       | 四个既有 PM2 进程 online，仅重启 web-app / web-scheduler，PM2 状态已保存；两个 worker PID/启动时间未变                             |
+| 公网       | 七个工作台页面、简报健康端点、既有模拟及用户提供的简报 H5 均为 200，无认证挑战                                                     |
+| 图片       | 既有模拟 SVG 与本地生成器逐字节一致，ETag 包含 plain-2；用户提供的既有简报为一张 720×583，分页与无页码路径均为 200，非法页码为 404 |
+| 只读 API   | 公网监控 Web、ingest、graph、Neo4j 四项可用性均为 true；三个应用健康端点为 200                                                     |
+| 浏览器     | 公网既有模拟 SVG 与 H5 实际显示成功，390px 详情无横向溢出；未发现页面异常或失败请求                                                |
+| 通知       | 有效通知开关保持开启，唯一显式收件人校验通过；本次未手动调用 AI 或投递测试消息                                                     |
+| 配置与入口 | Web 两进程读取根配置，构建/运行 Host 均匹配 drudge.microzj.com；配置、Home Ingress 路由和认证未修改                                |
+| 数据边界   | 未迁移或清理既有快照、业务数据和消费位点；Neo4j 容器 ID 与启动时间未变                                                             |
 
-发布前完整验证通过：72 个套件、860 项测试，lint、格式/环境检查和三个应用构建通过；本服务 Home Ingress manifest 校验通过。生产执行 `pnpm install --frozen-lockfile` 和 `pnpm --filter web run build`。本次仅 Web 包变化，共享库、依赖和两个 worker 未变化，因此不重启 worker。
+发布前本地验证通过：72 个套件、862 项测试，lint、格式/环境检查和三个应用构建成功；5 张合成图页、390px 手机预览和 Home Ingress manifest 校验通过。生产执行锁文件安装与 `pnpm --filter web run build`。只有 Web 包变化，不重建或重启 worker。
 
-本次代码回退分支为 Tide 的 `pve-pre-deploy-557db95`，指向发布前提交 `3dd0b1a43c1ad44f6fa30206f5edafac521874b8`。无配置或路由变更，不为本次发布新增这些对象的副本。
+重点标记来自现有总结的 Markdown；新生成的简报可保存可选 `emphasis` 字段。旧快照缺少标记时仍显示普通文字。本次未额外调用真实模型评价重点选择，也未做新的钉钉客户端展示验收。
 
-2026-09-05 统一入口里程碑的回退材料仍保留，属于那次发布：
+### 本次回退材料
 
-- Tide 代码分支：`pve-pre-deploy-3dd0b1a`，对应发布前提交 `c4f08934f1692693a8dea370c4ac47cf6b5eeb24`。
-- Tide 根配置副本：`/root/pre/drudge/.env.bak-DRUDGE-DEPLOY-3dd0b1a-20260905`。
-- 101 路由副本：`/etc/home-ingress/backups/drudge-3dd0b1a.caddy`。
+- 原状态引用：Tide `pve-pre-deploy-41972d8` 指向 `7ca0d074fdbbcd7dbf161592d3a4a1727ed3f9dd`；该基线的运行应用是 `557db95`。
+- **优先使用兼容回退分支**：GitHub 与 Tide 的 `codex/rollback-plain-2-41972d8`，提交 `224031a475fc100ef3a1935dc1237e9810bacb9d`，tree `d89d0f1439766b48b107d22d8a184a32c5aa896d`。
+- 兼容分支恢复旧 quick-2 渲染器和总结提示词，保留新字段的类型、解析和存储校验。已检查带 emphasis 的新快照可读取并交给旧渲染器；没有在生产执行该回退。
+- 不直接使用不认识 emphasis 的旧 schema 读取已产生的新简报，也不通过删除新快照回退。按下文流程重新构建/命名重启；本次没有配置或路由变更。
 
-本次原始记录位于本地忽略目录 `artifacts/DRUDGE-DEPLOY-557db95-20260906.md`；上述正式结论不依赖该目录可用。后续观察机器人实际呈现，详见 README 和消息手册。
+历史回退材料继续保留，不属于本次新建：
+
+- `pve-pre-deploy-557db95` → `3dd0b1a43c1ad44f6fa30206f5edafac521874b8`。
+- `pve-pre-deploy-3dd0b1a` → `c4f08934f1692693a8dea370c4ac47cf6b5eeb24`。
+- `/root/pre/drudge/.env.bak-DRUDGE-DEPLOY-3dd0b1a-20260905` 与 CT101 `/etc/home-ingress/backups/drudge-3dd0b1a.caddy` 是统一入口里程碑的材料。
+
+本次原始验收记录位于本地忽略目录 `artifacts/DRUDGE-DEPLOY-41972d8-20260906.md`；正式结论不依赖该目录可用。
 
 ## 运行位置与配置
 
-| 对象 | 位置 / 职责 |
-| --- | --- |
-| 本地工作区 | `/Users/microTT/toto/ih/drudge`，修改与验证 |
-| GitHub | `ZheLv-TideMetric-Investment/drudge`，main 作为共享代码基线 |
-| 业务容器 | `tide`，最近现场 CTID 为 `103`，仓库 `/root/pre/drudge` |
-| 入口容器 | CT101 `home-ingress`，只运行 Caddy 与共享隧道 |
-| 应用进程 | `ingest-worker`、`graph-worker`、`web-app`、`web-scheduler` |
-| 数据库 | 独立 Docker 容器 `drudge-neo4j`，普通应用发布不重启或重建 |
-| 运行配置 | `/root/pre/drudge/.env`；实际值不写入仓库和文档 |
+| 对象         | 位置 / 职责                                                       |
+| ------------ | ----------------------------------------------------------------- |
+| 本地工作区   | `/Users/microTT/toto/ih/drudge`，修改与验证                       |
+| GitHub       | `ZheLv-TideMetric-Investment/drudge`，main 作为共享代码基线       |
+| 业务容器     | `tide`，最近现场 CTID 为 `103`，仓库 `/root/pre/drudge`           |
+| 入口容器     | CT101 `home-ingress`，只运行 Caddy 与共享隧道                     |
+| 应用进程     | `ingest-worker`、`graph-worker`、`web-app`、`web-scheduler`       |
+| 数据库       | 独立 Docker 容器 `drudge-neo4j`，普通应用发布不重启或重建         |
+| 运行配置     | `/root/pre/drudge/.env`；实际值不写入仓库和文档                   |
 | 最近工具版本 | Node.js `v24.3.0`（NVM）、pnpm `10.12.4`、PM2 `5.4.3`；操作前核实 |
 
 固定管理入口是 `ssh home-pve`。开始远程工作先读取现行 home-pve 运维规则并运行其固定预检，保持已固定的 SSH Host Key 和严格校验；不换公网端口、身份或连接路线。
