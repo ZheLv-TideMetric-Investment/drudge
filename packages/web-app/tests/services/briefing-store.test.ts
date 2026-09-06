@@ -48,7 +48,23 @@ describe('briefing store', () => {
     expect(first.id).toBe(createBriefingId(draft));
     expect(second).toEqual(first);
     expect(files).toEqual([`${first.id}.json`]);
+    expect(first.items[0]).not.toHaveProperty('emphasis');
     await expect(readBriefing(first.id, storagePath)).resolves.toEqual(first);
+  });
+
+  it('persists optional emphasis and rejects phrases outside the event', async () => {
+    const marked = { ...draft, items: [{ ...draft.items[0], emphasis: ['核心新闻'] }] };
+    const saved = await saveBriefing(marked, storagePath);
+    const restored = await readBriefing(saved.id, storagePath);
+    expect(restored?.items[0].emphasis).toEqual(['核心新闻']);
+    expect(restored?.items[0].headline).toBe(draft.items[0].headline);
+    expect(saved.id).not.toBe(createBriefingId(draft));
+    await expect(
+      saveBriefing(
+        { ...draft, items: [{ ...draft.items[0], emphasis: ['不存在的结论'] }] },
+        storagePath
+      )
+    ).rejects.toThrow('Emphasis must be part of the existing headline');
   });
 
   it('returns null for unknown or path-like IDs', async () => {

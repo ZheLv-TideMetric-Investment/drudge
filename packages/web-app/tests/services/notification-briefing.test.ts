@@ -12,7 +12,7 @@ describe('notification briefing formatter', () => {
     const items = parseSummaryItems(`## Level 1级新闻总结
 
 ### 新闻内容
-- **央行**下调利率 **25bp** *(10:30)* [原文](https://example.com/rate)
+- 央行**下调利率25bp** *(10:30)* [原文](https://example.com/rate)
   后续说明仍属于同一条事实
 
 ---
@@ -26,6 +26,7 @@ describe('notification briefing formatter', () => {
       tone: 'core',
       time: '10:30',
       url: 'https://example.com/rate',
+      emphasis: ['下调利率25bp'],
     });
     expect(`${items[0].headline}\n${items[0].detail}`).toContain('25bp');
     expect(items[0].detail).toContain('后续说明仍属于同一条事实');

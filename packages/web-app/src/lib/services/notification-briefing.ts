@@ -8,6 +8,7 @@ export interface BriefingItem {
   tone: BriefingTone;
   label: string;
   headline: string;
+  emphasis?: string[];
   time: string;
   detail: string;
   source: string;
@@ -130,12 +131,18 @@ const makeItem = (
   options: { time?: string; source?: string; url?: string; tone?: BriefingTone } = {}
 ): BriefingItem => {
   const normalizedHeadline = plainText(headline) || '摘要';
+  const emphasis = [
+    ...new Set(Array.from(headline.matchAll(/\*\*([^*]+)\*\*/g), match => plainText(match[1]))),
+  ]
+    .filter(phrase => phrase && normalizedHeadline.includes(phrase))
+    .slice(0, 2);
   return {
     id,
     level: levelLabel(level),
     tone: options.tone ?? toneForLevel(level),
     label: shortenLabel(normalizedHeadline),
     headline: normalizedHeadline,
+    ...(emphasis.length ? { emphasis } : {}),
     time: options.time ?? extractClock(headline),
     detail: detailText(detail),
     source: plainText(options.source ?? ''),
