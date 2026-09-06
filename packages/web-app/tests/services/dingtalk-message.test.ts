@@ -50,7 +50,7 @@ describe('dingtalkMessageService', () => {
     const message = buildBriefingMessage(briefing, 'https://news.example.com/');
 
     expect(message.imageUrls).toEqual([
-      'https://news.example.com/briefings/0123456789abcdef0123456789abcdef/image.svg?v=plain-2&page=1',
+      'https://news.example.com/briefings/0123456789abcdef0123456789abcdef/image.png?v=plain-2&page=1',
     ]);
     expect(message.detailUrl).toBe(
       'https://news.example.com/briefings/0123456789abcdef0123456789abcdef'
@@ -189,7 +189,8 @@ describe('dingtalkMessageService', () => {
       expect(payload).not.toHaveProperty('cardTemplateId');
       expect(payload).not.toHaveProperty('atAll');
       const message = JSON.parse(payload.msgParam);
-      expect(message.text).toContain('/image.svg');
+      expect(message.text).toContain('/image.png');
+      expect(message.text).not.toContain('/image.svg');
       expect(message.text).toContain('/briefings/0123456789abcdef0123456789abcdef');
       expect(requestConfig?.headers?.['x-acs-dingtalk-access-token']).toBe('access-token');
     } finally {

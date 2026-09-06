@@ -50,7 +50,7 @@ export const buildBriefingMessage = (briefing: BriefingDocument, publicBaseUrl: 
 
   const detailUrl = `${baseUrl}/briefings/${encodeURIComponent(briefing.id)}`;
   const imageUrls = renderBriefingImages(briefing).map(
-    (_image, index) => `${detailUrl}/image.svg?v=${BRIEFING_IMAGE_VERSION}&page=${index + 1}`
+    (_image, index) => `${detailUrl}/image.png?v=${BRIEFING_IMAGE_VERSION}&page=${index + 1}`
   );
   return {
     title: briefing.title,

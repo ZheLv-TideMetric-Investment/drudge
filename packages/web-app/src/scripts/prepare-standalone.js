@@ -11,11 +11,18 @@ const copyDir = async (from, to) => {
 };
 
 const main = async () => {
-  await copyDir(path.join(appRoot, '.next', 'static'), path.join(standaloneRoot, '.next', 'static'));
+  await copyDir(
+    path.join(appRoot, '.next', 'static'),
+    path.join(standaloneRoot, '.next', 'static')
+  );
   await copyDir(path.join(appRoot, 'public'), path.join(standaloneRoot, 'public'));
+  await copyDir(
+    path.join(appRoot, 'assets', 'fonts'),
+    path.join(standaloneRoot, 'assets', 'fonts')
+  );
 };
 
-main().catch((error) => {
+main().catch(error => {
   console.error('prepare-standalone failed:', error);
   process.exitCode = 1;
 });
