@@ -41,7 +41,7 @@ describe('briefing PNG delivery', () => {
     expect(pages.length).toBeGreaterThan(1);
     const etags = new Set<string>();
     for (const [index, image] of pages.entries()) {
-      const response = await get(`?v=plain-2&page=${index + 1}`);
+      const response = await get(`?v=plain-3&page=${index + 1}`);
       const png = Buffer.from(await response.arrayBuffer());
       expect(response.status).toBe(200);
       expect(response.headers.get('content-type')).toBe('image/png');

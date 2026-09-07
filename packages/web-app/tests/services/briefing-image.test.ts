@@ -37,13 +37,14 @@ const briefing: BriefingDocument = {
 };
 const heightOf = (svg: string): number => Number(svg.match(/<svg[^>]* height="(\d+)"/)?.[1]);
 const visibleText = (svg: string): string =>
-  [...svg.matchAll(/<text\b[^>]*>(.*?)<\/text>/gs)]
+  [...svg.matchAll(/<g class="briefing-event">(.*?)<\/g>/gs)]
+    .flatMap(group => [...group[1].matchAll(/<text\b[^>]*>(.*?)<\/text>/gs)])
     .filter(match => match[1].includes('<tspan'))
     .map(match => match[1].replace(/<[^>]+>/g, ''))
     .join('');
 
 describe('briefing image renderer', () => {
-  it('shows only every event and optional context, keeping metadata and details in the snapshot', () => {
+  it('keeps every event and optional context together, with time separated from the event', () => {
     const before = JSON.stringify(briefing);
     const svg = renderBriefingSvg(briefing);
     const text = visibleText(svg);
@@ -64,6 +65,9 @@ describe('briefing image renderer', () => {
     expect(text.indexOf('muted-first 标题')).toBeLessThan(text.indexOf('muted-fourth 标题'));
     expect(svg).not.toMatch(/另有|查看详情|DRUDGE BRIEF|…/);
     expect(JSON.stringify(briefing)).toBe(before);
+    expect(svg).toContain('09-03 09:00 生成');
+    expect(svg).toContain('时段 14:30–14:35');
+    expect(svg.match(/>14:30<\/tspan>/g)).toHaveLength(briefing.items.length);
   });
 
   it('grows with all ten items instead of clipping to three or shrinking the text', () => {
@@ -121,17 +125,52 @@ describe('briefing image renderer', () => {
     expect(pages[1].svg).toContain('接上图');
   });
 
-  it('omits a matching metadata timestamp but retains other dates in the event', () => {
+  it('moves matching time and its date into the time column, retaining other dates in the event', () => {
     const headline = '示例标题（2026-09-05 14:30）';
     const svg = renderBriefingSvg({ ...briefing, items: [{ ...briefing.items[0], headline }] });
     expect(visibleText(svg)).not.toContain('2026-09-05 14:30');
     expect(visibleText(svg)).toContain('示例标题');
     expect(svg).not.toContain('示例标题（');
+    expect(svg).toContain('2026-09-05</tspan>');
+    expect(svg).toContain('14:30</tspan>');
     const different = renderBriefingSvg({
       ...briefing,
       items: [{ ...briefing.items[0], headline, time: '13:00' }],
     });
     expect(visibleText(different)).toContain(headline);
+  });
+
+  it('keeps the as-of qualifier when a summary timestamp moves out of the event', () => {
+    const svg = renderBriefingSvg({
+      ...briefing,
+      items: [{ ...briefing.items[0], headline: '某企业拟扩产（截至 2026-09-05 14:30）' }],
+    });
+    expect(visibleText(svg)).toBe('某企业拟扩产背景：仍需进一步确认');
+    expect(svg).toContain('2026-09-05</tspan>');
+    expect(svg).toContain('截至14:30</tspan>');
+  });
+
+  it('labels creation time in Beijing time independently from the original briefing period', () => {
+    const svg = renderBriefingSvg({
+      ...briefing,
+      createdAt: '2026-09-06T16:05:00.000Z',
+      meta: '09-06 23:00-00:00 · 4 条',
+    });
+    expect(svg).toContain('09-07 00:05 生成');
+    expect(svg).toContain('时段 09-06 23:00–00:00');
+    expect(svg).not.toContain('时段 09-07');
+  });
+
+  it.each(['', '测试', '25:72'])('does not invent a time or leave a time column for %s', time => {
+    const svg = renderBriefingSvg({
+      ...briefing,
+      meta: '1 条',
+      items: [{ ...briefing.items[0], time, headline: '某企业拟扩产', detail: '' }],
+    });
+    expect(svg).toContain('<g class="briefing-time"></g>');
+    expect(svg).not.toContain('时段');
+    expect(svg).toContain('<text x="20" y="70"');
+    expect(visibleText(svg)).toBe('某企业拟扩产');
   });
 
   it('escapes XML markup and removes invalid XML control characters', () => {

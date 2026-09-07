@@ -50,7 +50,7 @@ describe('dingtalkMessageService', () => {
     const message = buildBriefingMessage(briefing, 'https://news.example.com/');
 
     expect(message.imageUrls).toEqual([
-      'https://news.example.com/briefings/0123456789abcdef0123456789abcdef/image.png?v=plain-2&page=1',
+      'https://news.example.com/briefings/0123456789abcdef0123456789abcdef/image.png?v=plain-3&page=1',
     ]);
     expect(message.detailUrl).toBe(
       'https://news.example.com/briefings/0123456789abcdef0123456789abcdef'
