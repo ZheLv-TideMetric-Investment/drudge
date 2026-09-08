@@ -2,7 +2,8 @@ import axios from 'axios';
 import { config } from '../config';
 import { BUILT_BRIEFING_PUBLIC_HOST, isBriefingPublicHost } from '../public-surface';
 import type { BriefingDocument } from './notification-briefing';
-import { BRIEFING_IMAGE_VERSION, renderBriefingImages } from './briefing-image';
+import { BRIEFING_TIME, briefingExcerpt, briefingPeriod, toneRank } from './briefing-content';
+import { TimeZoneUtils, TIME_FORMATS } from '../utils/timezone';
 
 const DINGTALK_API = 'https://api.dingtalk.com';
 const TOKEN_ENDPOINT = `${DINGTALK_API}/v1.0/oauth2/accessToken`;
@@ -43,20 +44,58 @@ export const normalizePublicBaseUrl = (value: string): string | null => {
   }
 };
 
+const escapeMarkdown = (value: string): string =>
+  value.replace(/([\\`*_{}\[\]()#+.!<>|~-])/g, '\\$1');
+
+const markdownHeadline = (headline: string, emphasis: string[] = []): string => {
+  const ranges = emphasis
+    .slice(0, 2)
+    .map(phrase => ({ start: headline.indexOf(phrase), length: phrase.length }))
+    .filter(range => range.start >= 0 && range.length > 0)
+    .sort((a, b) => a.start - b.start)
+    .reduce<Array<{ start: number; end: number }>>((result, range) => {
+      const end = range.start + range.length;
+      const previous = result.at(-1);
+      if (previous && range.start <= previous.end) previous.end = Math.max(previous.end, end);
+      else result.push({ start: range.start, end });
+      return result;
+    }, []);
+  let cursor = 0;
+  let text = '';
+  for (const range of ranges) {
+    text += `${escapeMarkdown(headline.slice(cursor, range.start))}**${escapeMarkdown(headline.slice(range.start, range.end))}**`;
+    cursor = range.end;
+  }
+  return text + escapeMarkdown(headline.slice(cursor));
+};
+
 export const buildBriefingMessage = (briefing: BriefingDocument, publicBaseUrl: string) => {
   const baseUrl = normalizePublicBaseUrl(publicBaseUrl);
   if (!baseUrl)
     throw new Error('BRIEFING_PUBLIC_BASE_URL 必须是无凭证、路径、查询参数和锚点的 HTTPS Origin');
 
   const detailUrl = `${baseUrl}/briefings/${encodeURIComponent(briefing.id)}`;
-  const imageUrls = renderBriefingImages(briefing).map(
-    (_image, index) => `${detailUrl}/image.png?v=${BRIEFING_IMAGE_VERSION}&page=${index + 1}`
-  );
+  const generatedAt = TimeZoneUtils.format(briefing.createdAt, TIME_FORMATS.NEWS_TIME);
+  const period = briefingPeriod(briefing.meta);
+  const header = escapeMarkdown(`${generatedAt} 生成${period ? ` · 时段 ${period}` : ''}`);
+  const items = briefing.items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => toneRank[a.item.tone] - toneRank[b.item.tone] || a.index - b.index)
+    .map(({ item }) => {
+      const { headline, context, time } = briefingExcerpt(item);
+      const clock = time.match(BRIEFING_TIME);
+      const timestamp = clock
+        ? `${clock[1] ? '截至 ' : ''}${clock[2] ? `${clock[2]} ` : ''}${clock[3].slice(0, 5)}`
+        : '';
+      const event = `${timestamp ? `${escapeMarkdown(timestamp)} · ` : ''}${markdownHeadline(headline, item.emphasis)}`;
+      return `${event}${context ? `\n\n> ${escapeMarkdown(context)}` : ''}`;
+    });
   return {
     title: briefing.title,
-    text: `${imageUrls.map((url, index) => `![${briefing.title} ${index + 1}/${imageUrls.length}](${url})`).join('\n\n')}\n\n[查看完整详情 · ${briefing.items.length} 条 →](${detailUrl})`,
+    text: [header, ...items, `[查看完整详情 · ${briefing.items.length} 条 →](${detailUrl})`].join(
+      '\n\n'
+    ),
     detailUrl,
-    imageUrls,
   };
 };
 
@@ -178,7 +217,7 @@ class DingTalkMessageService {
         return false;
       }
 
-      console.log('钉钉图片摘要与详情链接发送成功', {
+      console.log('钉钉 Markdown 简报与详情链接发送成功', {
         title: briefing.title,
         itemCount: briefing.items.length,
       });
@@ -212,7 +251,7 @@ class DingTalkMessageService {
   getStatus() {
     return {
       enabled: config.notification.enabled,
-      mode: 'explicit_single_user_image_h5',
+      mode: 'explicit_single_user_markdown_h5',
       configured:
         this.missingConfig().length === 0 &&
         this.hasExplicitSingleTarget() &&

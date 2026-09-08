@@ -9,7 +9,7 @@ import {
 } from './notification-briefing';
 
 /**
- * 通知编排层：先保存完整简报，再向显式指定收件人发送图片摘要与 H5 入口。
+ * 通知编排层：先保存完整简报，再向显式指定收件人发送 Markdown 正文与 H5 入口。
  */
 class NotificationService {
   private async deliver(briefing: BriefingDraft): Promise<boolean> {
@@ -18,7 +18,7 @@ class NotificationService {
   }
 
   async initialize(): Promise<void> {
-    console.log('通知服务初始化完成（钉钉显式单收件人图片摘要 + H5 详情）');
+    console.log('通知服务初始化完成（钉钉显式单收件人 Markdown 简报 + H5 详情）');
   }
 
   async sendBatchHighLevelNewsNotification(newsItems: any[]): Promise<boolean> {
@@ -98,7 +98,7 @@ class NotificationService {
       status: 'unhealthy',
       service: 'NotificationService',
       timestamp: new Date().toISOString(),
-      error: '钉钉图片摘要通知未启用、配置不完整或鉴权失败',
+      error: '钉钉 Markdown 通知未启用、配置不完整或鉴权失败',
     };
   }
 }
