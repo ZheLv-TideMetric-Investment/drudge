@@ -22,7 +22,7 @@
 | AI 抽取、消费位点与失败重试 | `packages/graph-worker/src/services/` | graph 的同名 service 测试 |
 | 新闻/图谱/统计查询 | `packages/web-app/src/app/api/`、`packages/web-app/src/lib/neo4j/` | Web 的 `tests/apis/`、`tests/neo4j/` |
 | 工作台页面与交互 | `packages/web-app/src/app/`、`packages/web-app/src/components/` | API/工具测试及真实浏览器 |
-| 消息摘要图、H5、格式和投递 | [消息手册的源码导航](dingtalk-briefing.md#源码导航) | Web 的简报、通知和投递测试 |
+| Markdown 消息、H5、历史图片和投递 | [消息手册的源码导航](dingtalk-briefing.md#源码导航) | Web 的简报、通知和投递测试 |
 | 定时任务与总结 | `packages/web-app/src/scripts/scheduler.js`、`packages/web-app/src/app/api/scheduler/route.ts`、`packages/web-app/src/lib/services/summary.ts` | Web 的 `tests/apis/scheduler.test.ts`、`tests/services/summary.test.ts` |
 | 配置加载与校验 | `shared/common/utils/env.js`、三个包的配置入口 | 各包配置测试及 `lint:env` |
 
