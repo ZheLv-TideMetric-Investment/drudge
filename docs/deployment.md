@@ -2,7 +2,9 @@
 
 本文是 Drudge 生产状态、应用发布和回退的主要手册。应用源码留在本仓库，入口契约只在 [ops/home-service.yaml](../ops/home-service.yaml)；共享入口操作沿用 [Home Ingress 手册](../../home-ingress/SERVICE-ONBOARDING.md)。
 
-## 最近发布：历史摘要本地优先（2026-09-19）
+## 最近发布快照
+
+**2026-09-19：历史摘要本地优先。**
 
 用户要求默认优先本地 Qwen3.5-9B，但以质量合格为前提；手动停止表示让出 Windows，
 业务不得重新启动模型，改用千问云端。Windows 空闲卸载已改为 10 分钟，具体单元、
