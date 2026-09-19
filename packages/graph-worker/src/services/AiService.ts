@@ -151,6 +151,7 @@ export class AiService {
       return await this.callWithProvider(this.model, this.currentProvider, messages, options);
     } catch (primaryError: any) {
       logger.warn(`🔄 主Provider(${this.currentProvider})调用失败: ${primaryError.message}`);
+      this.logFailedUsage(this.currentProvider, primaryError);
 
       // 如果有备用provider，尝试使用
       if (this.fallbackModel && this.fallbackProvider) {
@@ -162,10 +163,15 @@ export class AiService {
             messages,
             options
           );
-          logger.info(`✅ 备用Provider(${this.fallbackProvider})调用成功`);
+          if (result.success) {
+            logger.info(`✅ 备用Provider(${this.fallbackProvider})调用成功`);
+          } else {
+            logger.warn(`备用Provider(${this.fallbackProvider})未返回有效结果`);
+          }
           return result;
         } catch (fallbackError: any) {
           logger.error(`❌ 备用Provider(${this.fallbackProvider})也失败: ${fallbackError.message}`);
+          this.logFailedUsage(this.fallbackProvider, fallbackError);
 
           // 不在这里发送通知，由上层EntityExtractionService在最终失败时统一发送
           // 返回主provider的错误（通常更有意义）
@@ -183,6 +189,17 @@ export class AiService {
           error: primaryError.message || 'LLM JSON调用失败',
         };
       }
+    }
+  }
+
+  private logFailedUsage(provider: string, error: any): void {
+    const usage = normalizeLLMUsage(error?.usage);
+    if (usage) {
+      logger.info('LLM JSON调用失败用量', {
+        provider,
+        model: (config.ai as any)[provider]?.model,
+        usage,
+      });
     }
   }
 
@@ -235,14 +252,19 @@ export class AiService {
     const schemaToUse = schema || z.object({}).passthrough();
 
     // 创建LLM调用Promise
+    const abortController = new AbortController();
     const llmPromise = async () => {
       try {
         return await generateObject({
           model,
+          // 千问返回 JSON 正文；旧 SDK 的 auto 模式默认等待工具调用，误判为失败。
+          ...(providerName === 'qwen' ? { mode: 'json' as const } : {}),
           prompt,
           temperature,
           system: systemMessage,
           schema: schemaToUse,
+          maxRetries: 0,
+          abortSignal: abortController.signal,
         });
       } catch (error: any) {
         // 如果generateObject失败，尝试从错误信息中解析JSON
@@ -250,7 +272,7 @@ export class AiService {
           try {
             return {
               object: JSON.parse(error.text),
-              usage: undefined,
+              usage: error.usage,
             };
           } catch (parseError) {
             throw error;
@@ -267,6 +289,7 @@ export class AiService {
       result = await Promise.race([llmPromise(), timeoutPromise]);
     } finally {
       clearTimeout(timeoutId);
+      abortController.abort();
     }
 
     // 解析结果
@@ -274,7 +297,7 @@ export class AiService {
     const parsedData = parsedResult.value as T;
     const usage = normalizeLLMUsage(result.usage);
 
-    logger.debug(
+    logger.info(
       `LLM JSON响应成功 (${providerName}):`,
       buildLLMLogMeta({
         provider: providerName,

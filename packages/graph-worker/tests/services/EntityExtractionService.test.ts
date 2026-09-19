@@ -158,6 +158,66 @@ describe('EntityExtractionService', () => {
     notificationService.sendEntityExtractionFailureNotification.mockClear();
   });
 
+  it('archives a failed extraction after one call and skips it across scans and restarts', async () => {
+    await withService(async ({ service, failedDir }) => {
+      const failed = createNewsItem('failed_news_with_underscores');
+      aiService.callLLMWithJsonResponse.mockResolvedValue({
+        success: false,
+        error: 'DataInspectionFailed',
+      });
+
+      expect(await service.batchExtractEntities([failed])).toEqual([]);
+      expect(await service.batchExtractEntities([failed])).toEqual([]);
+      expect(aiService.callLLMWithJsonResponse).toHaveBeenCalledTimes(1);
+      expect(notificationService.sendEntityExtractionFailureNotification).toHaveBeenCalledWith(
+        failed.id,
+        expect.any(String),
+        0
+      );
+
+      const files = await fs.promises.readdir(failedDir);
+      expect(files).toHaveLength(1);
+      const archive = JSON.parse(
+        await fs.promises.readFile(path.join(failedDir, files[0]!), 'utf8')
+      );
+      expect(archive.newsItem).toEqual(failed);
+
+      const restarted = new service.constructor();
+      expect(await restarted.batchExtractEntities([failed])).toEqual([]);
+      expect(aiService.callLLMWithJsonResponse).toHaveBeenCalledTimes(1);
+
+      aiService.callLLMWithJsonResponse.mockResolvedValue({
+        success: true,
+        data: createExtractionData(),
+      });
+      expect(await restarted.batchExtractEntities([createNewsItem('fresh_news')])).toHaveLength(1);
+      // 人工重试入口仍可处理留档新闻，不受自动扫描的跳过规则影响。
+      await expect(restarted.extractFromNews(failed)).resolves.toMatchObject({ newsId: failed.id });
+      expect(aiService.callLLMWithJsonResponse).toHaveBeenCalledTimes(3);
+      expect(await fs.promises.readdir(failedDir)).toEqual(files);
+    });
+  });
+
+  it('shares one model call for the same news in overlapping automatic batches', async () => {
+    await withService(async ({ service }) => {
+      let finish!: (value: any) => void;
+      aiService.callLLMWithJsonResponse.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            finish = resolve;
+          })
+      );
+      const news = createNewsItem('overlapping_news');
+      const first = service.batchExtractEntities([news]);
+      const second = service.batchExtractEntities([news]);
+      expect(aiService.callLLMWithJsonResponse).toHaveBeenCalledTimes(1);
+      finish({ success: true, data: createExtractionData() });
+      const results = await Promise.all([first, second]);
+      expect(results.map(items => items.length)).toEqual([1, 1]);
+      expect(aiService.callLLMWithJsonResponse).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('parseExtractionResult applies defaults and filters invalid entries', async () => {
     await withService(async ({ service }) => {
       const newsItem = createNewsItem();

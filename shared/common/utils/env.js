@@ -165,6 +165,11 @@ const buildGraphConfig = (options = {}) => {
 
   const defaultNewsDirectory = path.resolve(baseDir, '../../../../data/news');
   const newsDirectory = readPath(env, 'NEWS_DIRECTORY', defaultNewsDirectory);
+  const fallbackProvider = readString(
+    env,
+    'GRAPH_AI_FALLBACK_PROVIDER',
+    readString(env, 'AI_FALLBACK_PROVIDER', 'xai')
+  );
 
   return {
     nodeEnv: getNodeEnv(env),
@@ -180,11 +185,7 @@ const buildGraphConfig = (options = {}) => {
     },
     ai: {
       provider: readString(env, 'GRAPH_AI_PROVIDER', readString(env, 'AI_PROVIDER', 'qwen')),
-      fallbackProvider: readString(
-        env,
-        'GRAPH_AI_FALLBACK_PROVIDER',
-        readString(env, 'AI_FALLBACK_PROVIDER', 'xai')
-      ),
+      fallbackProvider: fallbackProvider.toLowerCase() === 'none' ? '' : fallbackProvider,
       deepseek: {
         apiKey: readString(env, 'GRAPH_DEEPSEEK_API_KEY', readString(env, 'DEEPSEEK_API_KEY', '')),
         model: readString(

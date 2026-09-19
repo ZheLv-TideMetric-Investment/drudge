@@ -154,4 +154,22 @@ describe('graph-worker config', () => {
 
     expect(config.processing.maxFilesPerScan).toBe(15);
   });
+
+  it('explicitly disables fallback despite a configured global provider', async () => {
+    const config = await loadConfig({
+      AI_FALLBACK_PROVIDER: 'xai',
+      GRAPH_AI_FALLBACK_PROVIDER: 'none',
+    });
+
+    expect(config.ai.fallbackProvider).toBe('');
+  });
+
+  it('supports disabling fallback at the shared configuration level', async () => {
+    const config = await loadConfig({
+      AI_FALLBACK_PROVIDER: 'none',
+      GRAPH_AI_FALLBACK_PROVIDER: undefined,
+    });
+
+    expect(config.ai.fallbackProvider).toBe('');
+  });
 });

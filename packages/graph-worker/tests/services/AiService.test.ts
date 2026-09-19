@@ -130,6 +130,65 @@ describe('AiService', () => {
     restore();
   });
 
+  it('requests Qwen JSON output once without implicit SDK retries or fallback', async () => {
+    createOpenAIMock.mockImplementation(() => jest.fn(() => ({ provider: 'qwen' })));
+    generateObject.mockRejectedValue(new Error('DataInspectionFailed'));
+    const { aiService, restore } = await loadService({
+      AI_PROVIDER: 'qwen',
+      AI_FALLBACK_PROVIDER: 'xai',
+      GRAPH_AI_FALLBACK_PROVIDER: 'none',
+      QWEN_API_KEY: 'qwen-key',
+      QWEN_MODEL: 'qwen3.7-flash',
+    });
+
+    try {
+      const result = await aiService.callLLMWithJsonResponse([
+        { role: 'user', content: 'Synthetic news' },
+      ]);
+      expect(result.success).toBe(false);
+      expect(generateObject).toHaveBeenCalledTimes(1);
+      expect(generateObject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode: 'json',
+          maxRetries: 0,
+          abortSignal: expect.any(AbortSignal),
+        })
+      );
+      expect(aiService.getProviderInfo().hasFallback).toBe(false);
+      expect(createOpenAIMock).toHaveBeenCalledTimes(1);
+    } finally {
+      aiService.reset();
+      restore();
+    }
+  });
+
+  it('aborts the model request on timeout without starting another request', async () => {
+    jest.useFakeTimers();
+    deepseekMock.mockReturnValue({ provider: 'primary' });
+    generateObject.mockImplementation(() => new Promise(() => {}));
+    const { aiService, restore } = await loadService({
+      AI_PROVIDER: 'deepseek',
+      AI_FALLBACK_PROVIDER: 'none',
+      DEEPSEEK_MODEL: 'deepseek-test',
+    });
+
+    try {
+      const pending = aiService.callLLMWithJsonResponse(
+        [{ role: 'user', content: 'Synthetic news' }],
+        { timeout: 10 }
+      );
+      await jest.advanceTimersByTimeAsync(10);
+      const result = await pending;
+      expect(result.success).toBe(false);
+      expect(generateObject).toHaveBeenCalledTimes(1);
+      expect(generateObject.mock.calls[0][0].abortSignal.aborted).toBe(true);
+    } finally {
+      aiService.reset();
+      restore();
+      jest.useRealTimers();
+    }
+  });
+
   it('returns default error when primary error has no message', async () => {
     deepseekMock.mockReturnValue({ provider: 'primary' });
 

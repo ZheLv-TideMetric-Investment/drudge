@@ -43,6 +43,17 @@ Graph 只扫描 `futu_live_*.json` 与 `awtmt_live_*.json`，优先处理修改�
 
 当前文件级判定是成功数大于失败数时标记整份文件。失败记录保留原条目和错误证据，默认位于 `data/news/failed/`；单条重试成功后才删除对应失败记录。位点和失败文件都不能当缓存清理。
 
+2026-09-19 起，逐条 AI 抽取每次只尝试一次，SDK 不再隐式重试；千问显式使用
+JSON 输出模式，避免旧 SDK 把已有 JSON 正文误判为“未调用工具”。失败条目进入
+既有失败目录后，自动批处理根据完整新闻 ID 跳过，进程重启也从原失败文件名恢复
+该判断；同一进程内重叠批次的同一新闻共用在途请求。失败记录不会被标记为图谱
+成功，也不清理或自动重放旧记录；既有失败重试 CLI 仍允许显式人工重试。
+
+配置 `GRAPH_AI_FALLBACK_PROVIDER=none` 可明确关闭图谱备用模型（空字符串仍沿用
+共享默认值，因此不能用留空表达禁用）。成功调用及 API 提供的失败用量在 info
+日志记录模型和 Token 数，不记录输入正文；超时会中止在途模型请求。当前生产模型
+与开关以[部署记录](deployment.md)为准。
+
 代码入口：[FileScanner](../packages/graph-worker/src/services/FileScanner.ts)、[NewsProcessor](../packages/graph-worker/src/services/NewsProcessor.ts)、[FailedNewsProcessor](../packages/graph-worker/src/services/FailedNewsProcessor.ts)。改变文件格式或消费规则须说明兼容、重放和迁移影响。
 
 ### 时间与图谱

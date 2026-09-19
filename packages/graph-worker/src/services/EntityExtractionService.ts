@@ -107,9 +107,11 @@ const newsExtractionSchema = z.object({
  * 负责从新闻内容中提取结构化信息
  */
 export class EntityExtractionService {
-  private maxRetries = 5;
-  private retryDelay = 2000;
+  // 一次调用后留档，后续自动扫描不重复尝试；人工重试仍走独立入口。
+  private maxRetries = 1;
   private failedNewsDir = config.dataSource.failedNewsDirectory;
+  private failedNewsIds: Set<string> | undefined;
+  private pendingExtractions = new Map<string, Promise<NewsExtractionResult>>();
 
   constructor() {}
 
@@ -149,6 +151,7 @@ export class EntityExtractionService {
     } catch (error: any) {
       logger.error(`❌ 新闻 ${newsItem.id} 六要素提取异常:`, error);
 
+      this.getFailedNewsIds().add(newsItem.id);
       // 保存失败的新闻数据
       await this.saveFailedNews(newsItem, error);
 
@@ -160,7 +163,7 @@ export class EntityExtractionService {
         await notificationService.sendEntityExtractionFailureNotification(
           newsItem.id,
           detailedError,
-          this.maxRetries // 发送重试次数信息
+          Math.max(0, this.maxRetries - 1)
         );
       } catch (notifyError) {
         logger.error('发送实体提取失败通知失败:', notifyError);
@@ -277,11 +280,25 @@ export class EntityExtractionService {
       );
 
       const batchPromises = batch.map(async newsItem => {
+        if (this.getFailedNewsIds().has(newsItem.id)) {
+          logger.debug(`新闻 ${newsItem.id} 已有失败记录，等待人工重试`);
+          return null;
+        }
+
+        let pending = this.pendingExtractions.get(newsItem.id);
+        if (!pending) {
+          pending = this.extractFromNews(newsItem);
+          this.pendingExtractions.set(newsItem.id, pending);
+        }
         try {
-          return await this.extractFromNews(newsItem);
+          return await pending;
         } catch (error) {
           logger.warn(`新闻 ${newsItem.id} 处理失败，跳过继续处理其他新闻`);
           return null;
+        } finally {
+          if (this.pendingExtractions.get(newsItem.id) === pending) {
+            this.pendingExtractions.delete(newsItem.id);
+          }
         }
       });
 
@@ -300,6 +317,23 @@ export class EntityExtractionService {
     }
 
     return chunkResults;
+  }
+
+  private getFailedNewsIds(): Set<string> {
+    if (this.failedNewsIds) return this.failedNewsIds;
+
+    const ids = new Set<string>();
+    if (fs.existsSync(this.failedNewsDir)) {
+      // 复用既有失败文件命名，不读取新闻正文、不清理历史失败记录。
+      for (const filename of fs.readdirSync(this.failedNewsDir)) {
+        const match = filename.match(
+          /^failed_(.+)_\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z\.json$/
+        );
+        if (match?.[1]) ids.add(match[1]);
+      }
+    }
+    this.failedNewsIds = ids;
+    return ids;
   }
 
   /**
