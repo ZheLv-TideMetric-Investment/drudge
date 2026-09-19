@@ -1,5 +1,5 @@
 // AI SDK imports
-import { generateObject, generateText } from 'ai';
+import { generateObject, generateText, zodSchema } from 'ai';
 import { createDeepSeek } from '@ai-sdk/deepseek';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -10,6 +10,7 @@ import {
   getLLMErrorMessage,
   normalizeLLMUsage,
   parseJsonContent,
+  LocalAiClient,
 } from '@drudge/common';
 import { z } from 'zod';
 import { config } from '../config';
@@ -59,6 +60,7 @@ export class ModelWrapper {
         model: this.rawModel,
         messages: formattedMessages,
         temperature: options.temperature || 0.7,
+        maxRetries: 0,
       });
 
       const usage = normalizeLLMUsage(result.usage);
@@ -131,6 +133,8 @@ export class ModelWrapper {
         messages: formattedMessages,
         schema: schema,
         temperature: options.temperature || 0.7,
+        maxRetries: 0,
+        ...(this.providerName === 'qwen' ? { mode: 'json' as const } : {}),
       });
 
       const usage = normalizeLLMUsage(result.usage);
@@ -549,6 +553,39 @@ class AiService {
   private simpleModel: ModelWrapper | null = null;
   private initialized: boolean = false;
   private mockMode: boolean = false;
+  private localClient: LocalAiClient | null = null;
+
+  private async tryLocal<T>(
+    messages: LLMMessage[],
+    options: LLMCallOptions,
+    json = false,
+    simple = false
+  ) {
+    if (!config.ai.local?.baseUrl) return null;
+    if (config.ai.localOnlySimple && !simple) return null;
+    this.localClient ??= new LocalAiClient(config.ai.local);
+    const result = await this.localClient.call<T>(messages, {
+      temperature: 0,
+      ...(json
+        ? {
+            schema: options.schema ? zodSchema(options.schema).jsonSchema : { type: 'object' },
+            validate: options.schema
+              ? (data: unknown) => options.schema!.safeParse(data).success
+              : undefined,
+          }
+        : {}),
+    });
+    if (result.success) {
+      console.log('✅ ollama 模型调用成功', {
+        provider: 'ollama',
+        model: config.ai.local.model,
+        usage: result.usage,
+      });
+      return result;
+    }
+    console.log('本地模型转云端', { reason: result.reason, usage: result.usage });
+    return null;
+  }
 
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -719,6 +756,8 @@ class AiService {
     options: LLMCallOptions = {}
   ): Promise<LLMResponse<string>> {
     try {
+      const local = await this.tryLocal<string>(messages, options);
+      if (local) return local;
       // 确保AI服务已初始化
       if (!this.initialized) {
         console.log('AI服务未初始化，正在自动初始化...');
@@ -759,6 +798,8 @@ class AiService {
     options: LLMCallOptions = {}
   ): Promise<LLMResponse<T>> {
     try {
+      const local = await this.tryLocal<T>(messages, options, true);
+      if (local) return local;
       // 确保AI服务已初始化
       if (!this.initialized) {
         console.log('AI服务未初始化，正在自动初始化...');
@@ -799,6 +840,8 @@ class AiService {
     options: LLMCallOptions = {}
   ): Promise<LLMResponse<T>> {
     try {
+      const local = await this.tryLocal<T>(messages, options, !!options.schema, true);
+      if (local) return local;
       // 确保AI服务已初始化
       if (!this.initialized) {
         console.log('AI服务未初始化，正在自动初始化...');
@@ -874,10 +917,14 @@ class AiService {
     mockMode: boolean;
   } {
     return {
-      provider: config.ai.provider,
-      model: this.getModelName(),
-      simpleProvider: config.ai.simpleProvider,
-      simpleModel: this.getSimpleModelName(),
+      provider:
+        config.ai.local?.baseUrl && !config.ai.localOnlySimple ? 'ollama' : config.ai.provider,
+      model:
+        config.ai.local?.baseUrl && !config.ai.localOnlySimple
+          ? config.ai.local.model
+          : this.getModelName(),
+      simpleProvider: config.ai.local?.baseUrl ? 'ollama' : config.ai.simpleProvider,
+      simpleModel: config.ai.local?.baseUrl ? config.ai.local.model : this.getSimpleModelName(),
       mockMode: this.mockMode,
     };
   }
@@ -886,6 +933,7 @@ class AiService {
    * 重置AI服务（用于错误恢复）
    */
   reset(): void {
+    this.localClient = null;
     this.initialized = false;
     this.mockMode = false;
     this.model = null;

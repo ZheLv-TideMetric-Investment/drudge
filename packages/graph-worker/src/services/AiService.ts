@@ -1,4 +1,4 @@
-import { generateObject } from 'ai';
+import { generateObject, zodSchema } from 'ai';
 import { createDeepSeek } from '@ai-sdk/deepseek';
 import { google } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -13,6 +13,7 @@ import {
   getLLMErrorMessage,
   normalizeLLMUsage,
   parseJsonContent,
+  LocalAiClient,
 } from '@drudge/common';
 
 /**
@@ -25,6 +26,7 @@ export class AiService {
   private currentProvider: string = '';
   private fallbackProvider: string = '';
   private initialized: boolean = false;
+  private localClient = new LocalAiClient(config.ai.local);
 
   async initialize(): Promise<void> {
     if (this.initialized) {
@@ -140,6 +142,25 @@ export class AiService {
     messages: LLMMessage[],
     options: LLMCallOptions = {}
   ): Promise<LLMResponse<T>> {
+    const local = config.ai.local?.baseUrl
+      ? await this.localClient.call<T>(messages, {
+          temperature: 0,
+          schema: options.schema ? zodSchema(options.schema).jsonSchema : { type: 'object' },
+          validate: options.schema ? data => options.schema!.safeParse(data).success : undefined,
+        })
+      : { success: false as const, reason: 'disabled', usage: undefined };
+    if (local.success) {
+      logger.info('LLM JSON响应成功 (ollama):', {
+        provider: 'ollama',
+        model: config.ai.local.model,
+        usage: local.usage,
+      });
+      return local;
+    }
+    if (local.reason !== 'disabled') {
+      logger.info('本地模型转云端', { reason: local.reason, usage: local.usage });
+    }
+
     // 确保AI服务已初始化
     if (!this.initialized) {
       logger.info('AI服务未初始化，正在自动初始化...');
@@ -459,6 +480,7 @@ export class AiService {
    * 重置AI服务（用于错误恢复）
    */
   reset(): void {
+    this.localClient = new LocalAiClient(config.ai.local);
     this.initialized = false;
     this.model = null;
     this.fallbackModel = null;
@@ -471,6 +493,9 @@ export class AiService {
    * 获取当前使用的provider信息
    */
   getProviderInfo(): { current: string; fallback: string; hasFallback: boolean } {
+    if (config.ai.local?.baseUrl) {
+      return { current: 'ollama', fallback: config.ai.provider, hasFallback: true };
+    }
     return {
       current: this.currentProvider,
       fallback: this.fallbackProvider,

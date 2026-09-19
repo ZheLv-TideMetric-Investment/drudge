@@ -3,6 +3,7 @@ const generateObject = jest.fn();
 const createOpenAI = jest.fn(() => jest.fn((model: string) => ({ provider: 'openai', model })));
 
 jest.mock('ai', () => ({
+  zodSchema: (...args: any[]) => jest.requireActual('ai').zodSchema(...args),
   generateText: (...args: any[]) => generateText(...args),
   generateObject: (...args: any[]) => generateObject(...args)
 }));
@@ -28,6 +29,8 @@ const restoreConfig = (snapshot: typeof config.ai) => {
   config.ai.google = { ...snapshot.google };
   config.ai.qwen = { ...snapshot.qwen };
   config.ai.xai = { ...snapshot.xai };
+  config.ai.local = { ...snapshot.local };
+  config.ai.localOnlySimple = snapshot.localOnlySimple;
 };
 
 describe('llm utils', () => {
@@ -46,6 +49,41 @@ describe('llm utils', () => {
 
   afterAll(() => {
     restoreConfig(originalConfig);
+  });
+
+  it('uses local summarization first and uses cloud once after manual stop', async () => {
+    config.ai.local = { baseUrl: 'http://local.invalid', model: 'qwen3.5:9b', contextLength: 16384, timeoutMs: 5000 };
+    config.ai.localOnlySimple = false;
+    config.ai.provider = 'qwen';
+    config.ai.simpleProvider = 'qwen';
+    config.ai.qwen = { apiKey: 'test-key', model: 'qwen3.7-flash' };
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ models: [{ name: 'qwen3.5:9b' }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ done: true, done_reason: 'stop', message: { content: '本地摘要' } }) })
+      .mockRejectedValueOnce(new Error('manually stopped'));
+    global.fetch = fetchMock;
+    expect(await callSimpleAIText('总结以下新闻', '合成新闻')).toMatchObject({ success: true, data: '本地摘要' });
+    expect(generateText).not.toHaveBeenCalled();
+    generateText.mockResolvedValue({ text: '云端摘要' });
+    expect(await aiService.callLLM([{ role: 'user', content: '合成新闻' }])).toMatchObject({ data: '云端摘要', success: true });
+    expect(generateText).toHaveBeenCalledTimes(1);
+    expect(generateText.mock.calls[0][0]).toMatchObject({ maxRetries: 0 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps final summaries in the cloud when only local historical summaries are qualified', async () => {
+    config.ai.local = { baseUrl: 'http://local.invalid', model: 'qwen3.5:9b', contextLength: 16384, timeoutMs: 5000 };
+    config.ai.localOnlySimple = true;
+    config.ai.provider = 'qwen';
+    config.ai.simpleProvider = 'qwen';
+    config.ai.qwen = { apiKey: 'test-key', model: 'qwen3.7-flash' };
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock;
+    generateText.mockResolvedValue({ text: '完整的云端最终简报' });
+    expect(await aiService.callLLM([{ role: 'user', content: '合成新闻' }])).toMatchObject({ data: '完整的云端最终简报' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(generateText).toHaveBeenCalledTimes(1);
+    expect(aiService.getProviderInfo()).toMatchObject({ provider: 'qwen', simpleProvider: 'ollama' });
   });
 
   it('returns mock responses in mock mode', async () => {

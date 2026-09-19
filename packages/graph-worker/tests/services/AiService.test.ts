@@ -19,7 +19,8 @@ const emptyEnvPath = path.join(os.tmpdir(), `drudge-ai-empty-env-${process.pid}`
 
 jest.mock('ai', () => ({
   __esModule: true,
-  generateObject
+  generateObject,
+  zodSchema: (...args: any[]) => jest.requireActual('ai').zodSchema(...args),
 }));
 
 jest.mock('@ai-sdk/deepseek', () => ({
@@ -53,6 +54,28 @@ const loadService = async (vars: Record<string, string | undefined>) => {
 };
 
 describe('AiService', () => {
+  it('uses local structured extraction and calls cloud once when local is stopped', async () => {
+    createOpenAIMock.mockImplementation(() => jest.fn(() => ({ provider: 'qwen' })));
+    const { aiService, restore } = await loadService({
+      LOCAL_AI_BASE_URL: 'http://local.invalid',
+      AI_PROVIDER: 'qwen', GRAPH_AI_FALLBACK_PROVIDER: 'none', QWEN_API_KEY: 'test-key',
+    });
+    const schema = z.object({ ok: z.boolean() });
+    const fetchMock = jest.fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ models: [{ name: 'qwen3.5:9b' }] }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ done: true, done_reason: 'stop', message: { content: '{"ok":true}' } }) })
+      .mockRejectedValueOnce(new Error('manually stopped'));
+    global.fetch = fetchMock;
+    try {
+      expect(await aiService.callLLMWithJsonResponse([{ role: 'user', content: 'synthetic' }], { schema })).toMatchObject({ success: true, data: { ok: true } });
+      expect(generateObject).not.toHaveBeenCalled();
+      generateObject.mockResolvedValue({ object: { ok: true } });
+      expect(await aiService.callLLMWithJsonResponse([{ role: 'user', content: 'synthetic' }], { schema })).toMatchObject({ success: true });
+      expect(generateObject).toHaveBeenCalledTimes(1);
+      expect(generateObject.mock.calls[0][0]).toMatchObject({ maxRetries: 0, mode: 'json' });
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+    } finally { aiService.reset(); restore(); }
+  });
   beforeAll(() => {
     fs.writeFileSync(emptyEnvPath, '');
   });

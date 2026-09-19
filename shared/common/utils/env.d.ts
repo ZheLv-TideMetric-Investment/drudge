@@ -1,4 +1,5 @@
 export type EnvRecord = Record<string, string | undefined>;
+import type { LocalAiConfig } from './local-ai';
 
 export type DotenvOptions = {
   env?: EnvRecord;
@@ -56,6 +57,7 @@ export type GraphConfig = {
   ai: {
     provider: string;
     fallbackProvider: string;
+    local: LocalAiConfig;
     deepseek: { apiKey: string; model: string };
     google: { apiKey: string; model: string };
     qwen: { apiKey: string; model: string };
@@ -109,6 +111,8 @@ export type WebConfig = {
   ai: {
     provider: string;
     simpleProvider: string;
+    local: LocalAiConfig;
+    localOnlySimple: boolean;
     deepseek: { model: string; apiKey: string };
     google: { model: string; apiKey: string };
     qwen: { model: string; apiKey: string };

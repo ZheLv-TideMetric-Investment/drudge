@@ -342,14 +342,16 @@ async function summarizeHistoricalNewsByEntities(
           })
           .join('\n');
 
-        const systemPrompt = `你是一个专业的金融新闻分析师。请对以下与${entityName}(${entityTypeName})相关的历史新闻进行简洁总结：
+        const systemPrompt = `请只压缩以下与${entityName}(${entityTypeName})相关的历史新闻事实，不做分析或预测：
 
 要求：
 - 用中文回答
-- 突出关键发展脉络和趋势变化
-- 篇幅控制在50字以内
+- 按时间说明已经发生的关键变化，保留否认、拟议、未确认、尚未完成等原有限定
+- 不补写原因、结果或影响；流程尚未完成不能写成审批失败，否认传闻不能写成交易成立
+- 不添加“显示”“意味着”“消除不确定性”等输入没有的结论
+- 尽量50字以内；必要时略长以保留事实含义
 - 格式：关键动态描述，不需要提及实体名称
-- 如果信息重复或不重要，可以总结为趋势性描述`;
+- 重复信息可合并，信息不足时只复述已知事实`;
 
         const userPrompt = `${entityName}相关历史新闻：\n\n${historicalContent}`;
 

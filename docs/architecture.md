@@ -54,6 +54,35 @@ JSON 输出模式，避免旧 SDK 把已有 JSON 正文误判为“未调用工�
 日志记录模型和 Token 数，不记录输入正文；超时会中止在途模型请求。当前生产模型
 与开关以[部署记录](deployment.md)为准。
 
+### 本地优先与云端切换
+
+2026-09-19 用户要求优先使用 Windows 已部署的 Ollama `qwen3.5:9b`，质量合格后启用。
+设置 `LOCAL_AI_BASE_URL` 后支持本地优先；留空维持云端。可用
+`GRAPH_LOCAL_AI_*` / `WEB_LOCAL_AI_*` 分别覆盖。Web 默认
+`WEB_LOCAL_AI_ONLY_SIMPLE=true`，只让简单任务（当前为实体历史摘要）使用本地，
+最终 Markdown 仍用云端；只有对应质量验证通过后才应关闭此限制。现有
+`AI_PROVIDER`、`WEB_AI_PROVIDER`、`SIMPLE_AI_PROVIDER` 继续指定云端模型。
+
+业务代码只请求 `/api/tags` 与 `/api/chat`，不执行 SSH、桌面启动脚本、WSL 或服务
+启动命令。桌面手动停止使模型服务不可用，后续任务转云端；不会为了处理新闻把服务
+重新拉起。用户再次手动启动后，下一次可用性检查恢复本地，离线检查有 5 秒冷却。
+空闲卸载只卸载权重，服务仍可接受推理，和手动停止有不同含义。
+
+本地请求每个应用进程串行，非思考、温度 0，默认 16K 上下文、输出最多 2048 Token。
+用 UTF-8 输入字节数保守预留输出及模板空间，过长的完整输入直接交给云端；本地
+超时、模型缺失、JSON 不符合 schema 或输出不完整也转云端。本地一次、云端一次，
+SDK 不隐式重试；图谱其他备用仍应保持 `GRAPH_AI_FALLBACK_PROVIDER=none`。
+日志分别记录模型、Token 和转云原因，不记录新闻正文。
+
+当前质量结论：9B 的历史摘要在收紧“只复述事实、不补写因果”的提示词后，三组
+合成时间线保留了否认、未完成审批、未实施计划和数字更正。复杂图谱抽取与最终
+Markdown 复测仍出现未确认关系、分级偏差、虚构或错放历史等问题，尚未合格。
+因此本轮候选只设置 `WEB_LOCAL_AI_BASE_URL`；全局及 Graph 本地地址留空，最终
+汇总继续云端。不能把路由测试或 JSON 合法率当作图谱与最终简报质量验收。
+
+Windows 模型的安装、空闲时间、手动启停与网络权限由 IH 的 `home-llm/README.md`
+维护。Drudge 不依赖操作用的 Mac 常驻转发；生产配置与网络生效状态见部署手册。
+
 代码入口：[FileScanner](../packages/graph-worker/src/services/FileScanner.ts)、[NewsProcessor](../packages/graph-worker/src/services/NewsProcessor.ts)、[FailedNewsProcessor](../packages/graph-worker/src/services/FailedNewsProcessor.ts)。改变文件格式或消费规则须说明兼容、重放和迁移影响。
 
 ### 时间与图谱

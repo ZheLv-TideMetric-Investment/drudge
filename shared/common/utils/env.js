@@ -156,6 +156,13 @@ const buildIngestConfig = (options = {}) => {
   };
 };
 
+const buildLocalAiConfig = (env, scope) => ({
+  baseUrl: readString(env, `${scope}_LOCAL_AI_BASE_URL`, readString(env, 'LOCAL_AI_BASE_URL', '')),
+  model: readString(env, `${scope}_LOCAL_AI_MODEL`, readString(env, 'LOCAL_AI_MODEL', 'qwen3.5:9b')),
+  contextLength: Math.max(4096, readInt(env, `${scope}_LOCAL_AI_CONTEXT_LENGTH`, readInt(env, 'LOCAL_AI_CONTEXT_LENGTH', 16384))),
+  timeoutMs: Math.max(2000, readInt(env, `${scope}_LOCAL_AI_TIMEOUT_MS`, readInt(env, 'LOCAL_AI_TIMEOUT_MS', 120000))),
+});
+
 const buildGraphConfig = (options = {}) => {
   const { env = process.env, baseDir = process.cwd(), loadEnv = true } = options;
 
@@ -185,6 +192,7 @@ const buildGraphConfig = (options = {}) => {
     },
     ai: {
       provider: readString(env, 'GRAPH_AI_PROVIDER', readString(env, 'AI_PROVIDER', 'qwen')),
+      local: buildLocalAiConfig(env, 'GRAPH'),
       fallbackProvider: fallbackProvider.toLowerCase() === 'none' ? '' : fallbackProvider,
       deepseek: {
         apiKey: readString(env, 'GRAPH_DEEPSEEK_API_KEY', readString(env, 'DEEPSEEK_API_KEY', '')),
@@ -278,6 +286,8 @@ const buildWebConfig = (options = {}) => {
     },
     ai: {
       provider: readString(env, 'WEB_AI_PROVIDER', readString(env, 'AI_PROVIDER', 'deepseek')),
+      local: buildLocalAiConfig(env, 'WEB'),
+      localOnlySimple: readBoolean(env, 'WEB_LOCAL_AI_ONLY_SIMPLE', true),
       simpleProvider: readString(
         env,
         'WEB_SIMPLE_AI_PROVIDER',
